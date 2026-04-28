@@ -67,9 +67,7 @@
     .toast.error .material-icons-round{color:var(--c-danger);}
     .toast.info .material-icons-round{color:var(--c-info);}
     @keyframes toast-in{from{opacity:0;transform:translateX(20px) scale(0.96);}to{opacity:1;transform:translateX(0) scale(1);}}
-    #login-screen{position:fixed;inset:0;background:var(--c-bg);z-index:500;display:flex;align-items:center;justify-content:center;}
-    #login-screen.hidden{animation:fade-out 0.3s ease forwards;pointer-events:none;}
-    @keyframes fade-out{to{opacity:0;transform:scale(0.98);}}
+    #login-overlay{position:fixed;inset:0;background:var(--c-bg);z-index:500;display:flex;align-items:center;justify-content:center;}
     @media(max-width:768px){
       :root{--sidebar-w:0px;}
       #app{grid-template-columns:1fr;grid-template-areas:"header" "main";}
@@ -81,13 +79,15 @@
 </head>
 <body>
 
-<div id="login-screen">
+<!-- Tela de login / loading inicial -->
+<div id="login-overlay">
   <div class="state-loading">
     <div class="spinner"></div>
     <p>Carregando…</p>
   </div>
 </div>
 
+<!-- Shell principal (oculto até autenticar) -->
 <div id="app" style="display:none;">
   <aside id="sidebar">
     <div class="sidebar-brand">
@@ -107,14 +107,14 @@
           <div class="user-name" id="user-name">—</div>
           <div class="user-role" id="user-role">—</div>
         </div>
-        <button class="btn-logout" id="btn-logout" title="Sair do sistema">
+        <button class="btn-logout" id="btn-logout" title="Sair">
           <span class="material-icons-round">logout</span>
         </button>
       </div>
     </div>
   </aside>
   <header id="header">
-    <button id="btn-menu-mobile" style="display:none;margin-right:8px;" aria-label="Abrir menu">
+    <button id="btn-menu-mobile" style="display:none;margin-right:8px;">
       <span class="material-icons-round" style="font-size:22px;color:var(--c-text-2);">menu</span>
     </button>
     <h1 class="header-title" id="header-title">Início</h1>
@@ -127,34 +127,53 @@
 
 <div id="toast-container"></div>
 
+<!-- Carrega os módulos JS -->
+<script src="auth.js"></script>
+<script src="api.js"></script>
+
 <script>
 // =========================================================
 // ESTADO GLOBAL
 // =========================================================
-var App = { token: null, usuario: null, semestre: null, modulo: null, config: null };
+var App = { usuario: null, semestre: null, modulo: null, config: null };
 
 // =========================================================
-// COMUNICAÇÃO COM O BACK-END
-// Usa exclusivamente google.script.run.
-// O token é passado explicitamente em cada chamada.
+// MAPA DE MÓDULOS
+// Cada chave aponta para o arquivo HTML correspondente
+// na mesma pasta do repositório.
 // =========================================================
-function postApi(acao, dados, tokenOverride) {
-  return new Promise(function(resolve, reject) {
-    var token = tokenOverride !== undefined ? tokenOverride : App.token;
-    google.script.run
-      .withSuccessHandler(resolve)
-      .withFailureHandler(reject)
-      .processarRequisicao(JSON.stringify({ acao: acao, token: token, dados: dados || {} }));
-  });
+var MODULOS = {
+  dashboard:  'modulos/dashboard.html',
+  usuarios:   'modulos/f3-usuarios.html',
+  alunos:     'modulos/f4-alunos.html',
+  cursos:     'modulos/f9-cursos.html',
+  turmas:     'modulos/f5-turmas.html',
+  matriculas: 'modulos/f5-matriculas.html',
+  diario:     'modulos/f6-diario.html',
+  notas:      'modulos/f7-notas.html',
+  relatorios: 'modulos/f8-relatorios.html',
+  config:     'modulos/f-config.html',
+};
+
+// =========================================================
+// CARREGAMENTO DE MÓDULO
+// Usa fetch para buscar o arquivo HTML local (sem Apps Script)
+// e injeta no #main. Reexecuta os <script> do fragmento.
+// =========================================================
+function carregarModulo(path) {
+  return fetch(path + '?v=' + Date.now())
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    });
 }
 
-// =========================================================
-// Re-executa <script> de fragmentos injetados via innerHTML
-// =========================================================
 function executarScripts(container) {
   container.querySelectorAll('script').forEach(function(original) {
     var novo = document.createElement('script');
-    Array.from(original.attributes).forEach(function(attr) { novo.setAttribute(attr.name, attr.value); });
+    Array.from(original.attributes).forEach(function(attr) {
+      novo.setAttribute(attr.name, attr.value);
+    });
     novo.textContent = original.textContent;
     original.parentNode.replaceChild(novo, original);
   });
@@ -162,80 +181,60 @@ function executarScripts(container) {
 
 // =========================================================
 // INICIALIZAÇÃO
-// Verifica sessão salva no servidor (via getSessaoAtiva),
-// que é mais confiável que sessionStorage entre iframes.
 // =========================================================
 function init() {
-  // Tenta primeiro via getSessaoAtiva (não depende de storage entre iframes)
-  google.script.run
-    .withSuccessHandler(function(sessao) {
-      if (sessao && sessao.token) {
-        App.token   = sessao.token;
-        App.usuario = sessao.usuario;
+  // Verifica sessão salva no localStorage
+  if (!Auth.temSessao()) {
+    carregarLogin();
+    return;
+  }
+
+  // Valida token com o servidor
+  postApi('auth.verificarSessao', {})
+    .then(function(res) {
+      if (res.sucesso && res.dados) {
+        App.usuario = res.dados;
         carregarShell();
       } else {
-        // Fallback: tenta sessionStorage
-        var tokenSalvo  = null;
-        var usuarioJson = null;
-        try { tokenSalvo = sessionStorage.getItem('sge_token'); } catch(e) {}
-        try { usuarioJson = sessionStorage.getItem('sge_usuario'); } catch(e) {}
-
-        if (tokenSalvo && usuarioJson) {
-          // Valida o token no servidor antes de usar
-          postApi('auth.verificarSessao', {}, tokenSalvo)
-            .then(function(res) {
-              if (res.sucesso) {
-                App.token   = tokenSalvo;
-                App.usuario = JSON.parse(usuarioJson);
-                carregarShell();
-              } else {
-                carregarLogin();
-              }
-            })
-            .catch(function() { carregarLogin(); });
-        } else {
-          carregarLogin();
-        }
+        Auth.limpar();
+        carregarLogin();
       }
     })
-    .withFailureHandler(function() {
-      carregarLogin();
-    })
-    .getSessaoAtiva();
+    .catch(function() {
+      // Sem conexão — tenta usar dados locais
+      var usuario = Auth.getUsuario();
+      if (usuario) {
+        App.usuario = usuario;
+        carregarShell();
+      } else {
+        carregarLogin();
+      }
+    });
 }
 
 // =========================================================
 // LOGIN
 // =========================================================
 function carregarLogin() {
-  google.script.run
-    .withSuccessHandler(function(html) {
-      var tela = document.getElementById('login-screen');
-      tela.innerHTML = html;
-      executarScripts(tela);
+  fetch('modulos/f2-login.html?v=' + Date.now())
+    .then(function(r) { return r.text(); })
+    .then(function(html) {
+      var overlay = document.getElementById('login-overlay');
+      overlay.innerHTML = html;
+      executarScripts(overlay);
     })
-    .withFailureHandler(function() {
-      document.getElementById('login-screen').innerHTML =
-        '<p style="color:#E63946;text-align:center;padding:40px;font-family:sans-serif;">Erro ao carregar o login. Recarregue a página.</p>';
-    })
-    .getModuloHtml('F2_Login');
+    .catch(function() {
+      document.getElementById('login-overlay').innerHTML =
+        '<p style="color:#E63946;padding:40px;font-family:sans-serif;text-align:center;">' +
+        'Erro ao carregar o login. Verifique sua conexão.</p>';
+    });
 }
 
-// Chamada pelo F2 após login bem-sucedido
+// Chamada pelo módulo de login após autenticação bem-sucedida
 function onLoginSucesso(token, usuario) {
-  App.token   = token;
+  Auth.salvar(token, usuario);
   App.usuario = usuario;
-
-  // Salva no sessionStorage como fallback
-  try {
-    sessionStorage.setItem('sge_token',   token);
-    sessionStorage.setItem('sge_usuario', JSON.stringify(usuario));
-  } catch(e) {}
-
-  var tela = document.getElementById('login-screen');
-  tela.classList.add('hidden');
-  setTimeout(function() { tela.style.display = 'none'; }, 320);
-
+  document.getElementById('login-overlay').style.display = 'none';
   carregarShell();
 }
 
@@ -275,7 +274,8 @@ function carregarShell() {
 function preencherUsuarioSidebar() {
   var u = App.usuario;
   if (!u) return;
-  var iniciais = (u.Nome || '').split(' ').filter(Boolean).slice(0,2).map(function(p){return p[0];}).join('').toUpperCase();
+  var iniciais = (u.Nome || '').split(' ').filter(Boolean).slice(0,2)
+    .map(function(p){return p[0];}).join('').toUpperCase();
   document.getElementById('user-avatar').textContent = iniciais || '?';
   document.getElementById('user-name').textContent   = u.Nome  || '—';
   document.getElementById('user-role').textContent   = u.Papel || '—';
@@ -292,8 +292,13 @@ function normalizarMenu(itens) {
   var diarioAdicionado = false;
   itens.forEach(function(item) {
     if (item.id === 'frequencia' || item.id === 'conteudo') {
-      if (!diarioAdicionado) { resultado.push({ id: 'diario', label: 'Diário de aula', icone: 'menu_book' }); diarioAdicionado = true; }
-    } else { resultado.push(item); }
+      if (!diarioAdicionado) {
+        resultado.push({ id: 'diario', label: 'Diário de aula', icone: 'menu_book' });
+        diarioAdicionado = true;
+      }
+    } else {
+      resultado.push(item);
+    }
   });
   return resultado;
 }
@@ -303,23 +308,22 @@ function renderizarMenuFallback() {
   var itens = [{ id: 'dashboard', label: 'Início', icone: 'home' }];
   if (papel === 'admin' || papel === 'coordenacao') {
     itens.push(
-      { id: 'usuarios',   label: 'Usuários',      icone: 'people'      },
-      { id: 'alunos',     label: 'Alunos',         icone: 'school'      },
-      { id: 'cursos',     label: 'Cursos',         icone: 'auto_stories'},
-      { id: 'turmas',     label: 'Turmas',         icone: 'groups'      },
-      { id: 'matriculas', label: 'Matrículas',     icone: 'assignment'  },
-      { id: 'diario',     label: 'Diário de aula', icone: 'menu_book'   },
-      { id: 'notas',      label: 'Notas',          icone: 'grade'       },
-      { id: 'relatorios', label: 'Relatórios',     icone: 'summarize'   },
-      { id: 'config',     label: 'Configurações',  icone: 'settings'    }
+      { id: 'usuarios',   label: 'Usuários',      icone: 'people'       },
+      { id: 'alunos',     label: 'Alunos',         icone: 'school'       },
+      { id: 'cursos',     label: 'Cursos',         icone: 'auto_stories' },
+      { id: 'turmas',     label: 'Turmas',         icone: 'groups'       },
+      { id: 'matriculas', label: 'Matrículas',     icone: 'assignment'   },
+      { id: 'diario',     label: 'Diário de aula', icone: 'menu_book'    },
+      { id: 'notas',      label: 'Notas',          icone: 'grade'        },
+      { id: 'relatorios', label: 'Relatórios',     icone: 'summarize'    },
+      { id: 'config',     label: 'Configurações',  icone: 'settings'     }
     );
   } else if (papel === 'professor') {
     itens.push(
-      { id: 'alunos',     label: 'Alunos',         icone: 'school'      },
-      { id: 'turmas',     label: 'Turmas',         icone: 'groups'      },
-    //  { id: 'matriculas', label: 'Matrículas',     icone: 'assignment'  },
-      { id: 'diario',     label: 'Diário de aula', icone: 'menu_book'   },
-      { id: 'notas',      label: 'Notas',          icone: 'grade'       }
+      { id: 'alunos',  label: 'Alunos',         icone: 'school'    },
+      { id: 'turmas',  label: 'Turmas',         icone: 'groups'    },
+      { id: 'diario',  label: 'Diário de aula', icone: 'menu_book' },
+      { id: 'notas',   label: 'Notas',          icone: 'grade'     }
     );
   } else if (papel === 'secretaria') {
     itens.push(
@@ -342,7 +346,9 @@ function renderizarMenu(itens) {
     var li = document.createElement('li');
     li.className = 'nav-item';
     li.dataset.id = item.id;
-    li.innerHTML = '<span class="material-icons-round">' + (item.icone || 'circle') + '</span><span>' + item.label + '</span>';
+    li.innerHTML =
+      '<span class="material-icons-round">' + (item.icone || 'circle') + '</span>' +
+      '<span>' + item.label + '</span>';
     li.addEventListener('click', function() { navegarPara(item.id, item.label); });
     nav.appendChild(li);
   });
@@ -351,19 +357,6 @@ function renderizarMenu(itens) {
 // =========================================================
 // NAVEGAÇÃO
 // =========================================================
-var mapaArquivos = {
-  dashboard:  'F_Dashboard',
-  usuarios:   'F3_Usuarios',
-  alunos:     'F4_Alunos',
-  cursos:     'F9_Cursos',
-  turmas:     'F5_Turmas',
-  matriculas: 'F5_Matriculas',
-  diario:     'F6_DiarioAula',
-  notas:      'F7_Notas',
-  relatorios: 'F8_Relatorios',
-  config:     'F_Config',
-};
-
 function navegarPara(moduloId, titulo) {
   if (App.modulo === moduloId) return;
   App.modulo = moduloId;
@@ -376,21 +369,26 @@ function navegarPara(moduloId, titulo) {
   var main = document.getElementById('main');
   main.innerHTML = '<div class="state-loading"><div class="spinner"></div><p>Carregando…</p></div>';
 
-  var nomeArquivo = mapaArquivos[moduloId];
-  if (!nomeArquivo) {
-    main.innerHTML = '<div class="state-error"><span class="material-icons-round" style="font-size:36px;">construction</span><p>Módulo em construção.</p></div>';
+  var path = MODULOS[moduloId];
+  if (!path) {
+    main.innerHTML =
+      '<div class="state-error">' +
+      '<span class="material-icons-round" style="font-size:36px;">construction</span>' +
+      '<p>Módulo em construção.</p></div>';
     return;
   }
 
-  google.script.run
-    .withSuccessHandler(function(html) {
+  carregarModulo(path)
+    .then(function(html) {
       main.innerHTML = html;
       executarScripts(main);
     })
-    .withFailureHandler(function() {
-      main.innerHTML = '<div class="state-error"><span class="material-icons-round" style="font-size:36px;">error_outline</span><p>Erro ao carregar o módulo.</p></div>';
-    })
-    .getModuloHtml(nomeArquivo);
+    .catch(function() {
+      main.innerHTML =
+        '<div class="state-error">' +
+        '<span class="material-icons-round" style="font-size:36px;">error_outline</span>' +
+        '<p>Erro ao carregar o módulo.</p></div>';
+    });
 }
 
 // =========================================================
@@ -400,13 +398,9 @@ document.getElementById('btn-logout').addEventListener('click', function() {
   postApi('auth.logout', {})
     .catch(function() {})
     .then(function() {
-      try {
-        sessionStorage.clear();
-        localStorage.clear();
-      } catch(e) {}
-      App.token = null;
+      Auth.limpar();
       App.usuario = null;
-      // Força reload sem cache
+      App.modulo  = null;
       window.location.href = window.location.href.split('?')[0] + '?t=' + Date.now();
     });
 });
@@ -415,14 +409,19 @@ document.getElementById('btn-logout').addEventListener('click', function() {
 // TOAST
 // =========================================================
 function toast(mensagem, tipo, duracao) {
-  tipo = tipo || 'default'; duracao = duracao || 3500;
+  tipo    = tipo    || 'default';
+  duracao = duracao || 3500;
   var iconMap = { success:'check_circle', error:'error', info:'info', default:'notifications' };
   var el = document.createElement('div');
   el.className = 'toast ' + tipo;
-  el.innerHTML = '<span class="material-icons-round">' + (iconMap[tipo] || 'notifications') + '</span><span>' + mensagem + '</span>';
+  el.innerHTML =
+    '<span class="material-icons-round">' + (iconMap[tipo] || 'notifications') + '</span>' +
+    '<span>' + mensagem + '</span>';
   document.getElementById('toast-container').appendChild(el);
   setTimeout(function() {
-    el.style.transition = '0.25s ease'; el.style.opacity = '0'; el.style.transform = 'translateX(12px)';
+    el.style.transition  = '0.25s ease';
+    el.style.opacity     = '0';
+    el.style.transform   = 'translateX(12px)';
     setTimeout(function() { el.remove(); }, 260);
   }, duracao);
 }
@@ -431,19 +430,25 @@ function toast(mensagem, tipo, duracao) {
 // MOBILE
 // =========================================================
 var btnMenuMobile = document.getElementById('btn-menu-mobile');
-btnMenuMobile.addEventListener('click', function() { document.getElementById('sidebar').classList.toggle('open'); });
+btnMenuMobile.addEventListener('click', function() {
+  document.getElementById('sidebar').classList.toggle('open');
+});
 document.addEventListener('click', function(e) {
   var sidebar = document.getElementById('sidebar');
-  if (sidebar.classList.contains('open') && !sidebar.contains(e.target) && !btnMenuMobile.contains(e.target)) {
+  if (sidebar.classList.contains('open') &&
+      !sidebar.contains(e.target) &&
+      !btnMenuMobile.contains(e.target)) {
     sidebar.classList.remove('open');
   }
 });
-function ajustarResponsivo() { btnMenuMobile.style.display = window.innerWidth <= 768 ? 'flex' : 'none'; }
+function ajustarResponsivo() {
+  btnMenuMobile.style.display = window.innerWidth <= 768 ? 'flex' : 'none';
+}
 window.addEventListener('resize', ajustarResponsivo);
 ajustarResponsivo();
 
 // =========================================================
-// INICIA — usa getSessaoAtiva() como fonte primária de token
+// INICIA
 // =========================================================
 init();
 </script>
