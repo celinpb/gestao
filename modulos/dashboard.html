@@ -1,0 +1,284 @@
+<!--
+  F_Dashboard.html
+  Tela inicial exibida após o login. Mostra um resumo do sistema
+  e atalhos rápidos para os módulos disponíveis ao papel do usuário.
+-->
+
+<style>
+  .dash-boas-vindas {
+    margin-bottom: 28px;
+  }
+
+  .dash-boas-vindas h2 {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--c-text-1, #1A1A2E);
+    margin-bottom: 4px;
+  }
+
+  .dash-boas-vindas p {
+    font-size: 14px;
+    color: var(--c-text-2, #5C5C7A);
+  }
+
+  .dash-semestre-banner {
+    background: #1A1A2E;
+    border-radius: 12px;
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .dash-semestre-info { flex: 1; }
+
+  .dash-semestre-label {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.40);
+    margin-bottom: 4px;
+  }
+
+  .dash-semestre-valor {
+    font-size: 20px;
+    font-weight: 600;
+    color: #FFFFFF;
+    font-family: var(--font-mono, monospace);
+    letter-spacing: 0.5px;
+  }
+
+  .dash-semestre-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(42,157,143,0.20);
+    color: #5DCAA5;
+    border: 1px solid rgba(42,157,143,0.30);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 11.5px;
+    font-weight: 500;
+  }
+
+  .dash-semestre-status .material-icons-round { font-size: 13px; }
+
+  /* Cards de atalho */
+  .dash-atalhos-titulo {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--c-text-3, #9898B0);
+    margin-bottom: 14px;
+  }
+
+  .dash-atalhos {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 32px;
+  }
+
+  .dash-card {
+    background: #FFFFFF;
+    border: 1px solid var(--c-border, #E8E7E2);
+    border-radius: 12px;
+    padding: 20px;
+    cursor: pointer;
+    transition: box-shadow 180ms ease, transform 180ms ease, border-color 180ms ease;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .dash-card:hover {
+    box-shadow: 0 4px 16px rgba(26,26,46,0.10);
+    transform: translateY(-2px);
+    border-color: #D0CFC9;
+  }
+
+  .dash-card-icone {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(230,57,70,0.08);
+    color: #E63946;
+  }
+
+  .dash-card-icone .material-icons-round { font-size: 20px; }
+
+  .dash-card-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--c-text-1, #1A1A2E);
+  }
+
+  .dash-card-desc {
+    font-size: 12px;
+    color: var(--c-text-3, #9898B0);
+    line-height: 1.4;
+  }
+
+  /* Informações do sistema */
+  .dash-info-sistema {
+    background: #F8F7F3;
+    border: 1px solid var(--c-border, #E8E7E2);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--c-text-2, #5C5C7A);
+  }
+
+  .dash-info-sistema .material-icons-round {
+    font-size: 18px;
+    color: var(--c-text-3, #9898B0);
+    flex-shrink: 0;
+  }
+
+  .dash-info-sistema strong {
+    color: var(--c-text-1, #1A1A2E);
+    font-weight: 500;
+  }
+</style>
+
+<div class="dash-boas-vindas">
+  <h2 id="dash-titulo">Olá!</h2>
+  <p id="dash-subtitulo">Bem-vindo ao Sistema de Gestão Escolar do CELINPB.</p>
+</div>
+
+<!-- Banner do semestre -->
+<div class="dash-semestre-banner">
+  <div class="dash-semestre-info">
+    <div class="dash-semestre-label">Semestre em curso</div>
+    <div class="dash-semestre-valor" id="dash-semestre">—</div>
+  </div>
+  <div class="dash-semestre-status" id="dash-status-semestre">
+    <span class="material-icons-round">check_circle</span>
+    <span>Ativo</span>
+  </div>
+</div>
+
+<!-- Atalhos -->
+<div class="dash-atalhos-titulo">Acesso rápido</div>
+<div class="dash-atalhos" id="dash-atalhos">
+  <!-- Preenchido pelo script abaixo -->
+</div>
+
+<!-- Info do sistema -->
+<div class="dash-info-sistema">
+  <span class="material-icons-round">info</span>
+  <span>SGE · CELINPB &nbsp;|&nbsp; Versão <strong id="dash-versao">1.0.0</strong> &nbsp;|&nbsp;
+  Em caso de dúvidas ou problemas, contate o administrador do sistema.</span>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // Mapa de atalhos por papel
+  var ATALHOS = {
+    admin: [
+      { id: 'usuarios',   label: 'Usuários',    desc: 'Gerenciar usuários do sistema',  icone: 'people'     },
+      { id: 'alunos',     label: 'Alunos',       desc: 'Cadastro e histórico de alunos', icone: 'school'     },
+      { id: 'turmas',     label: 'Turmas',       desc: 'Turmas do semestre atual',       icone: 'groups'     },
+      { id: 'matriculas', label: 'Matrículas',   desc: 'Matrículas e situações',         icone: 'assignment' },
+      { id: 'relatorios', label: 'Relatórios',   desc: 'Boletins e listagens',           icone: 'summarize'  },
+      { id: 'config',     label: 'Configurações',desc: 'Dados e logo da escola',         icone: 'settings'   },
+    ],
+    coordenacao: [
+      { id: 'alunos',     label: 'Alunos',       desc: 'Cadastro e histórico de alunos', icone: 'school'     },
+      { id: 'turmas',     label: 'Turmas',       desc: 'Turmas do semestre atual',       icone: 'groups'     },
+      { id: 'matriculas', label: 'Matrículas',   desc: 'Matrículas e situações',         icone: 'assignment' },
+      { id: 'notas',      label: 'Notas',        desc: 'Lançamento de notas',            icone: 'grade'      },
+      { id: 'relatorios', label: 'Relatórios',   desc: 'Boletins e listagens',           icone: 'summarize'  },
+    ],
+    professor: [
+      { id: 'turmas',     label: 'Minhas turmas',desc: 'Turmas sob sua responsabilidade',icone: 'groups'     },
+      { id: 'frequencia', label: 'Frequência',   desc: 'Registrar presença nas aulas',   icone: 'fact_check' },
+      { id: 'conteudo',   label: 'Conteúdo',     desc: 'Conteúdo ministrado por aula',   icone: 'edit_note'  },
+      { id: 'notas',      label: 'Notas',        desc: 'Lançar notas dos alunos',        icone: 'grade'      },
+    ],
+    secretaria: [
+      { id: 'alunos',     label: 'Alunos',       desc: 'Cadastro de alunos',             icone: 'school'     },
+      { id: 'turmas',     label: 'Turmas',       desc: 'Consultar turmas',               icone: 'groups'     },
+      { id: 'matriculas', label: 'Matrículas',   desc: 'Realizar matrículas',            icone: 'assignment' },
+      { id: 'relatorios', label: 'Relatórios',   desc: 'Boletins e listagens',           icone: 'summarize'  },
+    ],
+  };
+
+  function init() {
+    // Usa dados do App global (definido no Shell)
+    var usuario  = (typeof App !== 'undefined') ? App.usuario  : null;
+    var semestre = (typeof App !== 'undefined') ? App.semestre : null;
+
+    // Título de boas-vindas
+    if (usuario) {
+      var primeiroNome = (usuario.Nome || '').split(' ')[0];
+      var tituloEl = document.getElementById('dash-titulo');
+      if (tituloEl) tituloEl.textContent = 'Olá, ' + primeiroNome + '!';
+    }
+
+    // Semestre
+    var semestreEl = document.getElementById('dash-semestre');
+    if (semestreEl && semestre) {
+      semestreEl.textContent = semestre.Semestre || '—';
+
+      // Status de edição
+      var statusEl = document.getElementById('dash-status-semestre');
+      if (statusEl && semestre.EdicaoAtiva === false) {
+        statusEl.style.background = 'rgba(230,57,70,0.15)';
+        statusEl.style.color      = '#E63946';
+        statusEl.style.borderColor = 'rgba(230,57,70,0.25)';
+        statusEl.innerHTML =
+          '<span class="material-icons-round">lock</span><span>Fechado para edição</span>';
+      }
+    } else if (semestreEl) {
+      semestreEl.textContent = 'Nenhum semestre ativo';
+    }
+
+    // Atalhos
+    var papel   = usuario ? usuario.Papel : '';
+    var atalhos = ATALHOS[papel] || ATALHOS['coordenacao'];
+    var grid    = document.getElementById('dash-atalhos');
+
+    if (grid) {
+      atalhos.forEach(function(item) {
+        var card = document.createElement('div');
+        card.className = 'dash-card';
+        card.innerHTML =
+          '<div class="dash-card-icone">' +
+            '<span class="material-icons-round">' + item.icone + '</span>' +
+          '</div>' +
+          '<div>' +
+            '<div class="dash-card-label">' + item.label + '</div>' +
+            '<div class="dash-card-desc">'  + item.desc  + '</div>' +
+          '</div>';
+
+        card.addEventListener('click', function() {
+          if (typeof navegarPara === 'function') {
+            navegarPara(item.id, item.label);
+          }
+        });
+
+        grid.appendChild(card);
+      });
+    }
+  }
+
+  // Executa após o DOM do fragmento estar pronto
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+}());
+</script>
