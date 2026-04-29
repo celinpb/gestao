@@ -1,0 +1,443 @@
+<!--
+  F5_Matriculas.html
+  Listagem de matrículas com busca por nome/ID e filtros por situação e turma.
+-->
+<style>
+  .m5-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+  .m5-busca-wrap{flex:1;min-width:200px;position:relative;}
+  .m5-busca-wrap .material-icons-round{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--c-text-3,#9898B0);pointer-events:none;}
+  .m5-busca{width:100%;height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:8px;padding:0 12px 0 36px;font-family:var(--font-sans,sans-serif);font-size:13.5px;color:var(--c-text-1,#1A1A2E);background:#fff;outline:none;transition:border-color 150ms ease;}
+  .m5-busca:focus{border-color:#E63946;box-shadow:0 0 0 3px rgba(230,57,70,0.09);}
+  .m5-busca::placeholder{color:var(--c-text-3,#9898B0);}
+  .m5-select{height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:8px;padding:0 11px;font-family:var(--font-sans,sans-serif);font-size:13px;color:var(--c-text-1,#1A1A2E);background:#fff;outline:none;cursor:pointer;max-width:200px;}
+  .m5-select:focus{border-color:#E63946;}
+
+  .m5-card{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:10px;overflow:hidden;}
+  .m5-tabela{width:100%;border-collapse:collapse;font-size:13.5px;}
+  .m5-tabela thead tr{background:#F8F7F3;border-bottom:1px solid var(--c-border,#E8E7E2);}
+  .m5-tabela th{padding:10px 16px;font-size:11px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:var(--c-text-3,#9898B0);text-align:left;white-space:nowrap;}
+  .m5-tabela tbody tr{border-bottom:1px solid var(--c-border,#E8E7E2);transition:background 120ms ease;}
+  .m5-tabela tbody tr:last-child{border-bottom:none;}
+  .m5-tabela tbody tr:hover{background:#FAFAF8;}
+  .m5-tabela td{padding:11px 16px;color:var(--c-text-1,#1A1A2E);vertical-align:middle;}
+  .m5-mat-id{font-family:var(--font-mono,monospace);font-size:11.5px;color:var(--c-text-3,#9898B0);}
+  .m5-nome{font-weight:500;}
+  .m5-turma-id{font-family:var(--font-mono,monospace);font-size:12px;}
+  .badge-m5{display:inline-flex;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;}
+  .badge-m5.ATIVA{background:rgba(42,157,143,0.12);color:#1A6E65;}
+  .badge-m5.CANCELADA{background:rgba(230,57,70,0.10);color:#A32D2D;}
+  .badge-m5.TRANCADA{background:rgba(233,196,106,0.20);color:#5C4200;}
+  .badge-m5.CONCLUIDA{background:rgba(69,123,157,0.12);color:#185FA5;}
+  .m5-acoes{display:flex;gap:6px;justify-content:flex-end;}
+  .btn-m5-acao{height:28px;padding:0 10px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;color:var(--c-text-2,#5C5C7A);font-family:var(--font-sans,sans-serif);display:inline-flex;align-items:center;gap:4px;transition:background 120ms ease;}
+  .btn-m5-acao:hover{background:#F5F4F0;}
+  .btn-m5-acao .material-icons-round{font-size:14px;}
+
+  .m5-estado{padding:48px 24px;text-align:center;color:var(--c-text-3,#9898B0);font-size:13.5px;}
+  .m5-estado .material-icons-round{font-size:36px;display:block;margin:0 auto 10px;}
+  .m5-spinner{width:24px;height:24px;border:2.5px solid var(--c-border,#E8E7E2);border-top-color:#E63946;border-radius:50%;animation:spin-m5 0.7s linear infinite;margin:0 auto 10px;}
+  @keyframes spin-m5{to{transform:rotate(360deg);}}
+
+  .m5-paginacao{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--c-border,#E8E7E2);font-size:12.5px;color:var(--c-text-2,#5C5C7A);flex-wrap:wrap;gap:8px;}
+  .m5-pag-btns{display:flex;gap:4px;}
+  .btn-m5-pag{width:30px;height:30px;border-radius:6px;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;font-size:12px;font-family:var(--font-sans,sans-serif);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 120ms ease;color:var(--c-text-1,#1A1A2E);}
+  .btn-m5-pag:hover:not(:disabled){background:#F5F4F0;}
+  .btn-m5-pag:disabled{opacity:0.4;cursor:not-allowed;}
+  .btn-m5-pag.ativa{background:#E63946;border-color:#E63946;color:#fff;}
+  .btn-m5-pag .material-icons-round{font-size:16px;}
+
+  /* Modal situação */
+  .m5-modal-overlay{position:fixed;inset:0;background:rgba(26,26,46,0.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(2px);}
+  .m5-modal{background:#fff;border-radius:12px;width:100%;max-width:360px;box-shadow:0 12px 48px rgba(26,26,46,0.18);animation:modal-in-m5 200ms cubic-bezier(0.34,1.3,0.64,1);overflow:hidden;}
+  @keyframes modal-in-m5{from{opacity:0;transform:scale(0.95);}to{opacity:1;transform:scale(1);}}
+  .m5-modal-header{padding:16px 18px;border-bottom:1px solid var(--c-border,#E8E7E2);font-size:14px;font-weight:600;color:var(--c-text-1,#1A1A2E);}
+  .m5-modal-corpo{padding:16px 18px;}
+  .m5-modal-corpo p{font-size:13px;color:var(--c-text-2,#5C5C7A);margin-bottom:14px;}
+  .m5-sit-opcoes{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .m5-sit-opcao{padding:10px 12px;border-radius:8px;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;cursor:pointer;text-align:center;font-size:13px;font-weight:500;font-family:var(--font-sans,sans-serif);transition:border-color 150ms ease,background 150ms ease;color:var(--c-text-1,#1A1A2E);}
+  .m5-sit-opcao:hover{border-color:#C8C7C2;background:#FAFAF8;}
+  .m5-sit-opcao.ATIVA{border-color:#2A9D8F;color:#1A6E65;background:rgba(42,157,143,0.06);}
+  .m5-sit-opcao.CANCELADA{border-color:#E63946;color:#A32D2D;background:rgba(230,57,70,0.06);}
+  .m5-sit-opcao.TRANCADA{border-color:#D4A843;color:#5C4200;background:rgba(233,196,106,0.10);}
+  .m5-sit-opcao.CONCLUIDA{border-color:#457B9D;color:#185FA5;background:rgba(69,123,157,0.06);}
+  .m5-modal-footer{padding:12px 18px;border-top:1px solid var(--c-border,#E8E7E2);display:flex;justify-content:flex-end;}
+  .btn-cancelar-m5{height:36px;padding:0 16px;border-radius:7px;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;font-family:var(--font-sans,sans-serif);font-size:13px;cursor:pointer;color:var(--c-text-1,#1A1A2E);}
+  .btn-cancelar-m5:hover{background:#F5F4F0;}
+
+  /* Resumo por situação */
+  .m5-resumo{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+  .m5-resumo-item{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:8px;padding:10px 16px;font-size:12px;color:var(--c-text-2,#5C5C7A);display:flex;flex-direction:column;gap:2px;cursor:pointer;transition:border-color 150ms ease;}
+  .m5-resumo-item:hover{border-color:#C8C7C2;}
+  .m5-resumo-item.sel{border-color:#E63946;}
+  .m5-resumo-num{font-size:20px;font-weight:700;color:var(--c-text-1,#1A1A2E);line-height:1;}
+  .m5-resumo-num.ATIVA{color:#2A9D8F;}
+  .m5-resumo-num.CANCELADA{color:#E63946;}
+  .m5-resumo-num.TRANCADA{color:#D4A843;}
+  .m5-resumo-num.CONCLUIDA{color:#457B9D;}
+</style>
+
+<div>
+  <!-- Resumo -->
+  <div class="m5-resumo" id="m5-resumo">
+    <div class="m5-resumo-item sel" data-sit="">
+      <span class="m5-resumo-num" id="cnt-todas">—</span>
+      <span>Todas</span>
+    </div>
+    <div class="m5-resumo-item" data-sit="ATIVA">
+      <span class="m5-resumo-num ATIVA" id="cnt-ativas">—</span>
+      <span>Ativas</span>
+    </div>
+    <div class="m5-resumo-item" data-sit="TRANCADA">
+      <span class="m5-resumo-num TRANCADA" id="cnt-trancadas">—</span>
+      <span>Trancadas</span>
+    </div>
+    <div class="m5-resumo-item" data-sit="CONCLUIDA">
+      <span class="m5-resumo-num CONCLUIDA" id="cnt-concluidas">—</span>
+      <span>Concluídas</span>
+    </div>
+    <div class="m5-resumo-item" data-sit="CANCELADA">
+      <span class="m5-resumo-num CANCELADA" id="cnt-canceladas">—</span>
+      <span>Canceladas</span>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="m5-toolbar">
+    <div class="m5-busca-wrap">
+      <span class="material-icons-round">search</span>
+      <input type="text" class="m5-busca" id="m5-busca"
+             placeholder="Buscar por nome do aluno, MatriculaID ou TurmaID…">
+    </div>
+    <select class="m5-select" id="m5-filtro-sit">
+      <option value="">Todas as situações</option>
+      <option value="ATIVA">Ativas</option>
+      <option value="TRANCADA">Trancadas</option>
+      <option value="CONCLUIDA">Concluídas</option>
+      <option value="CANCELADA">Canceladas</option>
+    </select>
+    <select class="m5-select" id="m5-filtro-turma">
+      <option value="">Todas as turmas</option>
+    </select>
+  </div>
+
+  <!-- Tabela -->
+  <div class="m5-card">
+    <div id="m5-estado" class="m5-estado">
+      <div class="m5-spinner"></div><p>Carregando matrículas…</p>
+    </div>
+    <table class="m5-tabela" id="m5-tabela" style="display:none;">
+      <thead>
+        <tr>
+          <th>MatriculaID</th>
+          <th>Aluno</th>
+          <th>TurmaID</th>
+          <th>Estágio</th>
+          <th>Situação</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="m5-tbody"></tbody>
+    </table>
+    <div class="m5-paginacao" id="m5-paginacao" style="display:none;">
+      <span id="m5-pag-info">—</span>
+      <div class="m5-pag-btns" id="m5-pag-btns"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal situação -->
+<div class="m5-modal-overlay" id="m5-modal-sit" style="display:none;">
+  <div class="m5-modal">
+    <div class="m5-modal-header">Alterar situação da matrícula</div>
+    <div class="m5-modal-corpo">
+      <p id="m5-sit-aluno">Selecione a nova situação:</p>
+      <div class="m5-sit-opcoes">
+        <button class="m5-sit-opcao ATIVA"     data-sit="ATIVA">✓ Ativa</button>
+        <button class="m5-sit-opcao TRANCADA"  data-sit="TRANCADA">⏸ Trancada</button>
+        <button class="m5-sit-opcao CONCLUIDA" data-sit="CONCLUIDA">🎓 Concluída</button>
+        <button class="m5-sit-opcao CANCELADA" data-sit="CANCELADA">✕ Cancelada</button>
+      </div>
+    </div>
+    <div class="m5-modal-footer">
+      <button class="btn-cancelar-m5" id="btn-cancelar-m5-sit">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+
+  var state = {
+    matriculas: [], turmas: [],
+    paginaAtual: 1, tamanhoPagina: 25,
+    totalRegistros: 0, totalPaginas: 1,
+    busca: '', filtroSit: '', filtroTurma: '',
+    matriculaParaSit: null,
+    papel: '', podeEditar: false,
+  };
+
+  var buscarTimer = null;
+
+  // =========================================================
+  // postApi — usa api.js carregado pelo index.html
+  // =========================================================
+  function postApi(acao, dados) {
+    return window.postApi(acao, dados);
+  }
+
+  function el(id) { return document.getElementById(id); }
+
+  // =========================================================
+  // INIT
+  // =========================================================
+  function init() {
+    var usuario = (typeof App !== 'undefined' && App.usuario) ? App.usuario : null;
+    if (usuario) {
+      state.papel      = usuario.Papel || '';
+      state.podeEditar = ['admin','coordenacao','secretaria'].indexOf(state.papel) !== -1;
+    }
+    registrarEventos();
+    carregarTurmasParaFiltro();
+    carregarMatriculas();
+  }
+
+  // =========================================================
+  // FILTRO DE TURMAS
+  // =========================================================
+  function carregarTurmasParaFiltro() {
+    postApi('turmas.listar', { tamanhoPagina: 300 })
+      .then(function(res) {
+        if (!res.sucesso || !res.dados) return;
+        var turmas = res.dados.dados || [];
+        var sel = el('m5-filtro-turma');
+        turmas.forEach(function(t) {
+          var opt = document.createElement('option');
+          opt.value = t.TurmaID;
+          opt.textContent = t.TurmaID + ' — ' + (t.Estagio || t.CursoID || '');
+          sel.appendChild(opt);
+        });
+      })
+      .catch(function() {});
+  }
+
+  // =========================================================
+  // MATRÍCULAS
+  // =========================================================
+  function carregarMatriculas() {
+    el('m5-estado').style.display = 'block';
+    el('m5-estado').innerHTML = '<div class="m5-spinner"></div><p>Carregando matrículas…</p>';
+    el('m5-tabela').style.display = 'none';
+    el('m5-paginacao').style.display = 'none';
+
+    var filtros = {
+      pagina:        state.paginaAtual,
+      tamanhoPagina: state.tamanhoPagina,
+    };
+    if (state.filtroSit)   filtros.situacao = state.filtroSit;
+    if (state.filtroTurma) filtros.turmaId  = state.filtroTurma;
+
+    postApi('matriculas.listar', filtros)
+      .then(function(res) {
+        if (!res.sucesso) {
+          el('m5-estado').style.display = 'block';
+          el('m5-estado').innerHTML = '<span class="material-icons-round">error_outline</span><p>' + (res.mensagem||'Erro ao carregar.') + '</p>';
+          return;
+        }
+        var dados = res.dados || {};
+        state.matriculas      = dados.dados || [];
+        state.totalRegistros  = dados.totalRegistros || state.matriculas.length;
+        state.totalPaginas    = dados.totalPaginas   || 1;
+        atualizarResumo();
+        renderizarMatriculas();
+      })
+      .catch(function(e) {
+        el('m5-estado').style.display = 'block';
+        el('m5-estado').innerHTML = '<span class="material-icons-round">error_outline</span><p>Erro de comunicação: ' + (e.message||'') + '</p>';
+      });
+  }
+
+  function atualizarResumo() {
+    // Busca contagens por situação (todos os registros sem filtro de situação)
+    postApi('matriculas.listar', { tamanhoPagina: 5000 })
+      .then(function(res) {
+        if (!res.sucesso || !res.dados) return;
+        var todas = res.dados.dados || [];
+        var contar = function(sit) {
+          return todas.filter(function(m) { return m.SituacaoMatricula === sit; }).length;
+        };
+        el('cnt-todas').textContent     = todas.length;
+        el('cnt-ativas').textContent    = contar('ATIVA');
+        el('cnt-trancadas').textContent = contar('TRANCADA');
+        el('cnt-concluidas').textContent= contar('CONCLUIDA');
+        el('cnt-canceladas').textContent= contar('CANCELADA');
+      })
+      .catch(function() {});
+  }
+
+  function matriculasFiltradas() {
+    var busca = state.busca.toLowerCase();
+    if (!busca) return state.matriculas;
+    return state.matriculas.filter(function(m) {
+      return (m.MatriculaID||'').toLowerCase().indexOf(busca) !== -1 ||
+             (m.AlunoID||'').toLowerCase().indexOf(busca) !== -1 ||
+             (m.NomeExibicao||'').toLowerCase().indexOf(busca) !== -1 ||
+             (m.TurmaID||'').toLowerCase().indexOf(busca) !== -1;
+    });
+  }
+
+  function renderizarMatriculas() {
+    var lista = matriculasFiltradas();
+
+    if (lista.length === 0) {
+      el('m5-estado').style.display = 'block';
+      el('m5-estado').innerHTML = '<span class="material-icons-round">assignment</span><p>Nenhuma matrícula encontrada.</p>';
+      el('m5-tabela').style.display = 'none';
+      el('m5-paginacao').style.display = 'none';
+      return;
+    }
+
+    el('m5-estado').style.display = 'none';
+    el('m5-tabela').style.display = 'table';
+
+    var tbody = el('m5-tbody'); tbody.innerHTML = '';
+
+    lista.forEach(function(m) {
+      var sit = m.SituacaoMatricula || 'ATIVA';
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="m5-mat-id">' + (m.MatriculaID||'—') + '</td>' +
+        '<td><div class="m5-nome">' + (m.NomeExibicao || m.AlunoID || '—') + '</div>' +
+            '<div style="font-size:11.5px;color:var(--c-text-3);">' + (m.AlunoID||'') + '</div></td>' +
+        '<td class="m5-turma-id">' + (m.TurmaID||'—') + '</td>' +
+        '<td style="font-size:13px;">' + (m.Estagio || '—') + '</td>' +
+        '<td><span class="badge-m5 ' + sit + '">' + sit + '</span></td>' +
+        '<td>' +
+          (state.podeEditar ?
+            '<div class="m5-acoes">' +
+              '<button class="btn-m5-acao" data-mat="' + m.MatriculaID + '">' +
+                '<span class="material-icons-round">swap_horiz</span>Situação' +
+              '</button>' +
+            '</div>' : '') +
+        '</td>';
+
+      var btn = tr.querySelector('.btn-m5-acao');
+      if (btn) {
+        btn.addEventListener('click', function() {
+          state.matriculaParaSit = m;
+          el('m5-sit-aluno').textContent = 'Aluno: ' + (m.NomeExibicao || m.AlunoID || m.MatriculaID);
+          el('m5-modal-sit').style.display = 'flex';
+        });
+      }
+
+      tbody.appendChild(tr);
+    });
+
+    renderizarPaginacao();
+  }
+
+  function renderizarPaginacao() {
+    var pag = el('m5-paginacao'); pag.style.display = 'flex';
+    var ini = (state.paginaAtual - 1) * state.tamanhoPagina + 1;
+    var fim = Math.min(state.paginaAtual * state.tamanhoPagina, state.totalRegistros);
+    el('m5-pag-info').textContent = ini + '–' + fim + ' de ' + state.totalRegistros + ' matrícula(s)';
+
+    var btns = el('m5-pag-btns'); btns.innerHTML = '';
+
+    var prev = document.createElement('button'); prev.className = 'btn-m5-pag';
+    prev.innerHTML = '<span class="material-icons-round">chevron_left</span>';
+    prev.disabled = state.paginaAtual <= 1;
+    prev.addEventListener('click', function() { if (state.paginaAtual > 1) { state.paginaAtual--; carregarMatriculas(); } });
+    btns.appendChild(prev);
+
+    var ini2 = Math.max(1, state.paginaAtual - 2);
+    var fim2  = Math.min(state.totalPaginas, ini2 + 4);
+    for (var i = ini2; i <= fim2; i++) {
+      (function(pg) {
+        var b = document.createElement('button');
+        b.className = 'btn-m5-pag' + (pg === state.paginaAtual ? ' ativa' : '');
+        b.textContent = pg;
+        b.addEventListener('click', function() { state.paginaAtual = pg; carregarMatriculas(); });
+        btns.appendChild(b);
+      })(i);
+    }
+
+    var next = document.createElement('button'); next.className = 'btn-m5-pag';
+    next.innerHTML = '<span class="material-icons-round">chevron_right</span>';
+    next.disabled = state.paginaAtual >= state.totalPaginas;
+    next.addEventListener('click', function() { if (state.paginaAtual < state.totalPaginas) { state.paginaAtual++; carregarMatriculas(); } });
+    btns.appendChild(next);
+  }
+
+  function alterarSituacao(novaSit) {
+    if (!state.matriculaParaSit) return;
+    el('m5-modal-sit').style.display = 'none';
+
+    postApi('matriculas.atualizarSituacao', {
+      matriculaId: state.matriculaParaSit.MatriculaID,
+      novaSituacao: novaSit,
+    })
+      .then(function(res) {
+        if (!res.sucesso) { if (typeof toast==='function') toast(res.mensagem||'Erro.','error'); return; }
+        if (typeof toast === 'function') toast('Situação atualizada para ' + novaSit + '.', 'success');
+        carregarMatriculas();
+      })
+      .catch(function() { if (typeof toast==='function') toast('Erro de comunicação.','error'); });
+  }
+
+  // =========================================================
+  // EVENTOS
+  // =========================================================
+  function registrarEventos() {
+    // Busca com debounce
+    el('m5-busca') && el('m5-busca').addEventListener('input', function() {
+      clearTimeout(buscarTimer);
+      buscarTimer = setTimeout(function() {
+        state.busca = el('m5-busca').value.trim();
+        renderizarMatriculas();
+      }, 350);
+    });
+
+    // Filtros
+    el('m5-filtro-sit') && el('m5-filtro-sit').addEventListener('change', function() {
+      state.filtroSit = this.value;
+      state.paginaAtual = 1;
+      carregarMatriculas();
+    });
+
+    el('m5-filtro-turma') && el('m5-filtro-turma').addEventListener('change', function() {
+      state.filtroTurma = this.value;
+      state.paginaAtual = 1;
+      carregarMatriculas();
+    });
+
+    // Cards de resumo
+    document.querySelectorAll('.m5-resumo-item').forEach(function(card) {
+      card.addEventListener('click', function() {
+        document.querySelectorAll('.m5-resumo-item').forEach(function(c) { c.classList.remove('sel'); });
+        this.classList.add('sel');
+        state.filtroSit = this.dataset.sit;
+        el('m5-filtro-sit').value = this.dataset.sit;
+        state.paginaAtual = 1;
+        carregarMatriculas();
+      });
+    });
+
+    // Modal situação
+    document.querySelectorAll('.m5-sit-opcao').forEach(function(btn) {
+      btn.addEventListener('click', function() { alterarSituacao(this.dataset.sit); });
+    });
+    el('btn-cancelar-m5-sit') && el('btn-cancelar-m5-sit').addEventListener('click', function() {
+      el('m5-modal-sit').style.display = 'none';
+    });
+    el('m5-modal-sit') && el('m5-modal-sit').addEventListener('click', function(e) {
+      if (e.target === this) this.style.display = 'none';
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else { init(); }
+}());
+</script>
