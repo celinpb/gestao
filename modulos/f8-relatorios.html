@@ -1,0 +1,864 @@
+<!--
+  F8_Relatorios.html
+  Central de relatórios com visualização na tela e impressão/PDF via CSS.
+  Relatórios: Boletim, Listagem de turmas, Listagem de alunos,
+  Frequência por turma, Resultados por turma, Alunos por turma com campos selecionados.
+-->
+<style>
+  /* =========================================================
+     LAYOUT GERAL (tela)
+  ========================================================= */
+  .r8-menu{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:28px;}
+  .r8-tipo-card{background:#fff;border:1.5px solid var(--c-border,#E8E7E2);border-radius:10px;padding:16px 18px;cursor:pointer;transition:border-color 150ms ease,box-shadow 150ms ease,transform 150ms ease;display:flex;flex-direction:column;gap:8px;}
+  .r8-tipo-card:hover{border-color:#C8C7C2;box-shadow:0 3px 10px rgba(26,26,46,0.08);transform:translateY(-1px);}
+  .r8-tipo-card.sel{border-color:#E63946;background:rgba(230,57,70,0.03);}
+  .r8-tipo-icone{width:36px;height:36px;border-radius:8px;background:rgba(230,57,70,0.10);display:flex;align-items:center;justify-content:center;}
+  .r8-tipo-icone .material-icons-round{font-size:20px;color:#E63946;}
+  .r8-tipo-nome{font-size:13.5px;font-weight:600;color:var(--c-text-1,#1A1A2E);}
+  .r8-tipo-desc{font-size:12px;color:var(--c-text-3,#9898B0);line-height:1.4;}
+
+  /* Formulário de parâmetros */
+  .r8-params{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:10px;padding:18px;margin-bottom:20px;display:none;}
+  .r8-params.show{display:block;}
+  .r8-params-titulo{font-size:13px;font-weight:600;color:var(--c-text-1,#1A1A2E);margin-bottom:14px;display:flex;align-items:center;gap:6px;}
+  .r8-params-titulo .material-icons-round{font-size:17px;color:#E63946;}
+  .r8-params-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:14px;}
+  .r8-field{display:flex;flex-direction:column;gap:5px;}
+  .r8-field label{font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--c-text-3,#9898B0);}
+  .r8-select,.r8-input{height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:7px;padding:0 11px;font-family:var(--font-sans,sans-serif);font-size:13.5px;color:var(--c-text-1,#1A1A2E);background:#FAFAF8;outline:none;width:100%;transition:border-color 150ms ease;}
+  .r8-select:focus,.r8-input:focus{border-color:#E63946;}
+  .r8-select{cursor:pointer;}
+  .r8-campos-check{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+  .r8-check-item{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--c-text-1,#1A1A2E);cursor:pointer;}
+  .r8-check-item input{accent-color:#E63946;width:15px;height:15px;}
+  .r8-acoes{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .btn-r8{height:38px;padding:0 18px;border-radius:8px;font-family:var(--font-sans,sans-serif);font-size:13.5px;font-weight:500;cursor:pointer;border:none;display:inline-flex;align-items:center;gap:6px;transition:background 150ms ease;}
+  .btn-r8 .material-icons-round{font-size:17px;}
+  .btn-r8 .spinner-btn{width:15px;height:15px;border:2px solid rgba(255,255,255,0.35);border-top-color:#fff;border-radius:50%;animation:spin-r8 0.7s linear infinite;display:none;}
+  .btn-r8.loading .spinner-btn{display:block;}
+  .btn-r8.loading .btn-txt{display:none;}
+  @keyframes spin-r8{to{transform:rotate(360deg);}}
+  .btn-r8-primario{background:#E63946;color:#fff;}
+  .btn-r8-primario:hover:not(:disabled){background:#C1121F;}
+  .btn-r8-primario:disabled{opacity:0.55;cursor:not-allowed;}
+  .btn-r8-sec{background:#fff;color:var(--c-text-1,#1A1A2E);border:1.5px solid var(--c-border,#E8E7E2);}
+  .btn-r8-sec:hover{background:#F5F4F0;}
+
+  /* Preview na tela */
+  .r8-preview-wrap{background:#E8E7E2;padding:24px;border-radius:10px;display:none;}
+  .r8-preview-wrap.show{display:block;}
+  .r8-preview-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+  .r8-preview-label{font-size:12px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--c-text-2,#5C5C7A);}
+
+  .r8-estado{padding:32px 0;text-align:center;color:var(--c-text-3,#9898B0);font-size:13.5px;}
+  .r8-estado .material-icons-round{font-size:36px;display:block;margin:0 auto 10px;}
+  .r8-spinner-sm{width:20px;height:20px;border:2.5px solid var(--c-border,#E8E7E2);border-top-color:#E63946;border-radius:50%;animation:spin-r8 0.7s linear infinite;margin:0 auto 8px;}
+
+  /* =========================================================
+     FOLHA DO RELATÓRIO (tela e impressão)
+  ========================================================= */
+  .r8-folha{background:#fff;width:210mm;min-height:297mm;margin:0 auto;padding:16mm 18mm;box-shadow:0 2px 16px rgba(0,0,0,0.15);font-family:'DM Sans',sans-serif;font-size:10pt;color:#1A1A2E;box-sizing:border-box;}
+
+  /* Cabeçalho institucional */
+  .r8-cab{display:flex;align-items:center;gap:14px;padding-bottom:10px;border-bottom:2px solid #1A1A2E;margin-bottom:12px;}
+  .r8-cab-logo{width:52px;height:52px;object-fit:contain;flex-shrink:0;}
+  .r8-cab-logo-placeholder{width:52px;height:52px;background:#F5F4F0;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#E63946;flex-shrink:0;}
+  .r8-cab-info{flex:1;}
+  .r8-cab-nome{font-size:13pt;font-weight:700;color:#1A1A2E;line-height:1.2;}
+  .r8-cab-sub{font-size:8.5pt;color:#5C5C7A;margin-top:2px;}
+  .r8-cab-sem{font-size:8pt;color:#9898B0;margin-top:3px;font-family:monospace;}
+
+  /* Título do relatório */
+  .r8-titulo-rel{font-size:13pt;font-weight:700;color:#1A1A2E;margin:14px 0 4px;}
+  .r8-subtitulo-rel{font-size:9pt;color:#5C5C7A;margin-bottom:14px;}
+
+  /* Tabelas do relatório */
+  .r8-table{width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:16px;}
+  .r8-table th{background:#1A1A2E;color:#fff;padding:5px 8px;text-align:left;font-size:7.5pt;font-weight:600;letter-spacing:0.3px;}
+  .r8-table th.c{text-align:center;}
+  .r8-table td{padding:5px 8px;border-bottom:1px solid #E8E7E2;vertical-align:top;}
+  .r8-table td.c{text-align:center;}
+  .r8-table tbody tr:nth-child(even){background:#F8F7F3;}
+  .r8-table tbody tr:last-child td{border-bottom:none;}
+
+  /* Boletim */
+  .r8-boletim-aluno{margin-bottom:20px;padding-bottom:16px;border-bottom:1px dashed #C8C7C2;}
+  .r8-boletim-aluno:last-child{border-bottom:none;}
+  .r8-boletim-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
+  .r8-boletim-nome{font-size:11pt;font-weight:700;color:#1A1A2E;}
+  .r8-boletim-meta{font-size:8pt;color:#5C5C7A;}
+  .r8-boletim-secao{font-size:8pt;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#9898B0;margin:8px 0 4px;padding-bottom:3px;border-bottom:1px solid #E8E7E2;}
+  .r8-boletim-notas{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;margin-bottom:8px;}
+  .r8-nota-box{background:#F8F7F3;border:1px solid #E8E7E2;border-radius:5px;padding:6px 8px;text-align:center;}
+  .r8-nota-box-label{font-size:7pt;color:#9898B0;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:2px;}
+  .r8-nota-box-valor{font-size:12pt;font-weight:700;color:#1A1A2E;}
+  .r8-nota-box-valor.ap{color:#2A9D8F;}
+  .r8-nota-box-valor.rep{color:#E63946;}
+  .r8-nota-box-valor.ret{color:#E9C46A;}
+
+  .r8-resultado-geral{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:8pt;font-weight:700;}
+  .r8-resultado-geral.APROVADO{background:rgba(42,157,143,0.12);color:#1A6E65;}
+  .r8-resultado-geral.REPROVADO{background:rgba(230,57,70,0.10);color:#A32D2D;}
+  .r8-resultado-geral.RETIDO{background:rgba(233,196,106,0.20);color:#5C4200;}
+  .r8-resultado-geral.PENDENTE{background:#F5F4F0;color:#9898B0;}
+
+  .r8-freq-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:6px;}
+  .r8-freq-item{font-size:8.5pt;}
+  .r8-freq-item strong{color:#1A1A2E;}
+
+  .r8-com-texto{font-size:8.5pt;color:#5C5C7A;font-style:italic;line-height:1.5;background:#F8F7F3;padding:6px 10px;border-radius:4px;border-left:3px solid #E8E7E2;margin-bottom:4px;}
+
+  .r8-rodape-folha{margin-top:auto;padding-top:10px;border-top:1px solid #E8E7E2;font-size:7.5pt;color:#9898B0;display:flex;justify-content:space-between;}
+
+  /* =========================================================
+     CSS DE IMPRESSÃO
+  ========================================================= */
+  @media print {
+  .r8-folha {
+    box-shadow: none;
+    margin: 0;
+    padding: 12mm 14mm;
+    page-break-after: always;
+  }
+  .r8-folha:last-child { page-break-after: avoid; }
+  @page { size: A4; margin: 0; }
+}
+</style>
+
+<!-- MENU DE TIPOS -->
+<div class="r8-menu" id="r8-menu">
+  <div class="r8-tipo-card" data-tipo="boletim">
+    <div class="r8-tipo-icone"><span class="material-icons-round">assignment_ind</span></div>
+    <div class="r8-tipo-nome">Boletim individual</div>
+    <div class="r8-tipo-desc">Notas, frequência, resultado e comentários por aluno</div>
+  </div>
+  <div class="r8-tipo-card" data-tipo="turmas-alunos">
+    <div class="r8-tipo-icone"><span class="material-icons-round">groups</span></div>
+    <div class="r8-tipo-nome">Turmas com alunos</div>
+    <div class="r8-tipo-desc">Lista de alunos matriculados por turma</div>
+  </div>
+  <div class="r8-tipo-card" data-tipo="alunos-geral">
+    <div class="r8-tipo-icone"><span class="material-icons-round">people</span></div>
+    <div class="r8-tipo-nome">Listagem geral de alunos</div>
+    <div class="r8-tipo-desc">Todos os alunos do semestre com dados selecionados</div>
+  </div>
+  <div class="r8-tipo-card" data-tipo="frequencia-turma">
+    <div class="r8-tipo-icone"><span class="material-icons-round">fact_check</span></div>
+    <div class="r8-tipo-nome">Frequência por turma</div>
+    <div class="r8-tipo-desc">Resumo de presenças, faltas e percentual por aluno</div>
+  </div>
+  <div class="r8-tipo-card" data-tipo="resultados-turma">
+    <div class="r8-tipo-icone"><span class="material-icons-round">grade</span></div>
+    <div class="r8-tipo-nome">Resultados por turma</div>
+    <div class="r8-tipo-desc">Médias, aprovados, retidos e retidos por falta</div>
+  </div>
+  <div class="r8-tipo-card" data-tipo="alunos-turma-campos">
+    <div class="r8-tipo-icone"><span class="material-icons-round">table_chart</span></div>
+    <div class="r8-tipo-nome">Alunos por turma (campos)</div>
+    <div class="r8-tipo-desc">Lista de alunos de uma turma com campos do cadastro</div>
+  </div>
+</div>
+
+<!-- PARÂMETROS -->
+<div class="r8-params" id="r8-params">
+  <div class="r8-params-titulo">
+    <span class="material-icons-round">tune</span>
+    <span id="r8-params-titulo-txt">Parâmetros</span>
+  </div>
+
+  <!-- Seletores comuns -->
+  <div class="r8-params-grid" id="r8-params-grid">
+    <div class="r8-field" id="r8-param-turma-wrap">
+      <label>Turma</label>
+      <select class="r8-select" id="r8-param-turma">
+        <option value="">Carregando…</option>
+      </select>
+    </div>
+    <div class="r8-field" id="r8-param-aluno-wrap" style="display:none;">
+      <label>Aluno (MatriculaID ou deixe vazio para todos)</label>
+      <input type="text" class="r8-input" id="r8-param-aluno" placeholder="Ex: M252.0001 (vazio = todos)">
+    </div>
+  </div>
+
+  <!-- Campos selecionáveis (apenas para tipo alunos-turma-campos) -->
+  <div id="r8-campos-wrap" style="display:none;">
+    <div class="r8-field" style="margin-bottom:8px;"><label>Campos a incluir no relatório</label></div>
+    <div class="r8-campos-check" id="r8-campos-check"></div>
+  </div>
+
+  <div class="r8-acoes">
+    <button class="btn-r8 btn-r8-primario" id="btn-r8-gerar">
+      <div class="spinner-btn"></div>
+      <span class="material-icons-round btn-txt">play_arrow</span>
+      <span class="btn-txt">Gerar relatório</span>
+    </button>
+    <button class="btn-r8 btn-r8-sec" id="btn-r8-cancelar">
+      <span class="material-icons-round">close</span>Cancelar
+    </button>
+  </div>
+</div>
+
+<!-- PREVIEW -->
+<div class="r8-preview-wrap" id="r8-preview-wrap">
+  <div class="r8-preview-toolbar">
+    <span class="r8-preview-label" id="r8-preview-label">Pré-visualização</span>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-r8 btn-r8-sec" id="btn-r8-novo">
+        <span class="material-icons-round">arrow_back</span>Novo relatório
+      </button>
+      <button class="btn-r8 btn-r8-primario" id="btn-r8-imprimir">
+        <span class="material-icons-round">print</span>Imprimir / PDF
+      </button>
+    </div>
+  </div>
+  <div id="r8-preview-conteudo"></div>
+</div>
+
+<!-- Área oculta para impressão -->
+<div id="r8-print-area" style="display:none;"></div>
+
+<script>
+(function () {
+  'use strict';
+  var state = {
+    tipo: null, turmas: [], config: {}, semestre: {},
+    logob64: '',
+  };
+
+  var CAMPOS_DISPONIVEIS = [
+    { key: 'NomeExibicao',    label: 'Nome' },
+    { key: 'email',           label: 'E-mail' },
+    { key: 'Telefone',        label: 'Telefone' },
+    { key: 'Genero',          label: 'Gênero' },
+    { key: 'Nascimento',      label: 'Data de nascimento' },
+    { key: 'Municipio',       label: 'Município' },
+    { key: 'UF',              label: 'UF' },
+    { key: 'PublicoAluno',    label: 'Público-alvo' },
+    { key: 'PcDBoolean',      label: 'PcD' },
+  ];
+
+  // =========================================================
+  // postApi
+  // =========================================================
+  function postApi(acao, dados) {
+    return window.postApi(acao, dados);
+  }
+
+  function el(id) { return document.getElementById(id); }
+  function fmt(v) { return (v !== null && v !== undefined && v !== '') ? String(v) : '—'; }
+  function fmtData(d) {
+    if (!d) return '—';
+    if (typeof d === 'string' && d.indexOf('T') !== -1) { var p=d.substring(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+    return String(d).substring(0,10);
+  }
+  function fmtTel(t) {
+    if (!t) return '—';
+    var l=String(t).replace(/\D/g,'');
+    if(l.length===11) return l.replace(/(\d{2})(\d{5})(\d{4})/,'($1) $2-$3');
+    if(l.length===10) return l.replace(/(\d{2})(\d{4})(\d{4})/,'($1) $2-$3');
+    return String(t);
+  }
+
+  // =========================================================
+  // INIT
+  // =========================================================
+  function init() {
+    // Carrega turmas, config e logo em paralelo
+    Promise.all([
+      postApi('turmas.listar', { tamanhoPagina: 300 }),
+      postApi('sistema.config', {}),
+      postApi('sistema.semestreAtual', {}),
+      postApi('sistema.logo', {}),
+    ]).then(function(res) {
+      if (res[0].sucesso && res[0].dados) state.turmas = res[0].dados.dados || [];
+      if (res[1].sucesso) state.config = res[1].dados || {};
+      if (res[2].sucesso) state.semestre = res[2].dados || {};
+      if (res[3].sucesso && res[3].dados) state.logob64 = res[3].dados.logo_base64 || '';
+      popularSelectTurmas();
+    }).catch(function() {});
+
+    // Campos selecionáveis
+    var wrap = el('r8-campos-check');
+    CAMPOS_DISPONIVEIS.forEach(function(c) {
+      var label = document.createElement('label'); label.className = 'r8-check-item';
+      var input = document.createElement('input'); input.type = 'checkbox'; input.value = c.key;
+      input.checked = ['NomeExibicao','email','Telefone'].indexOf(c.key) !== -1;
+      label.appendChild(input);
+      label.appendChild(document.createTextNode(' ' + c.label));
+      wrap.appendChild(label);
+    });
+
+    registrarEventos();
+  }
+
+  function popularSelectTurmas() {
+    var sel = el('r8-param-turma'); sel.innerHTML = '<option value="">Selecione uma turma…</option>';
+    state.turmas.forEach(function(t) {
+      var opt = document.createElement('option');
+      opt.value = t.TurmaID;
+      opt.textContent = t.TurmaID + ' — ' + (t.Estagio||t.CursoID||'');
+      sel.appendChild(opt);
+    });
+  }
+
+  // =========================================================
+  // SELEÇÃO DE TIPO
+  // =========================================================
+  function selecionarTipo(tipo) {
+    state.tipo = tipo;
+    document.querySelectorAll('.r8-tipo-card').forEach(function(c) { c.classList.toggle('sel', c.dataset.tipo === tipo); });
+
+    var nomes = {
+      'boletim':          'Boletim individual',
+      'turmas-alunos':    'Turmas com alunos matriculados',
+      'alunos-geral':     'Listagem geral de alunos',
+      'frequencia-turma': 'Frequência por turma',
+      'resultados-turma': 'Resultados por turma',
+      'alunos-turma-campos': 'Alunos por turma com campos selecionados',
+    };
+    el('r8-params-titulo-txt').textContent = nomes[tipo] || tipo;
+
+    // Mostra/oculta campos conforme o tipo
+    el('r8-param-turma-wrap').style.display =
+      ['alunos-geral'].indexOf(tipo) !== -1 ? 'none' : 'block';
+    el('r8-param-aluno-wrap').style.display =
+      tipo === 'boletim' ? 'block' : 'none';
+    el('r8-campos-wrap').style.display =
+      tipo === 'alunos-turma-campos' ? 'block' : 'none';
+
+    el('r8-params').classList.add('show');
+    el('r8-preview-wrap').classList.remove('show');
+  }
+
+  // =========================================================
+  // CABEÇALHO INSTITUCIONAL
+  // =========================================================
+  function htmlCabecalho() {
+    var cfg = state.config;
+    var sem = state.semestre;
+    var logoHtml = state.logob64
+      ? '<img class="r8-cab-logo" src="' + state.logob64 + '" alt="Logo">'
+      : '<div class="r8-cab-logo-placeholder">' + (cfg.sigla_escola||'CL').substring(0,2) + '</div>';
+
+    var dadosCab = [cfg.endereco, cfg.telefone, cfg.email].filter(Boolean).join(' · ');
+
+    return '<div class="r8-cab">' +
+      logoHtml +
+      '<div class="r8-cab-info">' +
+        '<div class="r8-cab-nome">' + (cfg.nome_escola||'CELINPB') + '</div>' +
+        (dadosCab ? '<div class="r8-cab-sub">' + dadosCab + '</div>' : '') +
+        '<div class="r8-cab-sem">Semestre: ' + (sem.Semestre||'—') + '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function htmlRodape() {
+    var agora = new Date();
+    var pad = function(n){return String(n).padStart(2,'0');};
+    var dataStr = pad(agora.getDate())+'/'+pad(agora.getMonth()+1)+'/'+agora.getFullYear()+' '+pad(agora.getHours())+':'+pad(agora.getMinutes());
+    return '<div class="r8-rodape-folha"><span>Gerado em ' + dataStr + '</span><span>' + (state.config.nome_escola||'CELINPB') + ' · SGE</span></div>';
+  }
+
+  // =========================================================
+  // GERAÇÃO DOS RELATÓRIOS
+  // =========================================================
+  function gerarRelatorio() {
+    var tipo    = state.tipo;
+    var turmaId = el('r8-param-turma').value;
+    var alunoId = el('r8-param-aluno').value.trim();
+
+    if (!tipo) return;
+    if (['boletim','turmas-alunos','frequencia-turma','resultados-turma','alunos-turma-campos'].indexOf(tipo) !== -1 && !turmaId) {
+      if (typeof toast === 'function') toast('Selecione uma turma.', 'error'); return;
+    }
+
+    var btn = el('btn-r8-gerar'); btn.disabled = true; btn.classList.add('loading');
+    el('r8-preview-wrap').classList.remove('show');
+
+    var p;
+    if (tipo === 'boletim')            p = gerarBoletim(turmaId, alunoId);
+    else if (tipo === 'turmas-alunos') p = gerarTurmasAlunos(turmaId);
+    else if (tipo === 'alunos-geral')  p = gerarAlunosGeral();
+    else if (tipo === 'frequencia-turma') p = gerarFrequencia(turmaId);
+    else if (tipo === 'resultados-turma') p = gerarResultados(turmaId);
+    else if (tipo === 'alunos-turma-campos') p = gerarAlunosCampos(turmaId);
+    else p = Promise.reject(new Error('Tipo desconhecido.'));
+
+    p.then(function(html) {
+      btn.disabled = false; btn.classList.remove('loading');
+      el('r8-preview-conteudo').innerHTML = html;
+      el('r8-print-area').innerHTML = html;
+      el('r8-preview-wrap').classList.add('show');
+      el('r8-preview-label').textContent = 'Pré-visualização — ' + (el('r8-params-titulo-txt').textContent||'');
+      el('r8-preview-wrap').scrollIntoView({ behavior:'smooth', block:'start' });
+    }).catch(function(e) {
+      btn.disabled = false; btn.classList.remove('loading');
+      if (typeof toast === 'function') toast('Erro ao gerar: ' + (e.message||''), 'error');
+    });
+  }
+
+  // =========================================================
+  // 1. BOLETIM INDIVIDUAL
+  // =========================================================
+  function gerarBoletim(turmaId, filtroMatId) {
+    return Promise.all([
+      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 200 }),
+      postApi('turmas.buscar', { turmaId: turmaId }),
+      postApi('cursos.listar', {}),
+      postApi('avaliacoes.listar', {}),
+      postApi('frequencias.listar', { turmaId: turmaId }),
+    ]).then(function(res) {
+      var matriculas = (res[0].sucesso && res[0].dados) ? res[0].dados.dados || [] : [];
+      var turma      = res[1].sucesso ? res[1].dados : {};
+      var cursos     = (res[2].sucesso && res[2].dados) ? res[2].dados : [];
+      var avaliacoes = (res[3].sucesso && res[3].dados) ? res[3].dados : [];
+      var frequencias = (res[4].sucesso && res[4].dados) ? res[4].dados : [];
+
+      if (filtroMatId) matriculas = matriculas.filter(function(m){return m.MatriculaID===filtroMatId;});
+
+      var curso = cursos.find(function(c){return c.CursoID===turma.CursoID;});
+      var idsAv = curso && curso.AvaliacaoID ? String(curso.AvaliacaoID).split(',').map(function(s){return s.trim();}) : [];
+      var avs   = avaliacoes.filter(function(a){return idsAv.indexOf(a.AvaliacaoID)!==-1;});
+
+      // Calcula total de aulas únicas
+      var datasUnicas = {};
+      frequencias.forEach(function(f){ if(f.DataAula) datasUnicas[String(f.DataAula).substring(0,10)]=true; });
+      var totalAulas = Object.keys(datasUnicas).length;
+
+      // Busca notas e comentários de cada matrícula
+      var promises = matriculas.map(function(m) {
+        return Promise.all([
+          postApi('notas.listar', { matriculaId: m.MatriculaID }),
+          postApi('comentarios.listar', { matriculaId: m.MatriculaID }),
+        ]).then(function(r) {
+          return { matricula: m, notas: r[0].sucesso ? r[0].dados||[] : [], comentarios: r[1].sucesso ? r[1].dados||[] : [] };
+        });
+      });
+
+      return Promise.all(promises).then(function(dados) {
+        var html = '';
+        dados.forEach(function(d) {
+          var m   = d.matricula;
+          var notas = d.notas;
+          var coms  = d.comentarios;
+
+          // Frequência do aluno
+          var freqAluno = frequencias.filter(function(f){return f.MatriculaID===m.MatriculaID;});
+          var presencas  = freqAluno.filter(function(f){return f.Frequencia==='P';}).length;
+          var faltas     = freqAluno.filter(function(f){return f.Frequencia==='F';}).length;
+          var justif     = freqAluno.filter(function(f){return f.Frequencia==='J';}).length;
+          var pct        = totalAulas > 0 ? Math.round((presencas/totalAulas)*100) : 0;
+          var retidoFalta = pct < 75;
+
+          // Calcula médias
+          var aprovGeral = true; var pendGeral = false;
+          var compHtml = '';
+          avs.forEach(function(av) {
+            var subs = [];
+            for (var i=1;i<=Number(av.QntNotas);i++) {
+              var sub = av.ComponenteNota+' '+i;
+              var n = notas.find(function(x){return x.ComponenteNota===av.ComponenteNota&&x.SubcomponenteNota===sub;});
+              subs.push({ label: sub, valor: n ? n.ValorNota : null });
+            }
+            var valores = subs.filter(function(s){return s.valor!==null&&s.valor!==undefined;}).map(function(s){return parseFloat(s.valor);});
+            var media = null; var sit = 'PENDENTE';
+            if (valores.length === Number(av.QntNotas)) {
+              media = av.Tipo==='Média simples' ? valores.reduce(function(a,b){return a+b;},0)/valores.length : valores[0];
+              media = parseFloat(media.toFixed(1));
+              sit   = media >= Number(av.NotaAprovacao) ? 'APROVADO' : 'REPROVADO';
+            } else { pendGeral = true; }
+            if (sit !== 'APROVADO') aprovGeral = false;
+
+            compHtml += '<div class="r8-boletim-secao">' + av.ComponenteNota + '</div>';
+            compHtml += '<div class="r8-boletim-notas">';
+            subs.forEach(function(s) {
+              compHtml += '<div class="r8-nota-box"><div class="r8-nota-box-label">'+s.label+'</div>' +
+                '<div class="r8-nota-box-valor">'+(s.valor!==null&&s.valor!==undefined?s.valor:'–')+'</div></div>';
+            });
+            var mediaClass = sit==='APROVADO'?'ap':(sit==='REPROVADO'?'rep':'');
+            compHtml += '<div class="r8-nota-box"><div class="r8-nota-box-label">Média</div>' +
+              '<div class="r8-nota-box-valor '+mediaClass+'">'+(media!==null?media:'–')+'</div></div>';
+            compHtml += '</div>';
+          });
+
+          // Resultado final considerando frequência
+          var resultadoFinal = retidoFalta ? 'RETIDO' : (pendGeral ? 'PENDENTE' : (aprovGeral ? 'APROVADO' : 'REPROVADO'));
+          var resultadoLabel = { APROVADO:'Aprovado', REPROVADO:'Reprovado', RETIDO:'Retido por frequência', PENDENTE:'Pendente' }[resultadoFinal]||resultadoFinal;
+
+          // Comentários
+          var comHtml = '';
+          if (coms.length > 0) {
+            coms.forEach(function(c) {
+              if (c.Comentario) {
+                comHtml += '<div class="r8-boletim-secao">Comentário — Etapa ' + c.Etapa + '</div>';
+                comHtml += '<div class="r8-com-texto">' + c.Comentario + '</div>';
+              }
+            });
+          }
+
+          html += '<div class="r8-folha">' + htmlCabecalho() +
+            '<div class="r8-titulo-rel">Boletim</div>' +
+            '<div class="r8-subtitulo-rel">' + turma.TurmaID + ' · ' + (turma.Estagio||turma.CursoID||'') + ' · ' + (turma.DiaSemana||'') + (turma.Horario?' · '+turma.Horario:'') + '</div>' +
+            '<div class="r8-boletim-aluno">' +
+              '<div class="r8-boletim-header">' +
+                '<div><div class="r8-boletim-nome">' + (m.NomeExibicao||m.AlunoID) + '</div>' +
+                '<div class="r8-boletim-meta">' + m.MatriculaID + ' · Situação: ' + m.SituacaoMatricula + '</div></div>' +
+                '<span class="r8-resultado-geral '+resultadoFinal+'">' + resultadoLabel + '</span>' +
+              '</div>' +
+              compHtml +
+              '<div class="r8-boletim-secao">Frequência</div>' +
+              '<div class="r8-freq-row">' +
+                '<div class="r8-freq-item">Total de aulas: <strong>' + totalAulas + '</strong></div>' +
+                '<div class="r8-freq-item">Presenças: <strong>' + presencas + '</strong></div>' +
+                '<div class="r8-freq-item">Faltas: <strong>' + faltas + '</strong></div>' +
+                '<div class="r8-freq-item">Justificadas: <strong>' + justif + '</strong></div>' +
+                '<div class="r8-freq-item">Frequência: <strong style="color:' + (retidoFalta?'#E63946':'#2A9D8F') + '">' + pct + '%</strong>' +
+                (retidoFalta ? ' ⚠ Retido por falta' : '') + '</div>' +
+              '</div>' +
+              comHtml +
+            '</div>' +
+            htmlRodape() + '</div>';
+        });
+        return html || '<div class="r8-folha">' + htmlCabecalho() + '<div class="r8-estado"><span class="material-icons-round">info</span><p>Nenhum aluno encontrado.</p></div>' + htmlRodape() + '</div>';
+      });
+    });
+  }
+
+  // =========================================================
+  // 2. TURMAS COM ALUNOS
+  // =========================================================
+  function gerarTurmasAlunos(turmaId) {
+    return Promise.all([
+      postApi('turmas.buscar', { turmaId: turmaId }),
+      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 200 }),
+    ]).then(function(res) {
+      var turma     = res[0].sucesso ? res[0].dados : {};
+      var matriculas = (res[1].sucesso && res[1].dados) ? res[1].dados.dados||[] : [];
+
+      var linhas = matriculas.map(function(m, i) {
+        var ativo = m.SituacaoMatricula === 'ATIVA';
+        return '<tr>' +
+          '<td class="c">'+(i+1)+'</td>' +
+          '<td>'+(m.NomeExibicao||m.AlunoID||'—')+'</td>' +
+          '<td class="c">'+m.MatriculaID+'</td>' +
+          '<td class="c">'+m.SituacaoMatricula+'</td>' +
+        '</tr>';
+      }).join('');
+
+      return '<div class="r8-folha">' + htmlCabecalho() +
+        '<div class="r8-titulo-rel">Alunos matriculados</div>' +
+        '<div class="r8-subtitulo-rel">' + turmaId + ' · ' + (turma.Estagio||turma.CursoID||'') + ' · Prof. ' + (turma.ProfessorNome||'—') + ' · ' + (turma.DiaSemana||'') + (turma.Horario?' '+turma.Horario:'') + ' · ' + (turma.Modalidade||'') + '</div>' +
+        '<table class="r8-table"><thead><tr><th class="c">#</th><th>Nome</th><th class="c">MatriculaID</th><th class="c">Situação</th></tr></thead><tbody>' + linhas + '</tbody></table>' +
+        '<p style="font-size:8pt;color:#5C5C7A;">Total: ' + matriculas.length + ' matrícula(s)</p>' +
+        htmlRodape() + '</div>';
+    });
+  }
+
+  // =========================================================
+  // 3. LISTAGEM GERAL DE ALUNOS
+  // =========================================================
+  function gerarAlunosGeral() {
+    return postApi('alunos.listar', { tamanhoPagina: 2000 }).then(function(res) {
+      var alunos = (res.sucesso && res.dados) ? res.dados.dados||[] : [];
+      var linhas = alunos.map(function(a, i) {
+        return '<tr>' +
+          '<td class="c">'+(i+1)+'</td>' +
+          '<td>'+(a.NomeExibicao||a.NomeCompleto||'—')+'</td>' +
+          '<td class="c">'+fmt(a.AlunoID)+'</td>' +
+          '<td>'+fmt(a.email||a.Email)+'</td>' +
+          '<td class="c">'+fmtTel(a.Telefone)+'</td>' +
+          '<td class="c">'+(a.SituacaoAluno!==false&&a.SituacaoAluno!=='false'?'Ativo':'Inativo')+'</td>' +
+        '</tr>';
+      }).join('');
+
+      return '<div class="r8-folha">' + htmlCabecalho() +
+        '<div class="r8-titulo-rel">Listagem geral de alunos</div>' +
+        '<div class="r8-subtitulo-rel">Semestre ' + (state.semestre.Semestre||'—') + ' · Total: ' + alunos.length + ' aluno(s)</div>' +
+        '<table class="r8-table"><thead><tr><th class="c">#</th><th>Nome</th><th class="c">AlunoID</th><th>E-mail</th><th class="c">Telefone</th><th class="c">Situação</th></tr></thead><tbody>' + linhas + '</tbody></table>' +
+        htmlRodape() + '</div>';
+    });
+  }
+
+  // =========================================================
+  // 4. FREQUÊNCIA POR TURMA
+  // =========================================================
+  function gerarFrequencia(turmaId) {
+    return Promise.all([
+      postApi('turmas.buscar', { turmaId: turmaId }),
+      postApi('matriculas.listar', { turmaId: turmaId, situacao:'ATIVA', tamanhoPagina: 200 }),
+      postApi('frequencias.listar', { turmaId: turmaId }),
+    ]).then(function(res) {
+      var turma      = res[0].sucesso ? res[0].dados : {};
+      var matriculas = (res[1].sucesso && res[1].dados) ? res[1].dados.dados||[] : [];
+      var frequencias = (res[2].sucesso && res[2].dados) ? res[2].dados : [];
+
+      var datasUnicas = {};
+      frequencias.forEach(function(f){ if(f.DataAula) datasUnicas[String(f.DataAula).substring(0,10)]=true; });
+      var totalAulas = Object.keys(datasUnicas).length;
+
+      var linhas = matriculas.map(function(m, i) {
+        var freqAluno = frequencias.filter(function(f){return f.MatriculaID===m.MatriculaID;});
+        var p = freqAluno.filter(function(f){return f.Frequencia==='P';}).length;
+        var f = freqAluno.filter(function(f){return f.Frequencia==='F';}).length;
+        var j = freqAluno.filter(function(f){return f.Frequencia==='J';}).length;
+        var pct = totalAulas > 0 ? Math.round((p/totalAulas)*100) : 0;
+        var cor = pct < 75 ? '#E63946' : (pct < 85 ? '#D4A843' : '#2A9D8F');
+        return '<tr>' +
+          '<td class="c">'+(i+1)+'</td>' +
+          '<td>'+(m.NomeExibicao||m.AlunoID||'—')+'</td>' +
+          '<td class="c">'+p+'</td>' +
+          '<td class="c">'+f+'</td>' +
+          '<td class="c">'+j+'</td>' +
+          '<td class="c"><strong style="color:'+cor+'">'+pct+'%</strong></td>' +
+          '<td class="c">'+(pct<75?'⚠ Retido':'—')+'</td>' +
+        '</tr>';
+      }).join('');
+
+      return '<div class="r8-folha">' + htmlCabecalho() +
+        '<div class="r8-titulo-rel">Frequência por turma</div>' +
+        '<div class="r8-subtitulo-rel">' + turmaId + ' · ' + (turma.Estagio||'') + ' · Total de aulas: ' + totalAulas + '</div>' +
+        '<table class="r8-table"><thead><tr><th class="c">#</th><th>Aluno</th><th class="c">Presenças</th><th class="c">Faltas</th><th class="c">Justif.</th><th class="c">Frequência</th><th class="c">Situação</th></tr></thead><tbody>' + linhas + '</tbody></table>' +
+        '<p style="font-size:7.5pt;color:#9898B0;">⚠ Frequência abaixo de 75% = retido por falta</p>' +
+        htmlRodape() + '</div>';
+    });
+  }
+
+  // =========================================================
+  // 5. RESULTADOS POR TURMA
+  // =========================================================
+  function gerarResultados(turmaId) {
+    return Promise.all([
+      postApi('turmas.buscar', { turmaId: turmaId }),
+      postApi('matriculas.listar', { turmaId: turmaId, situacao:'ATIVA', tamanhoPagina: 200 }),
+      postApi('cursos.listar', {}),
+      postApi('avaliacoes.listar', {}),
+      postApi('frequencias.listar', { turmaId: turmaId }),
+    ]).then(function(res) {
+      var turma      = res[0].sucesso ? res[0].dados : {};
+      var matriculas = (res[1].sucesso && res[1].dados) ? res[1].dados.dados||[] : [];
+      var cursos     = (res[2].sucesso && res[2].dados) ? res[2].dados : [];
+      var avaliacoes = (res[3].sucesso && res[3].dados) ? res[3].dados : [];
+      var frequencias = (res[4].sucesso && res[4].dados) ? res[4].dados : [];
+
+      var curso = cursos.find(function(c){return c.CursoID===turma.CursoID;});
+      var idsAv = curso && curso.AvaliacaoID ? String(curso.AvaliacaoID).split(',').map(function(s){return s.trim();}) : [];
+      var avs   = avaliacoes.filter(function(a){return idsAv.indexOf(a.AvaliacaoID)!==-1;});
+
+      var datasUnicas = {};
+      frequencias.forEach(function(f){ if(f.DataAula) datasUnicas[String(f.DataAula).substring(0,10)]=true; });
+      var totalAulas = Object.keys(datasUnicas).length;
+
+      var promises = matriculas.map(function(m) {
+        return postApi('notas.listar', { matriculaId: m.MatriculaID }).then(function(r) {
+          return { m: m, notas: r.sucesso ? r.dados||[] : [] };
+        });
+      });
+
+      return Promise.all(promises).then(function(dados) {
+        var contadores = { APROVADO:0, REPROVADO:0, RETIDO:0, PENDENTE:0 };
+
+        var linhas = dados.map(function(d, i) {
+          var m = d.m; var notas = d.notas;
+          var freqAluno = frequencias.filter(function(f){return f.MatriculaID===m.MatriculaID;});
+          var presencas = freqAluno.filter(function(f){return f.Frequencia==='P';}).length;
+          var pct = totalAulas>0 ? Math.round((presencas/totalAulas)*100) : 0;
+          var retidoFalta = pct < 75;
+
+          var mediasHtml = '';
+          var aprovGeral = true; var pendGeral = false;
+          avs.forEach(function(av) {
+            var valores = [];
+            for (var k=1;k<=Number(av.QntNotas);k++) {
+              var sub = av.ComponenteNota+' '+k;
+              var n = notas.find(function(x){return x.ComponenteNota===av.ComponenteNota&&x.SubcomponenteNota===sub;});
+              if (n && n.ValorNota!==null && n.ValorNota!==undefined) valores.push(parseFloat(n.ValorNota));
+            }
+            var media=null; var sit='PENDENTE';
+            if (valores.length===Number(av.QntNotas)) {
+              media = av.Tipo==='Média simples'?valores.reduce(function(a,b){return a+b;},0)/valores.length:valores[0];
+              media = parseFloat(media.toFixed(1));
+              sit   = media>=Number(av.NotaAprovacao)?'APROVADO':'REPROVADO';
+            } else { pendGeral=true; }
+            if (sit!=='APROVADO') aprovGeral=false;
+            var cor = sit==='APROVADO'?'#2A9D8F':(sit==='REPROVADO'?'#E63946':'#9898B0');
+            mediasHtml += '<span style="color:'+cor+';font-weight:600;">'+(media!==null?media:'–')+'</span> ';
+          });
+
+          var resultado = retidoFalta?'RETIDO':(pendGeral?'PENDENTE':(aprovGeral?'APROVADO':'REPROVADO'));
+          var resultLabel = {APROVADO:'Aprovado',REPROVADO:'Reprovado',RETIDO:'Ret. falta',PENDENTE:'Pendente'}[resultado];
+          var resCor = {APROVADO:'#2A9D8F',REPROVADO:'#E63946',RETIDO:'#D4A843',PENDENTE:'#9898B0'}[resultado];
+          contadores[resultado]++;
+
+          return '<tr>' +
+            '<td class="c">'+(i+1)+'</td>' +
+            '<td>'+(m.NomeExibicao||m.AlunoID||'—')+'</td>' +
+            '<td class="c">'+mediasHtml+'</td>' +
+            '<td class="c" style="color:'+(pct<75?'#E63946':pct<85?'#D4A843':'#2A9D8F')+';font-weight:600;">'+pct+'%</td>' +
+            '<td class="c"><strong style="color:'+resCor+'">'+resultLabel+'</strong></td>' +
+          '</tr>';
+        }).join('');
+
+        var resumo = '<div style="display:flex;gap:16px;margin-bottom:10px;font-size:8.5pt;flex-wrap:wrap;">' +
+          '<span>Aprovados: <strong style="color:#2A9D8F">'+contadores.APROVADO+'</strong></span>' +
+          '<span>Reprovados: <strong style="color:#E63946">'+contadores.REPROVADO+'</strong></span>' +
+          '<span>Ret. por falta: <strong style="color:#D4A843">'+contadores.RETIDO+'</strong></span>' +
+          '<span>Pendentes: <strong style="color:#9898B0">'+contadores.PENDENTE+'</strong></span>' +
+          '<span>Total: <strong>'+matriculas.length+'</strong></span>' +
+        '</div>';
+
+        var cabAv = avs.map(function(av){return '<th class="c">'+av.ComponenteNota+'</th>';}).join('');
+
+        return '<div class="r8-folha">' + htmlCabecalho() +
+          '<div class="r8-titulo-rel">Resultados por turma</div>' +
+          '<div class="r8-subtitulo-rel">' + turmaId + ' · ' + (turma.Estagio||'') + ' · ' + (turma.ProfessorNome||'') + '</div>' +
+          resumo +
+          '<table class="r8-table"><thead><tr><th class="c">#</th><th>Aluno</th>'+cabAv+'<th class="c">Frequência</th><th class="c">Resultado</th></tr></thead><tbody>' + linhas + '</tbody></table>' +
+          htmlRodape() + '</div>';
+      });
+    });
+  }
+
+  // =========================================================
+  // 6. ALUNOS POR TURMA COM CAMPOS SELECIONADOS
+  // =========================================================
+  function gerarAlunosCampos(turmaId) {
+    var camposSel = [];
+    el('r8-campos-check').querySelectorAll('input:checked').forEach(function(inp){ camposSel.push(inp.value); });
+    if (camposSel.length === 0) camposSel = ['NomeExibicao'];
+
+    return Promise.all([
+      postApi('turmas.buscar', { turmaId: turmaId }),
+      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 200 }),
+      postApi('alunos.listar', { tamanhoPagina: 3000 }),
+    ]).then(function(res) {
+      var turma      = res[0].sucesso ? res[0].dados : {};
+      var matriculas = (res[1].sucesso && res[1].dados) ? res[1].dados.dados||[] : [];
+      var alunos     = (res[2].sucesso && res[2].dados) ? res[2].dados.dados||[] : [];
+
+      var labelMap = {};
+      CAMPOS_DISPONIVEIS.forEach(function(c){ labelMap[c.key]=c.label; });
+
+      var cabecalhos = ['#'].concat(camposSel.map(function(k){return labelMap[k]||k;})).concat(['Matrícula','Situação']);
+      var thHtml = cabecalhos.map(function(h,i){return '<th'+(i===0?' class="c"':'')+'>'+h+'</th>';}).join('');
+
+      var linhas = matriculas.map(function(m, i) {
+        var aluno = alunos.find(function(a){ return a.AlunoID===m.AlunoID; }) || {};
+        var tds = ['<td class="c">'+(i+1)+'</td>'].concat(camposSel.map(function(k) {
+          var v = aluno[k];
+          if (k==='Telefone') v = fmtTel(v);
+          else if (k==='Nascimento') v = fmtData(v);
+          else if (k==='PcDBoolean') v = v ? 'Sim' : 'Não';
+          return '<td>'+fmt(v)+'</td>';
+        })).concat([
+          '<td class="c">'+m.MatriculaID+'</td>',
+          '<td class="c">'+m.SituacaoMatricula+'</td>',
+        ]);
+        return '<tr>'+tds.join('')+'</tr>';
+      }).join('');
+
+      return '<div class="r8-folha">' + htmlCabecalho() +
+        '<div class="r8-titulo-rel">Alunos da turma</div>' +
+        '<div class="r8-subtitulo-rel">' + turmaId + ' · ' + (turma.Estagio||'') + ' · ' + (turma.DiaSemana||'') + (turma.Horario?' '+turma.Horario:'') + '</div>' +
+        '<table class="r8-table"><thead><tr>' + thHtml + '</tr></thead><tbody>' + linhas + '</tbody></table>' +
+        '<p style="font-size:8pt;color:#5C5C7A;">Total: ' + matriculas.length + ' matrícula(s)</p>' +
+        htmlRodape() + '</div>';
+    });
+  }
+
+  // =========================================================
+  // IMPRESSÃO
+  // =========================================================
+  function imprimir() {
+  var html = el('r8-print-area').innerHTML;
+  if (!html) {
+    if (typeof toast === 'function') toast('Gere o relatório antes de imprimir.', 'error');
+    return;
+  }
+
+  var janela = window.open('', '_blank', 'width=900,height=700');
+  janela.document.write(
+    '<!DOCTYPE html><html><head>' +
+    '<meta charset="UTF-8">' +
+    '<title>Relatório — CELINPB</title>' +
+    '<style>' +
+      // Estilos da folha copiados para a nova janela
+      'body{margin:0;padding:0;background:#fff;font-family:"DM Sans",sans-serif;}' +
+      '.r8-folha{background:#fff;width:210mm;min-height:297mm;margin:0 auto;padding:16mm 18mm;font-family:"DM Sans",sans-serif;font-size:10pt;color:#1A1A2E;box-sizing:border-box;}' +
+      '.r8-cab{display:flex;align-items:center;gap:14px;padding-bottom:10px;border-bottom:2px solid #1A1A2E;margin-bottom:12px;}' +
+      '.r8-cab-logo{width:52px;height:52px;object-fit:contain;flex-shrink:0;}' +
+      '.r8-cab-logo-placeholder{width:52px;height:52px;background:#F5F4F0;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#E63946;flex-shrink:0;}' +
+      '.r8-cab-info{flex:1;}' +
+      '.r8-cab-nome{font-size:13pt;font-weight:700;color:#1A1A2E;line-height:1.2;}' +
+      '.r8-cab-sub{font-size:8.5pt;color:#5C5C7A;margin-top:2px;}' +
+      '.r8-cab-sem{font-size:8pt;color:#9898B0;margin-top:3px;font-family:monospace;}' +
+      '.r8-titulo-rel{font-size:13pt;font-weight:700;color:#1A1A2E;margin:14px 0 4px;}' +
+      '.r8-subtitulo-rel{font-size:9pt;color:#5C5C7A;margin-bottom:14px;}' +
+      '.r8-table{width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:16px;}' +
+      '.r8-table th{background:#1A1A2E;color:#fff;padding:5px 8px;text-align:left;font-size:7.5pt;font-weight:600;letter-spacing:0.3px;}' +
+      '.r8-table th.c{text-align:center;}' +
+      '.r8-table td{padding:5px 8px;border-bottom:1px solid #E8E7E2;vertical-align:top;}' +
+      '.r8-table td.c{text-align:center;}' +
+      '.r8-table tbody tr:nth-child(even){background:#F8F7F3;}' +
+      '.r8-table tbody tr:last-child td{border-bottom:none;}' +
+      '.r8-boletim-aluno{margin-bottom:20px;padding-bottom:16px;border-bottom:1px dashed #C8C7C2;}' +
+      '.r8-boletim-aluno:last-child{border-bottom:none;}' +
+      '.r8-boletim-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;gap:8px;}' +
+      '.r8-boletim-nome{font-size:11pt;font-weight:700;color:#1A1A2E;}' +
+      '.r8-boletim-meta{font-size:8pt;color:#5C5C7A;}' +
+      '.r8-boletim-secao{font-size:8pt;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#9898B0;margin:8px 0 4px;padding-bottom:3px;border-bottom:1px solid #E8E7E2;}' +
+      '.r8-boletim-notas{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;margin-bottom:8px;}' +
+      '.r8-nota-box{background:#F8F7F3;border:1px solid #E8E7E2;border-radius:5px;padding:6px 8px;text-align:center;}' +
+      '.r8-nota-box-label{font-size:7pt;color:#9898B0;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:2px;}' +
+      '.r8-nota-box-valor{font-size:12pt;font-weight:700;color:#1A1A2E;}' +
+      '.r8-nota-box-valor.ap{color:#2A9D8F;}' +
+      '.r8-nota-box-valor.rep{color:#E63946;}' +
+      '.r8-nota-box-valor.ret{color:#E9C46A;}' +
+      '.r8-resultado-geral{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:8pt;font-weight:700;}' +
+      '.r8-resultado-geral.APROVADO{background:rgba(42,157,143,0.12);color:#1A6E65;}' +
+      '.r8-resultado-geral.REPROVADO{background:rgba(230,57,70,0.10);color:#A32D2D;}' +
+      '.r8-resultado-geral.RETIDO{background:rgba(233,196,106,0.20);color:#5C4200;}' +
+      '.r8-resultado-geral.PENDENTE{background:#F5F4F0;color:#9898B0;}' +
+      '.r8-freq-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:6px;}' +
+      '.r8-freq-item{font-size:8.5pt;}' +
+      '.r8-freq-item strong{color:#1A1A2E;}' +
+      '.r8-com-texto{font-size:8.5pt;color:#5C5C7A;font-style:italic;line-height:1.5;background:#F8F7F3;padding:6px 10px;border-radius:4px;border-left:3px solid #E8E7E2;margin-bottom:4px;}' +
+      '.r8-rodape-folha{margin-top:auto;padding-top:10px;border-top:1px solid #E8E7E2;font-size:7.5pt;color:#9898B0;display:flex;justify-content:space-between;}' +
+      '@media print{' +
+        '.r8-folha{page-break-after:always;margin:0;padding:12mm 14mm;}' +
+        '.r8-folha:last-child{page-break-after:avoid;}' +
+        '@page{size:A4;margin:0;}' +
+      '}' +
+    '</style>' +
+    '</head><body>' +
+    html +
+    '<script>window.onload=function(){window.print();};<\/script>' +
+    '</body></html>'
+  );
+  janela.document.close();
+}
+
+  // =========================================================
+  // EVENTOS
+  // =========================================================
+  function registrarEventos() {
+    document.querySelectorAll('.r8-tipo-card').forEach(function(card) {
+      card.addEventListener('click', function() { selecionarTipo(this.dataset.tipo); });
+    });
+    el('btn-r8-gerar')    && el('btn-r8-gerar').addEventListener('click', gerarRelatorio);
+    el('btn-r8-imprimir') && el('btn-r8-imprimir').addEventListener('click', imprimir);
+    el('btn-r8-cancelar') && el('btn-r8-cancelar').addEventListener('click', function() {
+      el('r8-params').classList.remove('show');
+      el('r8-preview-wrap').classList.remove('show');
+      state.tipo = null;
+      document.querySelectorAll('.r8-tipo-card').forEach(function(c){c.classList.remove('sel');});
+    });
+    el('btn-r8-novo') && el('btn-r8-novo').addEventListener('click', function() {
+      el('r8-preview-wrap').classList.remove('show');
+      el('r8-print-area').innerHTML = '';
+    });
+  }
+
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); }
+  else { init(); }
+}());
+</script>
