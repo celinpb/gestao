@@ -220,6 +220,8 @@
 <script>
 (function () {
   'use strict';
+
+  var _tokenCache = null;
   var state = {
     tipo: null, turmas: [], config: {}, semestre: {},
     logob64: '',
@@ -241,7 +243,26 @@
   // postApi
   // =========================================================
   function postApi(acao, dados) {
-    return window.postApi(acao, dados);
+    return new Promise(function(resolve, reject) {
+      function executar(token) {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res === null || res === undefined) { reject(new Error('Resposta nula: ' + acao)); }
+            else { resolve(res); }
+          })
+          .withFailureHandler(reject)
+          .processarRequisicao(JSON.stringify({ acao: acao, token: token, dados: dados || {} }));
+      }
+      if (_tokenCache) { executar(_tokenCache); return; }
+      google.script.run
+        .withSuccessHandler(function(sessao) {
+          if (!sessao || !sessao.token) { reject(new Error('Sessão não encontrada.')); return; }
+          _tokenCache = sessao.token;
+          executar(_tokenCache);
+        })
+        .withFailureHandler(reject)
+        .getSessaoAtiva();
+    });
   }
 
   function el(id) { return document.getElementById(id); }
@@ -435,7 +456,28 @@
         });
       });
 
-      return Promise.all(promises).then(function(dados) {
+      // Fallback avs para professor (sem permissao em cursos/avaliacoes)
+      var avsPromise = (avs.length > 0 || matriculas.length === 0)
+        ? Promise.resolve(avs)
+        : postApi('notas.calcularMedia', { matriculaId: matriculas[0].MatriculaID })
+            .then(function(r) {
+              if (r.sucesso && r.dados && r.dados.componentes) {
+                return r.dados.componentes.map(function(c) {
+                  return {
+                    AvaliacaoID:    c.AvaliacaoID || c.ComponenteNota,
+                    ComponenteNota: c.ComponenteNota,
+                    QntNotas:       c.QntNotas || 1,
+                    NotaAprovacao:  c.NotaAprovacao || 6,
+                    Tipo:           c.Tipo || 'Media simples',
+                  };
+                });
+              }
+              return avs;
+            })
+            .catch(function() { return avs; });
+
+      return Promise.all([Promise.all(promises), avsPromise]).then(function(res2) {
+        var dados = res2[0]; avs = res2[1];
         var html = '';
         dados.forEach(function(d) {
           var m   = d.matricula;
@@ -654,7 +696,30 @@
         });
       });
 
-      return Promise.all(promises).then(function(dados) {
+      // Fallback: se avs ficou vazio (sem permissao em cursos/avaliacoes),
+      // extrai componentes de calcularMedia da primeira matricula
+      var avsPromise = (avs.length > 0 || matriculas.length === 0)
+        ? Promise.resolve(avs)
+        : postApi('notas.calcularMedia', { matriculaId: matriculas[0].MatriculaID })
+            .then(function(r) {
+              if (r.sucesso && r.dados && r.dados.componentes) {
+                return r.dados.componentes.map(function(c) {
+                  return {
+                    AvaliacaoID:    c.AvaliacaoID || c.ComponenteNota,
+                    ComponenteNota: c.ComponenteNota,
+                    QntNotas:       c.QntNotas || 1,
+                    NotaAprovacao:  c.NotaAprovacao || 6,
+                    Tipo:           c.Tipo || 'Media simples',
+                  };
+                });
+              }
+              return avs;
+            })
+            .catch(function() { return avs; });
+
+      return Promise.all([Promise.all(promises), avsPromise]).then(function(res2) {
+        var dados = res2[0];
+        avs = res2[1];
         var contadores = { APROVADO:0, REPROVADO:0, RETIDO:0, PENDENTE:0 };
 
         var linhas = dados.map(function(d, i) {
