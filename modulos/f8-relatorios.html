@@ -284,19 +284,29 @@
   // INIT
   // =========================================================
   function init() {
-    // Carrega turmas, config e logo em paralelo
+    // Carrega turmas, config e semestre em paralelo
+    // Logo é carregado separadamente para não bloquear o restante em caso de erro
     Promise.all([
       postApi('turmas.listar', { tamanhoPagina: 300 }),
       postApi('sistema.config', {}),
       postApi('sistema.semestreAtual', {}),
-      postApi('sistema.logo', {}),
     ]).then(function(res) {
       if (res[0].sucesso && res[0].dados) state.turmas = res[0].dados.dados || [];
       if (res[1].sucesso) state.config = res[1].dados || {};
       if (res[2].sucesso) state.semestre = res[2].dados || {};
-      if (res[3].sucesso && res[3].dados) state.logob64 = res[3].dados.logo_base64 || '';
       popularSelectTurmas();
-    }).catch(function() {});
+    }).catch(function(e) {
+      // Mesmo em caso de erro parcial, tenta popular as turmas com o que houver
+      console.error('F8 init erro:', e);
+      popularSelectTurmas();
+    });
+
+    // Logo: carregado separadamente, sem bloquear o fluxo principal
+    postApi('sistema.logo', {})
+      .then(function(res) {
+        if (res && res.sucesso && res.dados) state.logob64 = res.dados.logo_base64 || '';
+      })
+      .catch(function() { state.logob64 = ''; });
 
     // Campos selecionáveis
     var wrap = el('r8-campos-check');
