@@ -220,8 +220,6 @@
 <script>
 (function () {
   'use strict';
-
-  var _tokenCache = null;
   var state = {
     tipo: null, turmas: [], config: {}, semestre: {},
     logob64: '',
@@ -243,26 +241,7 @@
   // postApi
   // =========================================================
   function postApi(acao, dados) {
-    return new Promise(function(resolve, reject) {
-      function executar(token) {
-        google.script.run
-          .withSuccessHandler(function(res) {
-            if (res === null || res === undefined) { reject(new Error('Resposta nula: ' + acao)); }
-            else { resolve(res); }
-          })
-          .withFailureHandler(reject)
-          .processarRequisicao(JSON.stringify({ acao: acao, token: token, dados: dados || {} }));
-      }
-      if (_tokenCache) { executar(_tokenCache); return; }
-      google.script.run
-        .withSuccessHandler(function(sessao) {
-          if (!sessao || !sessao.token) { reject(new Error('Sessão não encontrada.')); return; }
-          _tokenCache = sessao.token;
-          executar(_tokenCache);
-        })
-        .withFailureHandler(reject)
-        .getSessaoAtiva();
-    });
+    return window.postApi(acao, dados);
   }
 
   function el(id) { return document.getElementById(id); }
