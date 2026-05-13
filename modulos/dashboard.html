@@ -309,6 +309,7 @@
             '<span class="dash-oco-tipo '+cls+'">'+o.Tipo+'</span>'+
             '<span>'+fmtData(o.DataCriacao)+'</span>'+
             '<span>Por: '+(o.CriadoPorNome||o.CriadoPor||'—')+'</span>'+
+            (o.TurmaAtual ? '<span>Turma: '+o.TurmaAtual+'</span>' : '')+
           '</div>'+
         '</div>';
       card.addEventListener('click', function() { abrirDetalhe(o); });
@@ -327,6 +328,7 @@
       '<span class="dash-oco-tipo '+cls+'">'+oco.Tipo+'</span>'+
       '<span>'+fmtData(oco.DataCriacao)+'</span>'+
       '<span>Aluno: '+(oco.AlunoNome||oco.AlunoID||'—')+'</span>'+
+      (oco.TurmaAtual ? '<span>Turma: '+oco.TurmaAtual+'</span>' : '')+
       '<span>Por: '+(oco.CriadoPorNome||oco.CriadoPor||'—')+'</span>';
     el('det-desc').textContent = oco.Descricao || '';
     el('det-thread').innerHTML = '<div class="dash-oco-spinner"></div>';
