@@ -563,20 +563,21 @@
         </div>
         <div class="form-field span2">
           <label>Notificar (destinatarios)</label>
-          <div style="display:flex;flex-wrap:wrap;gap:10px;padding:6px 0;">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;padding:6px 0 10px;">
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
               <input type="checkbox" id="oco-dest-coord" value="coordenacao" style="accent-color:#E63946;width:15px;height:15px;">
               Coordenacao
-            </label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
-              <input type="checkbox" id="oco-dest-prof" value="professor" style="accent-color:#E63946;width:15px;height:15px;">
-              Professor(a)
             </label>
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
               <input type="checkbox" id="oco-dest-sec" value="secretaria" style="accent-color:#E63946;width:15px;height:15px;">
               Secretaria
             </label>
           </div>
+          <label style="font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--c-text-3,#9898B0);display:block;margin-bottom:5px;">Professor(a) da turma</label>
+          <select class="form-input" id="oco-dest-prof-sel" multiple style="height:80px;padding:6px 8px;font-size:13px;">
+            <option value="" disabled>Carregando professores...</option>
+          </select>
+          <span style="font-size:11px;color:var(--c-text-3,#9898B0);">Segure Ctrl para selecionar mais de um professor.</span>
         </div>
         <div class="form-field span2">
           <label>Semestre de referencia (opcional)</label>
@@ -1082,9 +1083,31 @@ function postApi(acao, dados) {
     for (i = 0; i < ids.length; i++) {
       var e = el(ids[i]); if (e) e.value = '';
     }
-    var cbs = ['oco-dest-coord', 'oco-dest-prof', 'oco-dest-sec'];
+    var cbs = ['oco-dest-coord', 'oco-dest-sec'];
     for (i = 0; i < cbs.length; i++) {
       var cb = el(cbs[i]); if (cb) cb.checked = false;
+    }
+    // Carrega professores das turmas ativas do aluno
+    var sel = el('oco-dest-prof-sel');
+    if (sel) {
+      sel.innerHTML = '<option value="" disabled>Carregando...</option>';
+      postApi('ocorrencias.professoresDasTurmas', { alunoId: state.ocoAlunoId })
+        .then(function(res) {
+          sel.innerHTML = '';
+          if (res.sucesso && res.dados && res.dados.length > 0) {
+            res.dados.forEach(function(p) {
+              var opt = document.createElement('option');
+              opt.value       = p.UsuarioID;
+              opt.textContent = p.Label || p.Nome;
+              sel.appendChild(opt);
+            });
+          } else {
+            sel.innerHTML = '<option value="" disabled>Nenhum professor encontrado</option>';
+          }
+        })
+        .catch(function() {
+          sel.innerHTML = '<option value="" disabled>Erro ao carregar</option>';
+        });
     }
     el('oco-modal-alerta').classList.remove('show');
     el('oco-modal-overlay').style.display = 'flex';
@@ -1110,8 +1133,14 @@ function postApi(acao, dados) {
 
     var dests = [];
     if (el('oco-dest-coord') && el('oco-dest-coord').checked) dests.push('coordenacao');
-    if (el('oco-dest-prof')  && el('oco-dest-prof').checked)  dests.push('professor');
     if (el('oco-dest-sec')   && el('oco-dest-sec').checked)   dests.push('secretaria');
+    // Coleta UsuarioIDs dos professores selecionados no select múltiplo
+    var profSel = el('oco-dest-prof-sel');
+    if (profSel) {
+      Array.from(profSel.options).forEach(function(opt) {
+        if (opt.selected && opt.value) dests.push(opt.value);
+      });
+    }
 
     var btn = el('oco-btn-salvar');
     if (btn) { btn.disabled = true; btn.classList.add('loading'); }
