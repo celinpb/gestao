@@ -286,6 +286,24 @@ function aplicarConfig(config) {
   App.config = config;
   if (config.sigla_escola) document.getElementById('brand-name').textContent = config.sigla_escola;
   if (config.nome_escola)  document.title = config.nome_escola + ' · SGE';
+
+  // Carrega o logo diretamente do repositório GitHub Pages.
+  // O arquivo 'logo 180x180.png' está na raiz do repositório, junto com index.html.
+  // Não depende do backend — é uma URL pública estática.
+  var logoEl = document.getElementById('brand-logo');
+  if (logoEl) {
+    var img = new Image();
+    img.onload = function() {
+      logoEl.innerHTML = '';
+      logoEl.appendChild(img);
+    };
+    img.onerror = function() {
+      // Mantém o placeholder de texto se o arquivo não carregar
+    };
+    img.src = 'logo 180x180.png';
+    img.alt = config.sigla_escola || 'Logo';
+    img.style.cssText = 'width:100%;height:100%;object-fit:contain;';
+  }
 }
 
 function normalizarMenu(itens) {
