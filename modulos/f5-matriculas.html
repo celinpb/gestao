@@ -225,56 +225,38 @@
   // =========================================================
   // MATRÍCULAS
   // =========================================================
-  // Substitua a função carregarMatriculas existente
-function carregarMatriculas() {
-  el('m5-estado').style.display = 'block';
-  el('m5-estado').innerHTML = '<div class="m5-spinner"></div><p>Carregando matrículas…</p>';
-  el('m5-tabela').style.display = 'none';
-  el('m5-paginacao').style.display = 'none';
+  function carregarMatriculas() {
+    el('m5-estado').style.display = 'block';
+    el('m5-estado').innerHTML = '<div class="m5-spinner"></div><p>Carregando matrículas…</p>';
+    el('m5-tabela').style.display = 'none';
+    el('m5-paginacao').style.display = 'none';
 
-  var filtros = {
-    pagina:        state.paginaAtual,
-    tamanhoPagina: state.tamanhoPagina,
-  };
-  if (state.filtroSit)   filtros.situacao = state.filtroSit;
-  if (state.filtroTurma) filtros.turmaId  = state.filtroTurma;
-  if (state.busca)       filtros.busca    = state.busca;   // ← NOVO: envia busca ao backend
+    var filtros = {
+      pagina:        state.paginaAtual,
+      tamanhoPagina: state.tamanhoPagina,
+    };
+    if (state.filtroSit)   filtros.situacao = state.filtroSit;
+    if (state.filtroTurma) filtros.turmaId  = state.filtroTurma;
+    if (state.busca)       filtros.busca    = state.busca;
 
-  postApi('matriculas.listar', filtros)
-    .then(function(res) {
-      if (!res.sucesso) {
+    postApi('matriculas.listar', filtros)
+      .then(function(res) {
+        if (!res.sucesso) {
+          el('m5-estado').style.display = 'block';
+          el('m5-estado').innerHTML = '<span class="material-icons-round">error_outline</span><p>' + (res.mensagem||'Erro ao carregar.') + '</p>';
+          return;
+        }
+        var dados = res.dados || {};
+        state.matriculas      = dados.dados || [];
+        state.totalRegistros  = dados.totalRegistros || state.matriculas.length;
+        state.totalPaginas    = dados.totalPaginas   || 1;
+        atualizarResumo();
+        renderizarMatriculas();
+      })
+      .catch(function(e) {
         el('m5-estado').style.display = 'block';
-        el('m5-estado').innerHTML = '<span class="material-icons-round">error_outline</span><p>' + (res.mensagem||'Erro ao carregar.') + '</p>';
-        return;
-      }
-      var dados = res.dados || {};
-      state.matriculas      = dados.dados || [];
-      state.totalRegistros  = dados.totalRegistros || state.matriculas.length;
-      state.totalPaginas    = dados.totalPaginas   || 1;
-      atualizarResumo();
-      renderizarMatriculas();
-    })
-    .catch(function(e) {
-      el('m5-estado').style.display = 'block';
-      el('m5-estado').innerHTML = '<span class="material-icons-round">error_outline</span><p>Erro de comunicação: ' + (e.message||'') + '</p>';
-    });
-}
-
-// Substitua a função matriculasFiltradas — ela não é mais necessária para busca,
-// mas mantenha como identidade para não quebrar chamadas existentes:
-function matriculasFiltradas() {
-  return state.matriculas; // filtro agora é feito inteiramente no backend
-}
-
-// Substitua o trecho de registro de eventos da busca (dentro de registrarEventos):
-el('m5-busca') && el('m5-busca').addEventListener('input', function() {
-  clearTimeout(buscarTimer);
-  buscarTimer = setTimeout(function() {
-    state.busca = el('m5-busca').value.trim();
-    state.paginaAtual = 1;   // volta para a primeira página ao buscar
-    carregarMatriculas();    // vai ao backend com o termo
-  }, 400);
-});
+        el('m5-estado').innerHTML = '<span class="material-icons-round">error_outline</span><p>Erro de comunicação: ' + (e.message||'') + '</p>';
+      });
   }
 
   function atualizarResumo() {
@@ -409,13 +391,14 @@ el('m5-busca') && el('m5-busca').addEventListener('input', function() {
   // EVENTOS
   // =========================================================
   function registrarEventos() {
-    // Busca com debounce
+    // Busca com debounce — envia ao backend para filtrar em todos os registros
     el('m5-busca') && el('m5-busca').addEventListener('input', function() {
       clearTimeout(buscarTimer);
       buscarTimer = setTimeout(function() {
         state.busca = el('m5-busca').value.trim();
-        renderizarMatriculas();
-      }, 350);
+        state.paginaAtual = 1;
+        carregarMatriculas();
+      }, 400);
     });
 
     // Filtros
