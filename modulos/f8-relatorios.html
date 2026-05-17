@@ -222,7 +222,7 @@
   'use strict';
   var state = {
     tipo: null, turmas: [], config: {}, semestre: {},
-    logob64: '',
+    logoUrl: '',
   };
 
   var CAMPOS_DISPONIVEIS = [
@@ -280,12 +280,9 @@
       popularSelectTurmas();
     });
 
-    // Logo: carregado separadamente, sem bloquear o fluxo principal
-    postApi('sistema.logo', {})
-      .then(function(res) {
-        if (res && res.sucesso && res.dados) state.logob64 = res.dados.logo_base64 || '';
-      })
-      .catch(function() { state.logob64 = ''; });
+    // Logo: carrega diretamente do repositório GitHub Pages (URL estática),
+    // sem depender do backend. O arquivo está na raiz, junto com index.html.
+    state.logoUrl = 'logo 180x180.png';
 
     // Campos selecionáveis
     var wrap = el('r8-campos-check');
@@ -346,8 +343,11 @@
   function htmlCabecalho() {
     var cfg = state.config;
     var sem = state.semestre;
-    var logoHtml = state.logob64
-      ? '<img class="r8-cab-logo" src="' + state.logob64 + '" alt="Logo">'
+    // Usa URL relativa ao repositório — funciona no preview e na janela de impressão
+    // (a janela de impressão é aberta com window.open na mesma origem)
+    var logoUrl = state.logoUrl || '';
+    var logoHtml = logoUrl
+      ? '<img class="r8-cab-logo" src="' + logoUrl + '" alt="Logo">'
       : '<div class="r8-cab-logo-placeholder">' + (cfg.sigla_escola||'CL').substring(0,2) + '</div>';
 
     var dadosCab = [cfg.endereco, cfg.telefone, cfg.email].filter(Boolean).join(' · ');
