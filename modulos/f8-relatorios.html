@@ -55,8 +55,45 @@
   .r8-spinner-sm{width:20px;height:20px;border:2.5px solid var(--c-border,#E8E7E2);border-top-color:#E63946;border-radius:50%;animation:spin-r8 0.7s linear infinite;margin:0 auto 8px;}
 
   /* =========================================================
-     FOLHA DO RELATÓRIO (tela e impressão)
+     RELATÓRIO CONDENSADO — painel de parâmetros próprio
   ========================================================= */
+  .r8c-painel{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:10px;padding:20px;margin-bottom:20px;display:none;}
+  .r8c-painel.show{display:block;}
+  .r8c-titulo{font-size:13px;font-weight:600;color:var(--c-text-1,#1A1A2E);margin-bottom:16px;display:flex;align-items:center;gap:6px;}
+  .r8c-titulo .material-icons-round{font-size:17px;color:#E63946;}
+  .r8c-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px;}
+  .r8c-field{display:flex;flex-direction:column;gap:5px;}
+  .r8c-field label{font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--c-text-3,#9898B0);}
+  .r8c-select{height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:7px;padding:0 11px;font-family:var(--font-sans,sans-serif);font-size:13.5px;color:var(--c-text-1,#1A1A2E);background:#FAFAF8;outline:none;width:100%;cursor:pointer;transition:border-color 150ms ease;}
+  .r8c-select:focus{border-color:#E63946;}
+  .r8c-metricas-titulo{font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--c-text-3,#9898B0);margin-bottom:8px;}
+  .r8c-metricas-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+  .r8c-check{display:flex;align-items:center;gap:6px;padding:6px 12px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:6px;cursor:pointer;font-size:13px;color:var(--c-text-1,#1A1A2E);transition:border-color 120ms ease,background 120ms ease;user-select:none;}
+  .r8c-check:has(input:checked){border-color:#E63946;background:rgba(230,57,70,0.05);color:#A32D2D;font-weight:500;}
+  .r8c-check input{accent-color:#E63946;width:14px;height:14px;cursor:pointer;}
+  .r8c-acoes{display:flex;gap:10px;flex-wrap:wrap;}
+
+  /* Tabela condensada na tela */
+  .r8c-resultado{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:10px;overflow:hidden;margin-bottom:16px;display:none;}
+  .r8c-resultado.show{display:block;}
+  .r8c-resultado-toolbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--c-border,#E8E7E2);flex-wrap:wrap;gap:8px;}
+  .r8c-resultado-titulo{font-size:13px;font-weight:600;color:var(--c-text-1,#1A1A2E);}
+  .r8c-tabela{width:100%;border-collapse:collapse;font-size:13px;}
+  .r8c-tabela thead tr{background:#1A1A2E;}
+  .r8c-tabela th{padding:9px 14px;font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:rgba(255,255,255,0.75);text-align:left;white-space:nowrap;}
+  .r8c-tabela th.num{text-align:right;}
+  .r8c-tabela tbody tr{border-bottom:1px solid var(--c-border,#E8E7E2);transition:background 100ms ease;}
+  .r8c-tabela tbody tr:last-child{border-bottom:none;}
+  .r8c-tabela tbody tr:hover{background:#FAFAF8;}
+  .r8c-tabela tbody tr.total-row{background:#F0EEE8;font-weight:600;border-top:2px solid var(--c-border,#E8E7E2);}
+  .r8c-tabela td{padding:9px 14px;color:var(--c-text-1,#1A1A2E);vertical-align:middle;}
+  .r8c-tabela td.num{text-align:right;font-family:var(--font-mono,monospace);font-size:12.5px;}
+  .r8c-tabela td.dim{font-weight:500;}
+  .r8c-badge{display:inline-flex;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;}
+  .r8c-badge.ap{background:rgba(42,157,143,0.12);color:#1A6E65;}
+  .r8c-badge.rep{background:rgba(230,57,70,0.10);color:#A32D2D;}
+  .r8c-badge.pend{background:#F5F4F0;color:#9898B0;}
+  .r8c-spinner{width:20px;height:20px;border:2.5px solid var(--c-border,#E8E7E2);border-top-color:#E63946;border-radius:50%;animation:spin-r8 0.7s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px;}
   .r8-folha{background:#fff;width:210mm;min-height:297mm;margin:0 auto;padding:16mm 18mm;box-shadow:0 2px 16px rgba(0,0,0,0.15);font-family:'DM Sans',sans-serif;font-size:10pt;color:#1A1A2E;box-sizing:border-box;}
 
   /* Cabeçalho institucional */
@@ -152,10 +189,10 @@
     <div class="r8-tipo-nome">Resultados por turma</div>
     <div class="r8-tipo-desc">Médias, aprovados, retidos e retidos por falta</div>
   </div>
-  <div class="r8-tipo-card" data-tipo="alunos-turma-campos">
-    <div class="r8-tipo-icone"><span class="material-icons-round">table_chart</span></div>
-    <div class="r8-tipo-nome">Alunos por turma (campos)</div>
-    <div class="r8-tipo-desc">Lista de alunos de uma turma com campos do cadastro</div>
+  <div class="r8-tipo-card" data-tipo="condensado">
+    <div class="r8-tipo-icone"><span class="material-icons-round">pivot_table_chart</span></div>
+    <div class="r8-tipo-nome">Relatório condensado</div>
+    <div class="r8-tipo-desc">Contagens por dimensão — curso, professor, perfil do aluno e mais</div>
   </div>
 </div>
 
@@ -198,8 +235,96 @@
   </div>
 </div>
 
-<!-- PREVIEW -->
-<div class="r8-preview-wrap" id="r8-preview-wrap">
+<!-- PAINEL CONDENSADO (parâmetros próprios, independente do r8-params padrão) -->
+<div class="r8c-painel" id="r8c-painel">
+  <div class="r8c-titulo">
+    <span class="material-icons-round">pivot_table_chart</span>
+    Relatório condensado — configurar
+  </div>
+
+  <div class="r8c-grid">
+    <div class="r8c-field">
+      <label>Semestre</label>
+      <select class="r8c-select" id="r8c-semestre">
+        <option value="">Carregando…</option>
+      </select>
+    </div>
+    <div class="r8c-field">
+      <label>Agrupar por (dimensão)</label>
+      <select class="r8c-select" id="r8c-dimensao">
+        <option value="idioma">Idioma / Curso</option>
+        <option value="turma">Turma / Estágio</option>
+        <option value="professor">Professor</option>
+        <option value="modalidade">Modalidade</option>
+        <option value="turno">Dia da semana / Turno</option>
+        <option value="situacao_matricula">Situação da matrícula</option>
+        <option value="genero">Gênero do aluno</option>
+        <option value="raca">Raça / Cor</option>
+        <option value="publico">Público-alvo</option>
+        <option value="municipio">Município</option>
+        <option value="pcd">PcD</option>
+        <option value="menor">Faixa etária (menor / maior)</option>
+      </select>
+    </div>
+    <div class="r8c-field">
+      <label>Filtrar situação da matrícula</label>
+      <select class="r8c-select" id="r8c-filtro-sit">
+        <option value="">Todas as situações</option>
+        <option value="ATIVA">Somente ativas</option>
+        <option value="TRANCADA">Somente trancadas</option>
+        <option value="CONCLUIDA">Somente concluídas</option>
+        <option value="CANCELADA">Somente canceladas</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="r8c-metricas-titulo">Métricas a exibir</div>
+  <div class="r8c-metricas-grid">
+    <label class="r8c-check"><input type="checkbox" value="total_matriculas" checked> Total de matrículas</label>
+    <label class="r8c-check"><input type="checkbox" value="sit_ativa" checked> Ativas</label>
+    <label class="r8c-check"><input type="checkbox" value="sit_trancada"> Trancadas</label>
+    <label class="r8c-check"><input type="checkbox" value="sit_concluida"> Concluídas</label>
+    <label class="r8c-check"><input type="checkbox" value="sit_cancelada"> Canceladas</label>
+    <label class="r8c-check"><input type="checkbox" value="aprovados"> Aprovados</label>
+    <label class="r8c-check"><input type="checkbox" value="reprovados"> Reprovados</label>
+    <label class="r8c-check"><input type="checkbox" value="pendentes"> Pendentes</label>
+    <label class="r8c-check"><input type="checkbox" value="freq_media"> Freq. média (%)</label>
+  </div>
+
+  <div class="r8c-acoes">
+    <button class="btn-r8 btn-r8-primario" id="r8c-btn-gerar">
+      <div class="spinner-btn"></div>
+      <span class="material-icons-round btn-txt">play_arrow</span>
+      <span class="btn-txt">Gerar</span>
+    </button>
+    <button class="btn-r8 btn-r8-sec" id="r8c-btn-cancelar">
+      <span class="material-icons-round">close</span>Cancelar
+    </button>
+  </div>
+</div>
+
+<!-- RESULTADO CONDENSADO -->
+<div class="r8c-resultado" id="r8c-resultado">
+  <div class="r8c-resultado-toolbar">
+    <span class="r8c-resultado-titulo" id="r8c-resultado-titulo">—</span>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-r8 btn-r8-sec" id="r8c-btn-imprimir">
+        <span class="material-icons-round">print</span>Imprimir / PDF
+      </button>
+    </div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="r8c-tabela" id="r8c-tabela">
+      <thead id="r8c-thead"></thead>
+      <tbody id="r8c-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Área de impressão do condensado -->
+<div id="r8c-print-area" style="display:none;"></div>
+
+
   <div class="r8-preview-toolbar">
     <span class="r8-preview-label" id="r8-preview-label">Pré-visualização</span>
     <div style="display:flex;gap:8px;">
@@ -222,7 +347,7 @@
   'use strict';
   var state = {
     tipo: null, turmas: [], config: {}, semestre: {},
-    logoUrl: '',
+    logoUrl: '', semestres: [],
   };
 
   var CAMPOS_DISPONIVEIS = [
@@ -263,26 +388,24 @@
   // INIT
   // =========================================================
   function init() {
-    // Carrega turmas, config e semestre em paralelo
-    // Logo é carregado separadamente para não bloquear o restante em caso de erro
     Promise.all([
       postApi('turmas.listar', { tamanhoPagina: 300 }),
       postApi('sistema.config', {}),
       postApi('sistema.semestreAtual', {}),
+      postApi('semestres.listar', {}),
     ]).then(function(res) {
       if (res[0].sucesso && res[0].dados) state.turmas = res[0].dados.dados || [];
       if (res[1].sucesso) state.config = res[1].dados || {};
       if (res[2].sucesso) state.semestre = res[2].dados || {};
+      if (res[3].sucesso && res[3].dados) state.semestres = res[3].dados || [];
       popularSelectTurmas();
+      popularSelectSemestres();
     }).catch(function(e) {
-      // Mesmo em caso de erro parcial, tenta popular as turmas com o que houver
       console.error('F8 init erro:', e);
       popularSelectTurmas();
     });
 
-    // Logo: carrega diretamente do repositório GitHub Pages (URL estática),
-    // sem depender do backend. O arquivo está na raiz, junto com index.html.
-    state.logoUrl = 'logo180x180.png';
+    state.logoUrl = 'logo 180x180.png';
 
     // Campos selecionáveis
     var wrap = el('r8-campos-check');
@@ -296,6 +419,27 @@
     });
 
     registrarEventos();
+  }
+
+  function popularSelectSemestres() {
+    var sel = el('r8c-semestre');
+    if (!sel) return;
+    sel.innerHTML = '';
+    // Ordena: atual primeiro, depois por ID decrescente
+    var lista = state.semestres.slice().sort(function(a, b) {
+      if (a.SemestreAtual && !b.SemestreAtual) return -1;
+      if (!a.SemestreAtual && b.SemestreAtual) return 1;
+      return Number(b.SemestreID) - Number(a.SemestreID);
+    });
+    lista.forEach(function(s) {
+      var opt = document.createElement('option');
+      opt.value = s.SemestreID;
+      opt.textContent = (s.Semestre || s.SemestreID) + (s.SemestreAtual ? ' (atual)' : '');
+      sel.appendChild(opt);
+    });
+    if (!lista.length) {
+      sel.innerHTML = '<option value="">Nenhum semestre encontrado</option>';
+    }
   }
 
   function popularSelectTurmas() {
@@ -315,17 +459,27 @@
     state.tipo = tipo;
     document.querySelectorAll('.r8-tipo-card').forEach(function(c) { c.classList.toggle('sel', c.dataset.tipo === tipo); });
 
+    // Oculta ambos os painéis antes de decidir qual mostrar
+    el('r8-params').classList.remove('show');
+    el('r8c-painel').classList.remove('show');
+    el('r8-preview-wrap').classList.remove('show');
+    el('r8c-resultado').classList.remove('show');
+
+    if (tipo === 'condensado') {
+      el('r8c-painel').classList.add('show');
+      return;
+    }
+
     var nomes = {
-      'boletim':          'Boletim individual',
-      'turmas-alunos':    'Turmas com alunos matriculados',
-      'alunos-geral':     'Listagem geral de alunos',
-      'frequencia-turma': 'Frequência por turma',
-      'resultados-turma': 'Resultados por turma',
+      'boletim':             'Boletim individual',
+      'turmas-alunos':       'Turmas com alunos matriculados',
+      'alunos-geral':        'Listagem geral de alunos',
+      'frequencia-turma':    'Frequência por turma',
+      'resultados-turma':    'Resultados por turma',
       'alunos-turma-campos': 'Alunos por turma com campos selecionados',
     };
     el('r8-params-titulo-txt').textContent = nomes[tipo] || tipo;
 
-    // Mostra/oculta campos conforme o tipo
     el('r8-param-turma-wrap').style.display =
       ['alunos-geral'].indexOf(tipo) !== -1 ? 'none' : 'block';
     el('r8-param-aluno-wrap').style.display =
@@ -334,7 +488,6 @@
       tipo === 'alunos-turma-campos' ? 'block' : 'none';
 
     el('r8-params').classList.add('show');
-    el('r8-preview-wrap').classList.remove('show');
   }
 
   // =========================================================
@@ -894,7 +1047,362 @@
   // =========================================================
   // EVENTOS
   // =========================================================
-  function registrarEventos() {
+  // =========================================================
+  // RELATÓRIO CONDENSADO
+  // =========================================================
+
+  // Mapa legível de nomes de dimensão
+  var DIMENSAO_LABEL = {
+    idioma:            'Idioma / Curso',
+    turma:             'Turma / Estágio',
+    professor:         'Professor',
+    modalidade:        'Modalidade',
+    turno:             'Dia da semana / Turno',
+    situacao_matricula:'Situação da matrícula',
+    genero:            'Gênero',
+    raca:              'Raça / Cor',
+    publico:           'Público-alvo',
+    municipio:         'Município',
+    pcd:               'PcD',
+    menor:             'Faixa etária',
+  };
+
+  // Mapa de nomes de métrica para cabeçalho da tabela
+  var METRICA_LABEL = {
+    total_matriculas: 'Total',
+    sit_ativa:        'Ativas',
+    sit_trancada:     'Trancadas',
+    sit_concluida:    'Concluídas',
+    sit_cancelada:    'Canceladas',
+    aprovados:        'Aprovados',
+    reprovados:       'Reprovados',
+    pendentes:        'Pendentes',
+    freq_media:       'Freq. média',
+  };
+
+  function gerarCondensado() {
+    var semestreId = el('r8c-semestre') ? el('r8c-semestre').value : '';
+    var dimensao   = el('r8c-dimensao') ? el('r8c-dimensao').value : 'idioma';
+    var filtroSit  = el('r8c-filtro-sit') ? el('r8c-filtro-sit').value : '';
+
+    var metricas = [];
+    document.querySelectorAll('.r8c-metricas-grid input[type=checkbox]').forEach(function(cb) {
+      if (cb.checked) metricas.push(cb.value);
+    });
+    if (!metricas.length) {
+      if (typeof toast === 'function') toast('Selecione ao menos uma métrica.', 'error');
+      return;
+    }
+    if (!semestreId) {
+      if (typeof toast === 'function') toast('Selecione um semestre.', 'error');
+      return;
+    }
+
+    var btn = el('r8c-btn-gerar');
+    btn.disabled = true; btn.classList.add('loading');
+    el('r8c-resultado').classList.remove('show');
+
+    // Cargas paralelas: matrículas (paginadas), alunos (para dados de perfil),
+    // turmas (para dados de turma), e frequências se necessário
+    var precisaFreq    = metricas.indexOf('freq_media') !== -1;
+    var precisaResultado = metricas.indexOf('aprovados') !== -1 ||
+                           metricas.indexOf('reprovados') !== -1 ||
+                           metricas.indexOf('pendentes') !== -1;
+
+    // Busca todas as matrículas do semestre selecionado (sem paginação)
+    var promessas = [
+      postApi('matriculas.listar', {
+        semestreId:    semestreId,
+        tamanhoPagina: 5000,
+        situacao:      filtroSit || undefined,
+      }),
+      postApi('turmas.listar', { semestreId: semestreId, tamanhoPagina: 300 }),
+      postApi('alunos.listar', { tamanhoPagina: 5000 }),
+    ];
+    if (precisaFreq) {
+      promessas.push(postApi('frequencias.listar', { semestreId: semestreId }));
+    }
+    if (precisaResultado) {
+      promessas.push(postApi('notas.calcularResultadosTurma', { semestreId: semestreId }));
+    }
+
+    Promise.all(promessas).then(function(res) {
+      btn.disabled = false; btn.classList.remove('loading');
+
+      var matriculas = (res[0].sucesso && res[0].dados) ? (res[0].dados.dados || []) : [];
+      var turmas     = (res[1].sucesso && res[1].dados) ? (res[1].dados.dados || []) : [];
+      var alunos     = (res[2].sucesso && res[2].dados) ? (res[2].dados.dados || []) : [];
+      var frequencias = [];
+      var resultados  = [];
+      var idx = 3;
+      if (precisaFreq)       { frequencias = (res[idx] && res[idx].sucesso && res[idx].dados) ? res[idx].dados : []; idx++; }
+      if (precisaResultado)  { resultados  = (res[idx] && res[idx].sucesso && res[idx].dados) ? res[idx].dados : []; }
+
+      // Monta mapas de apoio
+      var mapaAluno  = {};
+      alunos.forEach(function(a) { mapaAluno[a.AlunoID] = a; });
+
+      var mapaTurma  = {};
+      turmas.forEach(function(t) { mapaTurma[t.TurmaID] = t; });
+
+      // Mapa de frequência: MatriculaID → { total, presencas }
+      var mapaFreq = {};
+      if (precisaFreq && frequencias.length) {
+        // Conta datas únicas por turma para calcular total de aulas
+        var datasAulas = {}; // turmaId → Set de datas
+        frequencias.forEach(function(f) {
+          if (!datasAulas[f.TurmaID]) datasAulas[f.TurmaID] = {};
+          if (f.DataAula) datasAulas[f.TurmaID][String(f.DataAula).substring(0,10)] = true;
+          if (!mapaFreq[f.MatriculaID]) mapaFreq[f.MatriculaID] = { presencas: 0, total: 0 };
+          mapaFreq[f.MatriculaID].total++;
+          if (f.Frequencia === 'P') mapaFreq[f.MatriculaID].presencas++;
+        });
+      }
+
+      // Mapa de resultado: MatriculaID → 'APROVADO'|'REPROVADO'|'PENDENTE'
+      var mapaResultado = {};
+      if (precisaResultado && resultados.length) {
+        resultados.forEach(function(r) {
+          if (r.MatriculaID) mapaResultado[r.MatriculaID] = r.ResultadoFinal || 'PENDENTE';
+        });
+      }
+
+      // ── Extrai valor da dimensão de cada matrícula ─────────────────────
+      function valorDimensao(m) {
+        var turma = mapaTurma[m.TurmaID] || {};
+        var aluno = mapaAluno[m.AlunoID] || {};
+        switch (dimensao) {
+          case 'idioma':
+            // Tenta pegar o idioma do curso via turma
+            return turma.Idioma || turma.CursoID || m.TurmaID || '—';
+          case 'turma':
+            return (turma.Estagio || turma.CursoID || m.TurmaID || '—') +
+                   (turma.TurmaID ? ' (' + turma.TurmaID + ')' : '');
+          case 'professor':
+            return turma.ProfessorNome || '—';
+          case 'modalidade':
+            return turma.Modalidade || '—';
+          case 'turno':
+            var dia = turma.DiaSemana || '';
+            var turno = turma.Turno || '';
+            return [dia, turno].filter(Boolean).join(' / ') || '—';
+          case 'situacao_matricula':
+            return m.SituacaoMatricula || '—';
+          case 'genero':
+            return aluno.Genero || 'Não informado';
+          case 'raca':
+            return aluno.Raca || 'Não informado';
+          case 'publico':
+            // Abrevia textos longos de público-alvo
+            var pub = String(aluno.PublicoAluno || 'Não informado');
+            return pub.length > 55 ? pub.substring(0, 52) + '…' : pub;
+          case 'municipio':
+            return aluno.Municipio || 'Não informado';
+          case 'pcd':
+            return (aluno.PcDBoolean === true || aluno.PcDBoolean === 'true') ? 'Sim (PcD)' : 'Não';
+          case 'menor':
+            var nascStr = aluno.Nascimento || '';
+            if (!nascStr) return 'Não informado';
+            // Suporta formatos DD/MM/YYYY e YYYY-MM-DD
+            var dataNasc;
+            if (nascStr.indexOf('/') !== -1) {
+              var p = nascStr.split('/');
+              dataNasc = new Date(Number(p[2]), Number(p[1]) - 1, Number(p[0]));
+            } else {
+              dataNasc = new Date(nascStr.substring(0, 10));
+            }
+            if (isNaN(dataNasc.getTime())) return 'Não informado';
+            var hoje = new Date();
+            var idade = hoje.getFullYear() - dataNasc.getFullYear() -
+              (hoje < new Date(hoje.getFullYear(), dataNasc.getMonth(), dataNasc.getDate()) ? 1 : 0);
+            return idade < 18 ? 'Menor de idade (< 18)' : 'Maior de idade (≥ 18)';
+          default:
+            return '—';
+        }
+      }
+
+      // ── Agrupa e acumula métricas ──────────────────────────────────────
+      var grupos = {}; // chave → objeto de contadores
+      matriculas.forEach(function(m) {
+        var chave = valorDimensao(m);
+        if (!grupos[chave]) {
+          grupos[chave] = {
+            total_matriculas: 0,
+            sit_ativa: 0, sit_trancada: 0, sit_concluida: 0, sit_cancelada: 0,
+            aprovados: 0, reprovados: 0, pendentes: 0,
+            freq_soma: 0, freq_count: 0,
+          };
+        }
+        var g = grupos[chave];
+        g.total_matriculas++;
+        var sit = (m.SituacaoMatricula || '').toUpperCase();
+        if (sit === 'ATIVA')     g.sit_ativa++;
+        if (sit === 'TRANCADA')  g.sit_trancada++;
+        if (sit === 'CONCLUIDA') g.sit_concluida++;
+        if (sit === 'CANCELADA') g.sit_cancelada++;
+        if (precisaResultado) {
+          var res2 = mapaResultado[m.MatriculaID] || 'PENDENTE';
+          if (res2 === 'APROVADO')  g.aprovados++;
+          else if (res2 === 'REPROVADO') g.reprovados++;
+          else g.pendentes++;
+        }
+        if (precisaFreq && mapaFreq[m.MatriculaID]) {
+          var fq = mapaFreq[m.MatriculaID];
+          if (fq.total > 0) { g.freq_soma += fq.presencas / fq.total * 100; g.freq_count++; }
+        }
+      });
+
+      // ── Ordena grupos alfabeticamente ─────────────────────────────────
+      var chaves = Object.keys(grupos).sort(function(a, b) {
+        return a.localeCompare(b, 'pt-BR');
+      });
+
+      // ── Linha de totais ───────────────────────────────────────────────
+      var totais = {
+        total_matriculas: 0, sit_ativa: 0, sit_trancada: 0,
+        sit_concluida: 0, sit_cancelada: 0,
+        aprovados: 0, reprovados: 0, pendentes: 0,
+        freq_soma: 0, freq_count: 0,
+      };
+      chaves.forEach(function(k) {
+        var g = grupos[k];
+        Object.keys(totais).forEach(function(campo) { totais[campo] += g[campo] || 0; });
+      });
+
+      function fmtFreq(g) {
+        return g.freq_count > 0 ? (g.freq_soma / g.freq_count).toFixed(1) + '%' : '—';
+      }
+
+      function celulaMetrica(g, metrica) {
+        if (metrica === 'freq_media') return fmtFreq(g);
+        return String(g[metrica] || 0);
+      }
+
+      // ── Renderiza tabela na tela ──────────────────────────────────────
+      var dimLabel = DIMENSAO_LABEL[dimensao] || dimensao;
+      var semLabel = '';
+      state.semestres.forEach(function(s) {
+        if (String(s.SemestreID) === String(semestreId)) semLabel = s.Semestre || s.SemestreID;
+      });
+
+      // Cabeçalho
+      var thDim = '<th>' + dimLabel + '</th>';
+      var thMetricas = metricas.map(function(m2) {
+        return '<th class="num">' + (METRICA_LABEL[m2] || m2) + '</th>';
+      }).join('');
+      el('r8c-thead').innerHTML = '<tr>' + thDim + thMetricas + '</tr>';
+
+      // Linhas de dados
+      var tbody = el('r8c-tbody'); tbody.innerHTML = '';
+      chaves.forEach(function(k) {
+        var g = grupos[k];
+        var tds = metricas.map(function(m2) {
+          return '<td class="num">' + celulaMetrica(g, m2) + '</td>';
+        }).join('');
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td class="dim">' + k + '</td>' + tds;
+        tbody.appendChild(tr);
+      });
+
+      // Linha de total
+      var tdsTotais = metricas.map(function(m2) {
+        return '<td class="num">' + celulaMetrica(totais, m2) + '</td>';
+      }).join('');
+      var trTotal = document.createElement('tr');
+      trTotal.className = 'total-row';
+      trTotal.innerHTML = '<td class="dim">TOTAL</td>' + tdsTotais;
+      tbody.appendChild(trTotal);
+
+      var tituloResult = 'Condensado por ' + dimLabel + ' — Semestre ' + (semLabel || semestreId);
+      el('r8c-resultado-titulo').textContent = tituloResult;
+      el('r8c-resultado').classList.add('show');
+      el('r8c-resultado').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      // Prepara área de impressão
+      construirImpressaoCondensado(tituloResult, semLabel || semestreId, dimLabel, metricas, chaves, grupos, totais, fmtFreq, celulaMetrica);
+
+    }).catch(function(e) {
+      btn.disabled = false; btn.classList.remove('loading');
+      if (typeof toast === 'function') toast('Erro ao gerar relatório: ' + (e.message || ''), 'error');
+    });
+  }
+
+  function construirImpressaoCondensado(titulo, semLabel, dimLabel, metricas, chaves, grupos, totais, fmtFreq, celulaMetrica) {
+    var cfg = state.config;
+    var logoUrl = state.logoUrl || '';
+    var logoHtml = logoUrl
+      ? '<img class="r8-cab-logo" src="' + logoUrl + '" alt="Logo">'
+      : '<div class="r8-cab-logo-placeholder">' + (cfg.sigla_escola||'CL').substring(0,2) + '</div>';
+    var dadosCab = [cfg.endereco, cfg.telefone, cfg.email].filter(Boolean).join(' · ');
+    var agora = new Date();
+    var pad = function(n) { return String(n).padStart(2, '0'); };
+    var dataStr = pad(agora.getDate())+'/'+pad(agora.getMonth()+1)+'/'+agora.getFullYear()+' '+pad(agora.getHours())+':'+pad(agora.getMinutes());
+
+    var thMetricas = metricas.map(function(m2) {
+      return '<th class="c">' + (METRICA_LABEL[m2] || m2) + '</th>';
+    }).join('');
+
+    var linhas = chaves.map(function(k) {
+      var g = grupos[k];
+      var tds = metricas.map(function(m2) {
+        return '<td class="c">' + celulaMetrica(g, m2) + '</td>';
+      }).join('');
+      return '<tr><td>' + k + '</td>' + tds + '</tr>';
+    }).join('');
+
+    var tdsTotais = metricas.map(function(m2) {
+      return '<td class="c"><strong>' + celulaMetrica(totais, m2) + '</strong></td>';
+    }).join('');
+    linhas += '<tr style="background:#F0EEE8;font-weight:600;"><td>TOTAL</td>' + tdsTotais + '</tr>';
+
+    var html = '<div class="r8-folha">' +
+      '<div class="r8-cab">' + logoHtml +
+        '<div class="r8-cab-info">' +
+          '<div class="r8-cab-nome">' + (cfg.nome_escola||'CELINPB') + '</div>' +
+          (dadosCab ? '<div class="r8-cab-sub">' + dadosCab + '</div>' : '') +
+          '<div class="r8-cab-sem">Semestre: ' + semLabel + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="r8-titulo-rel">' + titulo + '</div>' +
+      '<table class="r8-table">' +
+        '<thead><tr><th>' + dimLabel + '</th>' + thMetricas + '</tr></thead>' +
+        '<tbody>' + linhas + '</tbody>' +
+      '</table>' +
+      '<div class="r8-rodape-folha"><span>Gerado em ' + dataStr + '</span><span>' + (cfg.nome_escola||'CELINPB') + ' · SGE</span></div>' +
+    '</div>';
+
+    el('r8c-print-area').innerHTML = html;
+  }
+
+  function imprimirCondensado() {
+    var html = el('r8c-print-area').innerHTML;
+    if (!html) { if (typeof toast === 'function') toast('Gere o relatório antes de imprimir.', 'error'); return; }
+    var janela = window.open('', '_blank', 'width=900,height=700');
+    janela.document.write(
+      '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório Condensado</title>' +
+      '<style>' +
+        'body{margin:0;padding:0;background:#fff;font-family:"DM Sans",sans-serif;}' +
+        '.r8-folha{background:#fff;width:210mm;min-height:297mm;margin:0 auto;padding:16mm 18mm;font-size:10pt;color:#1A1A2E;box-sizing:border-box;}' +
+        '.r8-cab{display:flex;align-items:center;gap:14px;padding-bottom:10px;border-bottom:2px solid #1A1A2E;margin-bottom:12px;}' +
+        '.r8-cab-logo{width:52px;height:52px;object-fit:contain;flex-shrink:0;}' +
+        '.r8-cab-logo-placeholder{width:52px;height:52px;background:#F5F4F0;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#E63946;flex-shrink:0;}' +
+        '.r8-cab-info{flex:1;}.r8-cab-nome{font-size:13pt;font-weight:700;}.r8-cab-sub{font-size:8.5pt;color:#5C5C7A;}.r8-cab-sem{font-size:8pt;color:#9898B0;font-family:monospace;}' +
+        '.r8-titulo-rel{font-size:12pt;font-weight:700;margin:14px 0 12px;}' +
+        '.r8-table{width:100%;border-collapse:collapse;font-size:8.5pt;}' +
+        '.r8-table th{background:#1A1A2E;color:#fff;padding:5px 8px;text-align:left;font-size:7.5pt;font-weight:600;}' +
+        '.r8-table th.c{text-align:center;}' +
+        '.r8-table td{padding:5px 8px;border-bottom:1px solid #E8E7E2;}' +
+        '.r8-table td.c{text-align:center;}' +
+        '.r8-table tbody tr:nth-child(even){background:#F8F7F3;}' +
+        '.r8-rodape-folha{margin-top:16px;padding-top:8px;border-top:1px solid #E8E7E2;font-size:7.5pt;color:#9898B0;display:flex;justify-content:space-between;}' +
+        '@media print{.r8-folha{margin:0;padding:12mm 14mm;}@page{size:A4;margin:0;}}' +
+      '</style></head><body>' + html +
+      '<script>window.onload=function(){window.print();};<\/script></body></html>'
+    );
+    janela.document.close();
+  }
+
+  
     document.querySelectorAll('.r8-tipo-card').forEach(function(card) {
       card.addEventListener('click', function() { selecionarTipo(this.dataset.tipo); });
     });
@@ -902,13 +1410,25 @@
     el('btn-r8-imprimir') && el('btn-r8-imprimir').addEventListener('click', imprimir);
     el('btn-r8-cancelar') && el('btn-r8-cancelar').addEventListener('click', function() {
       el('r8-params').classList.remove('show');
+      el('r8c-painel').classList.remove('show');
       el('r8-preview-wrap').classList.remove('show');
+      el('r8c-resultado').classList.remove('show');
       state.tipo = null;
       document.querySelectorAll('.r8-tipo-card').forEach(function(c){c.classList.remove('sel');});
     });
     el('btn-r8-novo') && el('btn-r8-novo').addEventListener('click', function() {
       el('r8-preview-wrap').classList.remove('show');
       el('r8-print-area').innerHTML = '';
+    });
+
+    // Condensado
+    el('r8c-btn-gerar')    && el('r8c-btn-gerar').addEventListener('click', gerarCondensado);
+    el('r8c-btn-imprimir') && el('r8c-btn-imprimir').addEventListener('click', imprimirCondensado);
+    el('r8c-btn-cancelar') && el('r8c-btn-cancelar').addEventListener('click', function() {
+      el('r8c-painel').classList.remove('show');
+      el('r8c-resultado').classList.remove('show');
+      state.tipo = null;
+      document.querySelectorAll('.r8-tipo-card').forEach(function(c){c.classList.remove('sel');});
     });
   }
 
