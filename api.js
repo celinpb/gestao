@@ -11,7 +11,7 @@
 // =============================================================================
 
 // URL do Web App do Apps Script — NÃO altere após publicar
-var API_URL = 'https://script.google.com/macros/s/AKfycbyURObOdmiBp7NhKzpUTQWkq8Hr9aATlIVxiYuNvSWozsiEmDVuX650x1XENPlV1y4/exec';
+var API_URL = 'https://script.google.com/macros/s/AKfycbzxgk_wBLI_0-U1RZ9ikgWEPgX9XHQnTvZcY6Y8WfYol1apV6JV2ddLgWjn00T9FWqG/exec';
 // ATENÇÃO: substitua pela URL /exec da sua implantação atual.
 // Encontre em: Apps Script → Implantações → Gerenciar → copiar URL /exec
 
