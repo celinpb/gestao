@@ -6,7 +6,12 @@
 <style>
   .diario-wrap{max-width:900px;}
   .diario-secao-titulo{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--c-text-3,#9898B0);margin-bottom:12px;}
-  .diario-turma-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:28px;}
+  .diario-busca-wrap{position:relative;margin-bottom:16px;}
+  .diario-busca-wrap .material-icons-round{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--c-text-3,#9898B0);pointer-events:none;}
+  .diario-busca{width:100%;height:40px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:8px;padding:0 12px 0 38px;font-family:var(--font-sans,sans-serif);font-size:13.5px;color:var(--c-text-1,#1A1A2E);background:#fff;outline:none;transition:border-color 150ms ease;}
+  .diario-busca:focus{border-color:#E63946;box-shadow:0 0 0 3px rgba(230,57,70,0.09);}
+  .diario-busca::placeholder{color:var(--c-text-3,#9898B0);}
+  .diario-busca-vazio{font-size:13px;color:var(--c-text-3,#9898B0);padding:20px 0;grid-column:1/-1;}
   .turma-card{background:#FFFFFF;border:1.5px solid var(--c-border,#E8E7E2);border-radius:10px;padding:16px 18px;cursor:pointer;transition:border-color 150ms ease,box-shadow 150ms ease,transform 150ms ease;}
   .turma-card:hover{border-color:#C8C7C2;box-shadow:0 3px 10px rgba(26,26,46,0.08);transform:translateY(-1px);}
   .turma-card.selecionada{border-color:#E63946;background:rgba(230,57,70,0.03);box-shadow:0 0 0 3px rgba(230,57,70,0.10);}
@@ -102,6 +107,11 @@
 <div class="diario-wrap">
   <div id="diario-step-turma">
     <div class="diario-secao-titulo">Selecione a turma</div>
+    <div class="diario-busca-wrap" id="diario-busca-wrap" style="display:none;">
+      <span class="material-icons-round">search</span>
+      <input type="text" class="diario-busca" id="diario-busca-turma"
+             placeholder="Buscar por TurmaID, estágio, professor, modalidade, dia ou horário…">
+    </div>
     <div id="diario-turmas-loading" class="diario-loading">
       <div class="spinner-sm"></div><span>Carregando turmas…</span>
     </div>
@@ -269,26 +279,49 @@
   // PASSO 1 — TURMAS
   // =========================================================
   function carregarTurmas() {
-    postApi('turmas.listar',{tamanhoPagina:100}).then(function(res){
+    postApi('turmas.listar',{tamanhoPagina:200}).then(function(res){
       el('diario-turmas-loading').style.display='none';
       if(!res.sucesso||!res.dados||!res.dados.dados||res.dados.dados.length===0){
         el('diario-turma-grid').style.display='grid';
-        el('diario-turma-grid').innerHTML='<p style="color:var(--c-text-3);font-size:13px;grid-column:1/-1;">Nenhuma turma encontrada.</p>';
+        el('diario-turma-grid').innerHTML='<p class="diario-busca-vazio">Nenhuma turma encontrada.</p>';
         return;
       }
       state.turmas=res.dados.dados;
-      renderizarTurmas(state.turmas);
+      el('diario-busca-wrap').style.display='block';
+      renderizarTurmas('');
     }).catch(function(){
       el('diario-turmas-loading').innerHTML='<span style="color:#E63946;">Erro ao carregar turmas.</span>';
     });
   }
 
-  function renderizarTurmas(turmas) {
+  function turmasFiltradas(busca) {
+    if (!busca) return state.turmas;
+    var termo = busca.toLowerCase();
+    return state.turmas.filter(function(t) {
+      return (t.TurmaID        ||'').toLowerCase().indexOf(termo) !== -1 ||
+             (t.Estagio        ||'').toLowerCase().indexOf(termo) !== -1 ||
+             (t.CursoID        ||'').toLowerCase().indexOf(termo) !== -1 ||
+             (t.ProfessorNome  ||'').toLowerCase().indexOf(termo) !== -1 ||
+             (t.Modalidade     ||'').toLowerCase().indexOf(termo) !== -1 ||
+             (t.DiaSemana      ||'').toLowerCase().indexOf(termo) !== -1 ||
+             (t.Turno          ||'').toLowerCase().indexOf(termo) !== -1 ||
+             (t.Horario        ||'').toLowerCase().indexOf(termo) !== -1;
+    });
+  }
+
+  function renderizarTurmas(busca) {
     var grid=el('diario-turma-grid'); grid.innerHTML='';
-    turmas.forEach(function(t){
+    var lista = turmasFiltradas(busca);
+    if (lista.length === 0) {
+      grid.innerHTML='<p class="diario-busca-vazio">Nenhuma turma corresponde à busca.</p>';
+      grid.style.display='grid';
+      return;
+    }
+    lista.forEach(function(t){
       var card=document.createElement('div'); card.className='turma-card'; card.dataset.turmaId=t.TurmaID;
       card.innerHTML='<div class="turma-card-id">'+t.TurmaID+'</div>'+
         '<div class="turma-card-estagio">'+(t.Estagio||t.CursoID)+'</div>'+
+        '<div class="turma-card-detalhe">'+(t.ProfessorNome||'')+'</div>'+
         '<div class="turma-card-detalhe">'+(t.DiaSemana||'')+(t.Horario?' · '+t.Horario:'')+'</div>'+
         '<div class="turma-card-detalhe" style="margin-top:2px;">'+(t.Modalidade||'')+'</div>';
       card.addEventListener('click',function(){selecionarTurma(t);});
@@ -523,6 +556,13 @@
       state.turmaSel=null;
       el('diario-step-data').style.display='none';
       el('diario-step-turma').style.display='block';
+      // Limpa a busca ao voltar para seleção de turma
+      var inp = el('diario-busca-turma');
+      if (inp) { inp.value=''; renderizarTurmas(''); }
+    });
+    // Busca de turma com filtragem local em tempo real
+    el('diario-busca-turma')&&el('diario-busca-turma').addEventListener('input',function(){
+      renderizarTurmas(this.value.trim());
     });
     el('diario-btn-voltar-data')&&el('diario-btn-voltar-data').addEventListener('click',function(){
       el('diario-step-aula').classList.remove('visivel');
