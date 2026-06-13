@@ -8,6 +8,12 @@
      SELEÇÃO DE TURMA
   ========================================================= */
   .n7-turma-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-bottom:28px;}
+  .n7-busca-wrap{position:relative;margin-bottom:16px;}
+  .n7-busca-wrap .material-icons-round{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--c-text-3,#9898B0);pointer-events:none;}
+  .n7-busca{width:100%;height:40px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:8px;padding:0 12px 0 38px;font-family:var(--font-sans,sans-serif);font-size:13.5px;color:var(--c-text-1,#1A1A2E);background:#fff;outline:none;transition:border-color 150ms ease;}
+  .n7-busca:focus{border-color:#E63946;box-shadow:0 0 0 3px rgba(230,57,70,0.09);}
+  .n7-busca::placeholder{color:var(--c-text-3,#9898B0);}
+  .n7-busca-vazio{font-size:13px;color:var(--c-text-3,#9898B0);padding:20px 0;grid-column:1/-1;}
   .n7-turma-card{background:#fff;border:1.5px solid var(--c-border,#E8E7E2);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color 150ms ease,box-shadow 150ms ease,transform 150ms ease;}
   .n7-turma-card:hover{border-color:#C8C7C2;box-shadow:0 3px 10px rgba(26,26,46,0.08);transform:translateY(-1px);}
   .n7-turma-card.sel{border-color:#E63946;background:rgba(230,57,70,0.03);box-shadow:0 0 0 3px rgba(230,57,70,0.10);}
@@ -127,6 +133,11 @@
 <!-- PASSO 1: SELEÇÃO DE TURMA -->
 <div id="n7-step-turma">
   <div style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--c-text-3,#9898B0);margin-bottom:12px;">Selecione a turma</div>
+  <div class="n7-busca-wrap" id="n7-busca-wrap" style="display:none;">
+    <span class="material-icons-round">search</span>
+    <input type="text" class="n7-busca" id="n7-busca-turma"
+           placeholder="Buscar por TurmaID, estágio, professor, modalidade, dia ou horário…">
+  </div>
   <div id="n7-turmas-loading" style="display:flex;align-items:center;gap:10px;padding:32px 0;color:var(--c-text-3,#9898B0);font-size:13.5px;">
     <div class="n7-spinner" style="margin:0;"></div><span>Carregando turmas…</span>
   </div>
@@ -257,24 +268,47 @@
         el('n7-turmas-loading').style.display = 'none';
         if (!res.sucesso || !res.dados || !res.dados.dados || res.dados.dados.length === 0) {
           el('n7-turma-grid').style.display = 'grid';
-          el('n7-turma-grid').innerHTML = '<p style="color:var(--c-text-3);font-size:13px;grid-column:1/-1;">Nenhuma turma encontrada.</p>';
+          el('n7-turma-grid').innerHTML = '<p class="n7-busca-vazio">Nenhuma turma encontrada.</p>';
           return;
         }
         state.turmas = res.dados.dados;
-        renderizarTurmas();
+        el('n7-busca-wrap').style.display = 'block';
+        renderizarTurmas('');
       })
       .catch(function(e) {
         el('n7-turmas-loading').innerHTML = '<span style="color:#E63946;">Erro ao carregar turmas: ' + (e.message||'') + '</span>';
       });
   }
 
-  function renderizarTurmas() {
+  function n7TurmasFiltradas(busca) {
+    if (!busca) return state.turmas;
+    var termo = busca.toLowerCase();
+    return state.turmas.filter(function(t) {
+      return (t.TurmaID       ||'').toLowerCase().indexOf(termo) !== -1 ||
+             (t.Estagio       ||'').toLowerCase().indexOf(termo) !== -1 ||
+             (t.CursoID       ||'').toLowerCase().indexOf(termo) !== -1 ||
+             (t.ProfessorNome ||'').toLowerCase().indexOf(termo) !== -1 ||
+             (t.Modalidade    ||'').toLowerCase().indexOf(termo) !== -1 ||
+             (t.DiaSemana     ||'').toLowerCase().indexOf(termo) !== -1 ||
+             (t.Turno         ||'').toLowerCase().indexOf(termo) !== -1 ||
+             (t.Horario       ||'').toLowerCase().indexOf(termo) !== -1;
+    });
+  }
+
+  function renderizarTurmas(busca) {
     var grid = el('n7-turma-grid'); grid.innerHTML = '';
-    state.turmas.forEach(function(t) {
+    var lista = n7TurmasFiltradas(busca);
+    if (lista.length === 0) {
+      grid.innerHTML = '<p class="n7-busca-vazio">Nenhuma turma corresponde à busca.</p>';
+      grid.style.display = 'grid';
+      return;
+    }
+    lista.forEach(function(t) {
       var card = document.createElement('div'); card.className = 'n7-turma-card';
       card.innerHTML =
         '<div class="n7-turma-id">' + t.TurmaID + '</div>' +
         '<div class="n7-turma-estagio">' + (t.Estagio||t.CursoID) + '</div>' +
+        '<div class="n7-turma-det">' + (t.ProfessorNome||'') + '</div>' +
         '<div class="n7-turma-det">' + (t.DiaSemana||'') + (t.Horario ? ' · ' + t.Horario : '') + '</div>' +
         '<div class="n7-turma-det">' + (t.Modalidade||'') + '</div>';
       card.addEventListener('click', function() { selecionarTurma(t); });
@@ -745,6 +779,14 @@
       el('n7-step-notas').style.display = 'none';
       el('n7-step-turma').style.display = 'block';
       state.turmaSel = null;
+      // Limpa a busca ao voltar para seleção de turma
+      var inp = el('n7-busca-turma');
+      if (inp) { inp.value = ''; renderizarTurmas(''); }
+    });
+
+    // Busca de turma com filtragem local em tempo real
+    el('n7-busca-turma') && el('n7-busca-turma').addEventListener('input', function() {
+      renderizarTurmas(this.value.trim());
     });
 
     el('btn-n7-salvar')     && el('btn-n7-salvar').addEventListener('click', salvarNotas);
