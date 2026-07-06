@@ -682,7 +682,7 @@
     el('t5-estado').innerHTML = '<div class="t5-spinner"></div><p>Carregando turmas…</p>';
     el('t5-tabela').style.display = 'none';
 
-    postApi('turmas.listar', { tamanhoPagina: 200 })
+    postApi('turmas.listar', { tamanhoPagina: 300 })
       .then(function (res) {
         if (!res.sucesso) { mostrarEstado('Erro: ' + (res.mensagem || '')); return; }
         S.turmas = (res.dados && res.dados.dados) ? res.dados.dados : [];
