@@ -263,7 +263,7 @@
   // PASSO 1 — TURMAS
   // =========================================================
   function carregarTurmas() {
-    postApi('turmas.listar', { tamanhoPagina: 200 })
+    postApi('turmas.listar', { tamanhoPagina: 300 })
       .then(function(res) {
         el('n7-turmas-loading').style.display = 'none';
         if (!res.sucesso || !res.dados || !res.dados.dados || res.dados.dados.length === 0) {
