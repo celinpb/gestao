@@ -757,12 +757,7 @@ function postApi(acao, dados) {
     el('aluno-painel').classList.add('aberto');
     el('alunos-main').classList.add('com-painel');
     el('painel-abas-topo').style.display = 'flex';
-    // Professor nao vê ocorrências completas nem aba de edição
-    if (state.papel === 'professor') {
-      el('painel-aba-ocorrencias').style.display = 'none';
-    } else {
-      el('painel-aba-ocorrencias').style.display = '';
-    }
+    el('painel-aba-ocorrencias').style.display = '';
     mostrarAbaPainel('ficha');
     renderizarFicha(aluno);
   }
