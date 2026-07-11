@@ -319,19 +319,20 @@
         sel.innerHTML+='<option disabled>Nenhuma data encontrada</option>'; return;
       }
 
-      // Mapa de nome do dia → número getDay() (0=Dom, 1=Seg, …, 6=Sáb)
+      // Mapa de nome do dia em maiúsculas → número getDay()
+      // Cobre grafia com e sem acento (vinda de m7_maiusculas que faz toUpperCase)
       var diasSemana={
         'SEGUNDA-FEIRA':1,'SEGUNDA':1,
-        'TERÇA-FEIRA':2,'TERCA-FEIRA':2,'TERÇA':2,'TERCA':2,
+        'TERCA-FEIRA':2,'TERÇA-FEIRA':2,'TERCA':2,'TERÇA':2,
         'QUARTA-FEIRA':3,'QUARTA':3,
         'QUINTA-FEIRA':4,'QUINTA':4,
         'SEXTA-FEIRA':5,'SEXTA':5,
-        'SÁBADO':6,'SABADO':6,
+        'SABADO':6,'SÁBADO':6,
         'DOMINGO':0,
       };
 
-      // DiaSemana pode ser "TERÇA-FEIRA" ou "TERÇA-FEIRA,QUINTA-FEIRA"
-      // Converte para um array de números de dia da semana
+      // DiaSemana vem de m7_maiusculas → sempre CAIXA ALTA
+      // Pode ser "SEGUNDA-FEIRA" ou "SEGUNDA-FEIRA,QUINTA-FEIRA"
       var diasTurma = [];
       if (turma.DiaSemana) {
         turma.DiaSemana.toUpperCase().split(',').forEach(function(d) {
@@ -345,21 +346,28 @@
 
       res.dados.forEach(function(d){
         // Filtra dias não letivos
-        if(!d.DiaLetivo)return;
+        if(!d.DiaLetivo) return;
 
-        // Filtra dias que não correspondem a nenhum dos dias da turma
-        if(diasTurma.length > 0){
-          var dataObj=new Date(d.DataAula);
-          if(!isNaN(dataObj.getTime()) && diasTurma.indexOf(dataObj.getDay()) === -1) return;
+        // DataAula vem no formato DD/MM/YYYY (de m7_dataParaString)
+        // new Date("DD/MM/YYYY") é Invalid Date no navegador — parsear manualmente
+        if(diasTurma.length > 0) {
+          var dataStr = String(d.DataAula || '');
+          var partes  = dataStr.split('/');   // ["15","04","2025"]
+          var diaSem  = NaN;
+          if (partes.length === 3) {
+            // Constrói como YYYY-MM-DD que o navegador reconhece corretamente
+            var dataObj = new Date(partes[2] + '-' + partes[1] + '-' + partes[0] + 'T12:00:00');
+            diaSem = dataObj.getDay();
+          }
+          if (isNaN(diaSem) || diasTurma.indexOf(diaSem) === -1) return;
         }
 
         var opt=document.createElement('option');
-        var dataStr=d.DataAula?String(d.DataAula).substring(0,10):'';
-        var partes=dataStr.split('-');
-        var label=partes.length===3?partes[2]+'/'+partes[1]+'/'+partes[0]:dataStr;
-        if(d.DiaSemana)label+=' ('+d.DiaSemana+')';
-        if(d.Informacao)label+=' — '+d.Informacao;
-        opt.value=label.split(' ')[0]+' '+horario;
+        var dataStr2=String(d.DataAula||'');   // já está em DD/MM/YYYY
+        var label=dataStr2;
+        if(d.DiaSemana) label+=' ('+d.DiaSemana+')';
+        if(d.Informacao) label+=' — '+d.Informacao;
+        opt.value=dataStr2.split(' ')[0]+' '+horario;
         opt.textContent=label;
         sel.appendChild(opt);
       });
