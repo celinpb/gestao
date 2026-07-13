@@ -94,6 +94,44 @@
   .r8c-badge.rep{background:rgba(230,57,70,0.10);color:#A32D2D;}
   .r8c-badge.pend{background:#F5F4F0;color:#9898B0;}
   .r8c-spinner{width:20px;height:20px;border:2.5px solid var(--c-border,#E8E7E2);border-top-color:#E63946;border-radius:50%;animation:spin-r8 0.7s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px;}
+
+  /* =========================================================
+     CONTROLE DE REGISTROS — painel de parâmetros próprio
+  ========================================================= */
+  .r8cr-painel{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:10px;padding:20px;margin-bottom:20px;display:none;}
+  .r8cr-painel.show{display:block;}
+  .r8cr-titulo{font-size:13px;font-weight:600;color:var(--c-text-1,#1A1A2E);margin-bottom:16px;display:flex;align-items:center;gap:6px;}
+  .r8cr-titulo .material-icons-round{font-size:17px;color:#E63946;}
+  .r8cr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px;}
+  .r8cr-field{display:flex;flex-direction:column;gap:5px;}
+  .r8cr-field label{font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--c-text-3,#9898B0);}
+  .r8cr-select,.r8cr-input{height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:7px;padding:0 11px;font-family:var(--font-sans,sans-serif);font-size:13.5px;color:var(--c-text-1,#1A1A2E);background:#FAFAF8;outline:none;width:100%;cursor:pointer;transition:border-color 150ms ease;}
+  .r8cr-select:focus,.r8cr-input:focus{border-color:#E63946;}
+  .r8cr-acoes{display:flex;gap:10px;flex-wrap:wrap;}
+  .r8cr-resultado{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:10px;overflow:hidden;margin-bottom:16px;display:none;}
+  .r8cr-resultado.show{display:block;}
+  .r8cr-resultado-toolbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--c-border,#E8E7E2);flex-wrap:wrap;gap:8px;}
+  .r8cr-resultado-titulo{font-size:13px;font-weight:600;color:var(--c-text-1,#1A1A2E);}
+  .r8cr-secao{padding:0;margin-bottom:12px;border:1px solid var(--c-border,#E8E7E2);border-radius:8px;overflow:hidden;}
+  .r8cr-secao-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#1A1A2E;gap:8px;}
+  .r8cr-secao-dia{font-size:12px;font-weight:600;color:#fff;letter-spacing:0.3px;}
+  .r8cr-secao-counts{display:flex;gap:12px;}
+  .r8cr-count{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:4px;}
+  .r8cr-count.ok{background:rgba(42,157,143,0.25);color:#5DCAA5;}
+  .r8cr-count.pend{background:rgba(230,57,70,0.25);color:#ff8087;}
+  .r8cr-prof-header{display:flex;align-items:center;gap:8px;padding:8px 16px;background:#F0EEE8;border-bottom:1px solid var(--c-border,#E8E7E2);}
+  .r8cr-prof-nome{font-size:12.5px;font-weight:600;color:var(--c-text-1,#1A1A2E);}
+  .r8cr-tabela{width:100%;border-collapse:collapse;font-size:13px;}
+  .r8cr-tabela th{padding:8px 14px;font-size:10.5px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--c-text-3,#9898B0);text-align:left;background:#F8F7F3;border-bottom:1px solid var(--c-border,#E8E7E2);white-space:nowrap;}
+  .r8cr-tabela td{padding:8px 14px;vertical-align:middle;border-bottom:1px solid var(--c-border,#E8E7E2);}
+  .r8cr-tabela tbody tr:last-child td{border-bottom:none;}
+  .r8cr-tabela tbody tr:hover{background:#FAFAF8;}
+  .r8cr-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;}
+  .r8cr-badge.ok{background:rgba(42,157,143,0.12);color:#1A6E65;}
+  .r8cr-badge.pend{background:rgba(230,57,70,0.10);color:#A32D2D;}
+  .r8cr-badge .material-icons-round{font-size:12px;}
+  .r8cr-vazio{padding:20px 16px;text-align:center;font-size:13px;color:var(--c-text-3,#9898B0);}
+
   .r8-folha{background:#fff;width:210mm;min-height:297mm;margin:0 auto;padding:16mm 18mm;box-shadow:0 2px 16px rgba(0,0,0,0.15);font-family:'DM Sans',sans-serif;font-size:10pt;color:#1A1A2E;box-sizing:border-box;}
 
   /* Cabeçalho institucional */
@@ -199,6 +237,11 @@
     <div class="r8-tipo-nome">Relatório condensado</div>
     <div class="r8-tipo-desc">Contagens por dimensão — curso, professor, perfil do aluno e mais</div>
   </div>
+  <div class="r8-tipo-card" data-tipo="controle-registros">
+    <div class="r8-tipo-icone"><span class="material-icons-round">fact_check</span></div>
+    <div class="r8-tipo-nome">Controle de registros</div>
+    <div class="r8-tipo-desc">Turmas com registro em dia ou em atraso por data ou semana</div>
+  </div>
 </div>
 
 <!-- PARÂMETROS -->
@@ -239,6 +282,59 @@
     </button>
   </div>
 </div>
+
+<!-- PAINEL CONTROLE DE REGISTROS -->
+<div class="r8cr-painel" id="r8cr-painel">
+  <div class="r8cr-titulo">
+    <span class="material-icons-round">fact_check</span>
+    Controle de registros — configurar
+  </div>
+  <div class="r8cr-grid">
+    <div class="r8cr-field">
+      <label>Modo</label>
+      <select class="r8cr-select" id="r8cr-modo">
+        <option value="data">Por data específica</option>
+        <option value="semana">Por semana</option>
+      </select>
+    </div>
+    <div class="r8cr-field" id="r8cr-data-wrap">
+      <label>Data (dia letivo)</label>
+      <input type="date" class="r8cr-input" id="r8cr-data">
+    </div>
+    <div class="r8cr-field" id="r8cr-semana-wrap" style="display:none;">
+      <label>Qualquer data da semana</label>
+      <input type="date" class="r8cr-input" id="r8cr-semana-data">
+    </div>
+    <div class="r8cr-field">
+      <label>Filtrar por professor (opcional)</label>
+      <select class="r8cr-select" id="r8cr-professor">
+        <option value="">Todos os professores</option>
+      </select>
+    </div>
+  </div>
+  <div class="r8cr-acoes">
+    <button class="btn-r8 btn-r8-primario" id="r8cr-btn-gerar">
+      <div class="spinner-btn"></div>
+      <span class="material-icons-round btn-txt">play_arrow</span>
+      <span class="btn-txt">Gerar</span>
+    </button>
+    <button class="btn-r8 btn-r8-sec" id="r8cr-btn-cancelar">
+      <span class="material-icons-round">close</span>Cancelar
+    </button>
+  </div>
+</div>
+
+<!-- RESULTADO CONTROLE -->
+<div class="r8cr-resultado" id="r8cr-resultado">
+  <div class="r8cr-resultado-toolbar">
+    <span class="r8cr-resultado-titulo" id="r8cr-resultado-titulo">—</span>
+    <button class="btn-r8 btn-r8-primario" id="r8cr-btn-imprimir">
+      <span class="material-icons-round">print</span>Imprimir / PDF
+    </button>
+  </div>
+  <div id="r8cr-corpo" style="padding:12px 16px;"></div>
+</div>
+<div id="r8cr-print-area" style="display:none;"></div>
 
 <!-- PAINEL CONDENSADO (parâmetros próprios, independente do r8-params padrão) -->
 <div class="r8c-painel" id="r8c-painel">
@@ -482,14 +578,22 @@
     state.tipo = tipo;
     document.querySelectorAll('.r8-tipo-card').forEach(function(c) { c.classList.toggle('sel', c.dataset.tipo === tipo); });
 
-    // Oculta ambos os painéis antes de decidir qual mostrar
+    // Oculta todos os painéis antes de decidir qual mostrar
     el('r8-params').classList.remove('show');
     el('r8c-painel').classList.remove('show');
+    el('r8cr-painel').classList.remove('show');
     el('r8-preview-wrap').classList.remove('show');
     el('r8c-resultado').classList.remove('show');
+    el('r8cr-resultado').classList.remove('show');
 
     if (tipo === 'condensado') {
       el('r8c-painel').classList.add('show');
+      return;
+    }
+
+    if (tipo === 'controle-registros') {
+      crPopularProfessores();
+      el('r8cr-painel').classList.add('show');
       return;
     }
 
@@ -1487,6 +1591,261 @@
   // =========================================================
   // EVENTOS
   // =========================================================
+  // =========================================================
+  // CONTROLE DE REGISTROS
+  // =========================================================
+  var DIAS_SEMANA_NUM = {
+    'SEGUNDA-FEIRA':1,'SEGUNDA':1,
+    'TERCA-FEIRA':2,'TERÇA-FEIRA':2,'TERCA':2,'TERÇA':2,
+    'QUARTA-FEIRA':3,'QUARTA':3,
+    'QUINTA-FEIRA':4,'QUINTA':4,
+    'SEXTA-FEIRA':5,'SEXTA':5,
+    'SABADO':6,'SÁBADO':6,'DOMINGO':0,
+  };
+
+  var NOMES_DIA_CR = ['Domingo','Segunda-Feira','Terça-Feira','Quarta-Feira','Quinta-Feira','Sexta-Feira','Sábado'];
+
+  function crParsearData(str) {
+    if (!str) return null;
+    var p = String(str).split('/');
+    if (p.length === 3) return new Date(p[2]+'-'+p[1]+'-'+p[0]+'T12:00:00');
+    var p2 = String(str).split('-');
+    if (p2.length === 3) return new Date(str+'T12:00:00');
+    return null;
+  }
+
+  function crFmtData(d) {
+    var pad = function(n){return String(n).padStart(2,'0');};
+    return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();
+  }
+
+  function crDiasTurma(turma) {
+    var dias = [];
+    if (!turma.DiaSemana) return dias;
+    turma.DiaSemana.toUpperCase().split(',').forEach(function(d) {
+      var num = DIAS_SEMANA_NUM[d.trim()];
+      if (num !== undefined) dias.push(num);
+    });
+    return dias;
+  }
+
+  function crPopularProfessores() {
+    var sel = el('r8cr-professor');
+    if (!sel) return;
+    while (sel.options.length > 1) sel.remove(1);
+    var vistos = {};
+    state.turmas.forEach(function(t) {
+      var nome = t.ProfessorNome || '';
+      if (nome && !vistos[nome]) {
+        vistos[nome] = true;
+        var opt = document.createElement('option');
+        opt.value = nome;
+        opt.textContent = nome;
+        sel.appendChild(opt);
+      }
+    });
+    var opts = Array.from(sel.options).slice(1).sort(function(a,b){
+      return a.textContent.localeCompare(b.textContent,'pt-BR');
+    });
+    while (sel.options.length > 1) sel.remove(1);
+    opts.forEach(function(o){ sel.appendChild(o); });
+  }
+
+  function gerarControleRegistros() {
+    var modo       = el('r8cr-modo').value;
+    var profFiltro = el('r8cr-professor').value;
+    var dataInput  = modo === 'semana' ? el('r8cr-semana-data').value : el('r8cr-data').value;
+
+    if (!dataInput) {
+      if (typeof toast === 'function') toast('Informe uma data.', 'error'); return;
+    }
+    var dataRef = crParsearData(dataInput);
+    if (!dataRef) {
+      if (typeof toast === 'function') toast('Data inválida.', 'error'); return;
+    }
+
+    var btn = el('r8cr-btn-gerar');
+    btn.disabled = true; btn.classList.add('loading');
+    el('r8cr-resultado').classList.remove('show');
+
+    var diasVerificar = [];
+    if (modo === 'semana') {
+      var dow = dataRef.getDay();
+      var diffSeg = (dow === 0) ? -6 : 1 - dow;
+      for (var i = 0; i <= 5; i++) {
+        var d = new Date(dataRef);
+        d.setDate(d.getDate() + diffSeg + i);
+        diasVerificar.push({ data: d, dataStr: crFmtData(d) });
+      }
+    } else {
+      diasVerificar.push({ data: dataRef, dataStr: crFmtData(dataRef) });
+    }
+
+    Promise.all([
+      postApi('calendario.listar', {}),
+      postApi('frequencias.listar', {}),
+    ]).then(function(res) {
+      btn.disabled = false; btn.classList.remove('loading');
+
+      var calendario  = (res[0].sucesso && res[0].dados) ? res[0].dados : [];
+      var frequencias = (res[1].sucesso && res[1].dados) ? res[1].dados : [];
+
+      var diasLetivos = {};
+      calendario.forEach(function(c) {
+        if (c.DiaLetivo) diasLetivos[String(c.DataAula)] = true;
+      });
+
+      // Mapa de registros: "TurmaID|DD/MM/YYYY" → true
+      // DataAula de frequências vem como "DD/MM/YYYY HH:MM" — pegar só a data
+      var registros = {};
+      frequencias.forEach(function(f) {
+        var dataF = String(f.DataAula || '').substring(0, 10);
+        registros[(f.TurmaID || '') + '|' + dataF] = true;
+      });
+
+      var turmasFiltradas = profFiltro
+        ? state.turmas.filter(function(t){ return (t.ProfessorNome||'') === profFiltro; })
+        : state.turmas;
+
+      var resultadosDias = [];
+      diasVerificar.forEach(function(diaObj) {
+        if (!diasLetivos[diaObj.dataStr]) return;
+        var dow2 = diaObj.data.getDay();
+        var turmasDoDia = turmasFiltradas.filter(function(t) {
+          return crDiasTurma(t).indexOf(dow2) !== -1;
+        });
+        if (!turmasDoDia.length) return;
+
+        var registradas = [], pendentes = [];
+        turmasDoDia.forEach(function(t) {
+          (registros[t.TurmaID + '|' + diaObj.dataStr] ? registradas : pendentes).push(t);
+        });
+        resultadosDias.push({ dataStr: diaObj.dataStr, data: diaObj.data, registradas: registradas, pendentes: pendentes });
+      });
+
+      if (!resultadosDias.length) {
+        if (typeof toast === 'function') toast(
+          modo === 'semana' ? 'Nenhum dia letivo encontrado na semana selecionada.' : 'A data selecionada não é um dia letivo.',
+          'error'
+        );
+        return;
+      }
+      renderizarControleRegistros(resultadosDias, modo, profFiltro);
+
+    }).catch(function(e) {
+      btn.disabled = false; btn.classList.remove('loading');
+      if (typeof toast === 'function') toast('Erro ao gerar: ' + (e.message||''), 'error');
+    });
+  }
+
+  function renderizarControleRegistros(dias, modo, profFiltro) {
+    var titulo = modo === 'semana'
+      ? 'Controle de registros — Semana de ' + dias[0].dataStr + ' a ' + dias[dias.length-1].dataStr
+      : 'Controle de registros — ' + dias[0].dataStr;
+    if (profFiltro) titulo += ' · Prof. ' + profFiltro;
+    el('r8cr-resultado-titulo').textContent = titulo;
+
+    var html = '';
+    dias.forEach(function(diaObj) {
+      var nomeDia = NOMES_DIA_CR[diaObj.data.getDay()] || '';
+      html += '<div class="r8cr-secao">';
+      html += '<div class="r8cr-secao-header">' +
+        '<span class="r8cr-secao-dia">' + nomeDia + ', ' + diaObj.dataStr + '</span>' +
+        '<div class="r8cr-secao-counts">' +
+          '<span class="r8cr-count ok">' + diaObj.registradas.length + ' em dia</span>' +
+          '<span class="r8cr-count pend">' + diaObj.pendentes.length + ' pendente(s)</span>' +
+        '</div></div>';
+
+      // Agrupa por professor
+      var porProf = {};
+      diaObj.registradas.concat(diaObj.pendentes).forEach(function(t) {
+        var prof = t.ProfessorNome || '—';
+        if (!porProf[prof]) porProf[prof] = [];
+        porProf[prof].push(t);
+      });
+
+      Object.keys(porProf).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); }).forEach(function(prof) {
+        html += '<div class="r8cr-prof-header">' +
+          '<span class="material-icons-round" style="font-size:15px;color:#E63946;">person</span>' +
+          '<span class="r8cr-prof-nome">' + prof + '</span></div>';
+        html += '<table class="r8cr-tabela"><thead><tr>' +
+          '<th>TurmaID</th><th>Estágio</th><th>Modalidade</th><th>Horário</th><th>Situação</th>' +
+          '</tr></thead><tbody>';
+        porProf[prof].sort(function(a,b){ return (a.TurmaID||'').localeCompare(b.TurmaID||'','pt-BR'); })
+          .forEach(function(t) {
+            var emDia = diaObj.registradas.indexOf(t) !== -1;
+            html += '<tr>' +
+              '<td style="font-family:var(--font-mono,monospace);font-size:12px;">' + (t.TurmaID||'—') + '</td>' +
+              '<td style="font-weight:500;">' + (t.Estagio||t.CursoID||'—') + '</td>' +
+              '<td>' + (t.Modalidade||'—') + '</td>' +
+              '<td>' + (t.Horario||'—') + '</td>' +
+              '<td><span class="r8cr-badge ' + (emDia?'ok':'pend') + '">' +
+                '<span class="material-icons-round">' + (emDia?'check_circle':'schedule') + '</span>' +
+                (emDia ? 'Em dia' : 'Pendente') + '</span></td></tr>';
+          });
+        html += '</tbody></table>';
+      });
+      html += '</div>';
+    });
+
+    el('r8cr-corpo').innerHTML = html;
+    el('r8cr-resultado').classList.add('show');
+    el('r8cr-resultado').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    crMontarImpressao(titulo, html);
+  }
+
+  function crMontarImpressao(titulo, corpoHtml) {
+    var cfg = state.config; var sem = state.semestre;
+    var logoUrl = state.logoUrl || '';
+    var logoHtml = logoUrl
+      ? '<img class="r8-cab-logo" src="' + logoUrl + '" alt="Logo">'
+      : '<div class="r8-cab-logo-placeholder">' + (cfg.sigla_escola||'CL').substring(0,2) + '</div>';
+    var dadosCab = [cfg.endereco, cfg.telefone, cfg.email].filter(Boolean).join(' · ');
+    var agora = new Date(); var pad = function(n){return String(n).padStart(2,'0');};
+    var dataStr = pad(agora.getDate())+'/'+pad(agora.getMonth()+1)+'/'+agora.getFullYear()+' '+pad(agora.getHours())+':'+pad(agora.getMinutes());
+    el('r8cr-print-area').innerHTML =
+      '<div class="r8-folha">' +
+      '<div class="r8-cab">' + logoHtml + '<div class="r8-cab-info">' +
+        '<div class="r8-cab-nome">' + (cfg.nome_escola||'CELINPB') + '</div>' +
+        (dadosCab ? '<div class="r8-cab-sub">' + dadosCab + '</div>' : '') +
+        '<div class="r8-cab-sem">Semestre: ' + (sem.Semestre||'—') + '</div>' +
+      '</div></div>' +
+      '<div class="r8-titulo-rel">' + titulo + '</div>' +
+      corpoHtml +
+      '<div class="r8-rodape-folha"><span>Gerado em ' + dataStr + '</span><span>' + (cfg.nome_escola||'CELINPB') + ' · SGE</span></div>' +
+      '</div>';
+  }
+
+  function crImprimir() {
+    var html = el('r8cr-print-area').innerHTML;
+    if (!html) { if (typeof toast === 'function') toast('Gere o relatório antes de imprimir.', 'error'); return; }
+    var janela = window.open('', '_blank', 'width=900,height=700');
+    janela.document.write(
+      '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Controle de Registros</title><style>' +
+      'body{margin:0;padding:0;font-family:"DM Sans",sans-serif;}' +
+      '.r8-folha{width:210mm;min-height:297mm;margin:0 auto;padding:12mm 14mm;font-size:10pt;color:#1A1A2E;box-sizing:border-box;}' +
+      '.r8-cab{display:flex;align-items:center;gap:14px;padding-bottom:10px;border-bottom:2px solid #1A1A2E;margin-bottom:12px;}' +
+      '.r8-cab-logo{width:52px;height:52px;object-fit:contain;flex-shrink:0;}' +
+      '.r8-cab-logo-placeholder{width:52px;height:52px;background:#F5F4F0;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#E63946;flex-shrink:0;}' +
+      '.r8-cab-nome{font-size:13pt;font-weight:700;}.r8-cab-sub{font-size:8.5pt;color:#5C5C7A;}.r8-cab-sem{font-size:8pt;color:#9898B0;font-family:monospace;}' +
+      '.r8-titulo-rel{font-size:12pt;font-weight:700;margin:12px 0 10px;}' +
+      '.r8cr-secao{margin-bottom:12px;border:1px solid #E8E7E2;border-radius:6px;overflow:hidden;}' +
+      '.r8cr-secao-header{background:#1A1A2E;color:#fff;padding:6px 10px;display:flex;justify-content:space-between;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+      '.r8cr-secao-dia{font-size:9pt;font-weight:600;}.r8cr-secao-counts{display:flex;gap:10px;font-size:8pt;}' +
+      '.r8cr-prof-header{background:#F0EEE8;padding:5px 10px;font-size:8.5pt;font-weight:600;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+      '.r8cr-tabela{width:100%;border-collapse:collapse;font-size:8pt;}' +
+      '.r8cr-tabela th{background:#F8F7F3;padding:4px 8px;text-align:left;font-size:7pt;font-weight:600;border-bottom:1px solid #E8E7E2;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+      '.r8cr-tabela td{padding:4px 8px;border-bottom:1px solid #E8E7E2;}' +
+      '.r8cr-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:10px;font-size:7.5pt;font-weight:600;}' +
+      '.r8cr-badge.ok{background:rgba(42,157,143,0.15);color:#1A6E65;}.r8cr-badge.pend{background:rgba(230,57,70,0.10);color:#A32D2D;}' +
+      '.r8-rodape-folha{margin-top:14px;padding-top:8px;border-top:1px solid #E8E7E2;font-size:7.5pt;color:#9898B0;display:flex;justify-content:space-between;}' +
+      '@media print{@page{size:A4;margin:0;}.r8-folha{padding:10mm 12mm;}}' +
+      '</style></head><body>' + html +
+      '<script>window.onload=function(){window.print();};<\/script></body></html>'
+    );
+    janela.document.close();
+  }
+
   function registrarEventos() {
     document.querySelectorAll('.r8-tipo-card').forEach(function(card) {
       card.addEventListener('click', function() { selecionarTipo(this.dataset.tipo); });
@@ -1496,8 +1855,10 @@
     el('btn-r8-cancelar') && el('btn-r8-cancelar').addEventListener('click', function() {
       el('r8-params').classList.remove('show');
       el('r8c-painel').classList.remove('show');
+      el('r8cr-painel').classList.remove('show');
       el('r8-preview-wrap').classList.remove('show');
       el('r8c-resultado').classList.remove('show');
+      el('r8cr-resultado').classList.remove('show');
       state.tipo = null;
       document.querySelectorAll('.r8-tipo-card').forEach(function(c){c.classList.remove('sel');});
     });
@@ -1514,6 +1875,21 @@
       el('r8c-resultado').classList.remove('show');
       state.tipo = null;
       document.querySelectorAll('.r8-tipo-card').forEach(function(c){c.classList.remove('sel');});
+    });
+
+    // Controle de registros
+    el('r8cr-btn-gerar')    && el('r8cr-btn-gerar').addEventListener('click', gerarControleRegistros);
+    el('r8cr-btn-imprimir') && el('r8cr-btn-imprimir').addEventListener('click', crImprimir);
+    el('r8cr-btn-cancelar') && el('r8cr-btn-cancelar').addEventListener('click', function() {
+      el('r8cr-painel').classList.remove('show');
+      el('r8cr-resultado').classList.remove('show');
+      state.tipo = null;
+      document.querySelectorAll('.r8-tipo-card').forEach(function(c){c.classList.remove('sel');});
+    });
+    el('r8cr-modo') && el('r8cr-modo').addEventListener('change', function() {
+      var porSemana = this.value === 'semana';
+      el('r8cr-data-wrap').style.display   = porSemana ? 'none'  : 'block';
+      el('r8cr-semana-wrap').style.display = porSemana ? 'block' : 'none';
     });
   }
 
