@@ -708,7 +708,7 @@
   // =========================================================
   function gerarBoletim(turmaId, filtroMatId) {
     return Promise.all([
-      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 200 }),
+      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 300 }),
       postApi('turmas.buscar', { turmaId: turmaId }),
       postApi('cursos.listar', {}),
       postApi('avaliacoes.listar', {}),
@@ -857,7 +857,7 @@
   function gerarTurmasAlunos(turmaId) {
     return Promise.all([
       postApi('turmas.buscar', { turmaId: turmaId }),
-      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 200 }),
+      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 300 }),
     ]).then(function(res) {
       var turma     = res[0].sucesso ? res[0].dados : {};
       var matriculas = (res[1].sucesso && res[1].dados) ? res[1].dados.dados||[] : [];
@@ -931,7 +931,7 @@
       });
     }
 
-    return postApi('alunos.listar', { tamanhoPagina: 3000 }).then(function(res) {
+    return postApi('alunos.listar', { tamanhoPagina: 5000 }).then(function(res) {
       var alunos = (res.sucesso && res.dados) ? res.dados.dados||[] : [];
       var linhas = alunos.map(function(a, i) {
         return '<tr>' +
@@ -958,7 +958,7 @@
   function gerarFrequencia(turmaId) {
     return Promise.all([
       postApi('turmas.buscar', { turmaId: turmaId }),
-      postApi('matriculas.listar', { turmaId: turmaId, situacao:'ATIVA', tamanhoPagina: 200 }),
+      postApi('matriculas.listar', { turmaId: turmaId, situacao:'ATIVA', tamanhoPagina: 300 }),
       postApi('frequencias.listar', { turmaId: turmaId }),
     ]).then(function(res) {
       var turma      = res[0].sucesso ? res[0].dados : {};
@@ -1002,7 +1002,7 @@
   function gerarResultados(turmaId) {
     return Promise.all([
       postApi('turmas.buscar', { turmaId: turmaId }),
-      postApi('matriculas.listar', { turmaId: turmaId, situacao:'ATIVA', tamanhoPagina: 200 }),
+      postApi('matriculas.listar', { turmaId: turmaId, situacao:'ATIVA', tamanhoPagina: 300 }),
       postApi('cursos.listar', {}),
       postApi('avaliacoes.listar', {}),
       postApi('frequencias.listar', { turmaId: turmaId }),
@@ -1124,8 +1124,8 @@
 
     return Promise.all([
       postApi('turmas.buscar', { turmaId: turmaId }),
-      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 200 }),
-      postApi('alunos.listar', { tamanhoPagina: 3000 }),
+      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 300 }),
+      postApi('alunos.listar', { tamanhoPagina: 5000 }),
     ]).then(function(res) {
       var turma      = res[0].sucesso ? res[0].dados : {};
       var matriculas = (res[1].sucesso && res[1].dados) ? res[1].dados.dados||[] : [];
