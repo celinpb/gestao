@@ -269,7 +269,7 @@
   // PASSO 1 — TURMAS
   // =========================================================
   function carregarTurmas() {
-    postApi('turmas.listar',{tamanhoPagina:100}).then(function(res){
+    postApi('turmas.listar',{tamanhoPagina:300}).then(function(res){
       el('diario-turmas-loading').style.display='none';
       if(!res.sucesso||!res.dados||!res.dados.dados||res.dados.dados.length===0){
         el('diario-turma-grid').style.display='grid';
@@ -399,7 +399,7 @@
     el('historico-corpo').innerHTML='<div class="historico-vazio">Carregando…</div>';
     var turmaId=state.turmaSel.TurmaID, data=state.dataSel;
     Promise.all([
-      postApi('matriculas.listar',{turmaId:turmaId,situacao:'ATIVA',tamanhoPagina:100}),
+      postApi('matriculas.listar',{turmaId:turmaId,situacao:'ATIVA',tamanhoPagina:300}),
       postApi('frequencias.listar',{turmaId:turmaId,dataAula:data}),
       postApi('conteudo.listar',{turmaId:turmaId}),
     ]).then(function(res){
