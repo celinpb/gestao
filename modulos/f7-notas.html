@@ -252,7 +252,7 @@
   // PASSO 1 — TURMAS
   // =========================================================
   function carregarTurmas() {
-    postApi('turmas.listar', { tamanhoPagina: 200 })
+    postApi('turmas.listar', { tamanhoPagina: 300 })
       .then(function(res) {
         el('n7-turmas-loading').style.display = 'none';
         if (!res.sucesso || !res.dados || !res.dados.dados || res.dados.dados.length === 0) {
@@ -308,7 +308,7 @@
   function carregarDadosNotas(turma) {
     // Busca: matrículas ativas + cursos (para avaliação) em paralelo
     Promise.all([
-      postApi('matriculas.listar', { turmaId: turma.TurmaID, situacao: 'ATIVA', tamanhoPagina: 100 }),
+      postApi('matriculas.listar', { turmaId: turma.TurmaID, situacao: 'ATIVA', tamanhoPagina: 300 }),
       postApi('cursos.listar', {}),
       postApi('avaliacoes.listar', {}),
     ])
