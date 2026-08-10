@@ -260,6 +260,24 @@
     setTimeout(function(){a.classList.remove('show');},5000);
   }
 
+  // Encontra o Timestamp mais recente entre os registros de frequência de
+  // uma data, para exibir "Já registrado em DD/MM/AAAA HH:MM" no badge.
+  function ultimoTimestamp(lista) {
+    var max = null;
+    (lista||[]).forEach(function(item) {
+      var ts = item.Timestamp;
+      if (!ts) return;
+      var partes = String(ts).split(' ');
+      var d  = (partes[0]||'').split('/');
+      var hm = (partes[1]||'00:00').split(':');
+      if (d.length !== 3) return;
+      var dt = new Date(Number(d[2]), Number(d[1])-1, Number(d[0]), Number(hm[0])||0, Number(hm[1])||0);
+      if (isNaN(dt.getTime())) return;
+      if (!max || dt > max.dt) max = { dt: dt, texto: ts };
+    });
+    return max ? max.texto : null;
+  }
+
   function atualizarContador() {
     var ta=el('diario-conteudo'),c=el('diario-conteudo-cont');
     if(ta&&c)c.textContent=ta.value.length;
@@ -408,8 +426,9 @@
       if(res[1].sucesso&&res[1].dados&&res[1].dados.length>0){
         state.jaRegistrado=true;
         res[1].dados.forEach(function(f){state.frequencias[f.MatriculaID]={freq:f.Frequencia,anotacao:f.Anotacao||''};});
+        var ts=ultimoTimestamp(res[1].dados);
         el('diario-header-badge').className='diario-aula-header-badge salvo';
-        el('diario-header-badge').innerHTML='<span class="material-icons-round">check_circle</span><span>Já registrado</span>';
+        el('diario-header-badge').innerHTML='<span class="material-icons-round">check_circle</span><span>Já registrado'+(ts?' em '+ts:'')+'</span>';
       }
       if(res[2].sucesso&&res[2].dados){
         var dataBase=data.split(' ')[0];
@@ -519,6 +538,18 @@
     });
   }
 
+  // =========================================================
+  // NAVEGAÇÃO — volta para a etapa de seleção de data
+  // (mesma turma; o professor pode escolher outra data ou trocar de turma)
+  // =========================================================
+  function voltarParaSelecaoData() {
+    el('diario-step-aula').classList.remove('visivel');
+    el('diario-step-data').style.display='block';
+    state.dataSel=null; state.jaRegistrado=false;
+    el('diario-header-badge').className='diario-aula-header-badge';
+    el('diario-header-badge').innerHTML='<span class="material-icons-round">edit</span><span>Novo registro</span>';
+  }
+
   function salvarRegistro() {
     if(state.matriculas.length===0){mostrarAlerta('Não há alunos para registrar.','erro');return;}
     var conteudo=el('diario-conteudo')?el('diario-conteudo').value.trim():'';
@@ -542,6 +573,9 @@
       el('diario-header-badge').className='diario-aula-header-badge salvo';
       el('diario-header-badge').innerHTML='<span class="material-icons-round">check_circle</span><span>Salvo</span>';
       if(typeof toast==='function')toast('Diário de aula salvo!','success');
+      // Volta automaticamente para a seleção de data da mesma turma, dando
+      // tempo do professor ver a confirmação antes da tela mudar.
+      setTimeout(voltarParaSelecaoData, 1400);
     }).catch(function(){
       btn.disabled=false; btn.classList.remove('loading');
       mostrarAlerta('Erro de comunicação. Tente novamente.','erro');
@@ -558,13 +592,7 @@
       el('diario-step-data').style.display='none';
       el('diario-step-turma').style.display='block';
     });
-    el('diario-btn-voltar-data')&&el('diario-btn-voltar-data').addEventListener('click',function(){
-      el('diario-step-aula').classList.remove('visivel');
-      el('diario-step-data').style.display='block';
-      state.dataSel=null; state.jaRegistrado=false;
-      el('diario-header-badge').className='diario-aula-header-badge';
-      el('diario-header-badge').innerHTML='<span class="material-icons-round">edit</span><span>Novo registro</span>';
-    });
+    el('diario-btn-voltar-data')&&el('diario-btn-voltar-data').addEventListener('click',voltarParaSelecaoData);
     el('diario-btn-salvar')&&el('diario-btn-salvar').addEventListener('click',salvarRegistro);
     el('btn-todos-p')&&el('btn-todos-p').addEventListener('click',todosPresente);
     el('btn-todos-f')&&el('btn-todos-f').addEventListener('click',todosFalta);
