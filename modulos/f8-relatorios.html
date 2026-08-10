@@ -271,6 +271,11 @@
     <div class="r8-campos-check" id="r8-campos-check"></div>
   </div>
 
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--c-text-2,#5C5C7A);cursor:pointer;user-select:none;margin-bottom:14px;">
+    <input type="checkbox" id="r8-chk-inativos" style="accent-color:#E63946;width:15px;height:15px;cursor:pointer;">
+    Incluir alunos/matrículas inativos
+  </label>
+
   <div class="r8-acoes">
     <button class="btn-r8 btn-r8-primario" id="btn-r8-gerar">
       <div class="spinner-btn"></div>
@@ -391,6 +396,11 @@
     <label class="r8c-check"><input type="checkbox" value="pendentes"> Pendentes</label>
     <label class="r8c-check"><input type="checkbox" value="freq_media"> Freq. média (%)</label>
   </div>
+
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--c-text-2,#5C5C7A);cursor:pointer;user-select:none;margin-bottom:14px;">
+    <input type="checkbox" id="r8c-chk-inativos" style="accent-color:#E63946;width:15px;height:15px;cursor:pointer;">
+    Incluir alunos com cadastro inativo
+  </label>
 
   <div class="r8c-acoes">
     <button class="btn-r8 btn-r8-primario" id="r8c-btn-gerar">
@@ -588,6 +598,7 @@
 
     if (tipo === 'condensado') {
       el('r8c-painel').classList.add('show');
+      if (el('r8c-chk-inativos')) el('r8c-chk-inativos').checked = false;
       return;
     }
 
@@ -627,6 +638,9 @@
       tipo === 'boletim' ? 'block' : 'none';
     el('r8-campos-wrap').style.display =
       tipo === 'alunos-turma-campos' ? 'block' : 'none';
+
+    // Cada novo tipo selecionado volta ao padrão: somente ativos.
+    if (el('r8-chk-inativos')) el('r8-chk-inativos').checked = false;
 
     el('r8-params').classList.add('show');
   }
@@ -670,6 +684,10 @@
     var tipo    = state.tipo;
     var turmaId = el('r8-param-turma').value;
     var alunoId = el('r8-param-aluno').value.trim();
+    // Padrão: somente alunos com cadastro ativo e matrículas ATIVAS.
+    // A caixa "Incluir alunos/matrículas inativos" desliga esse filtro.
+    var incluirInativos = el('r8-chk-inativos') ? el('r8-chk-inativos').checked : false;
+    var somenteAtivos   = !incluirInativos;
 
     if (!tipo) return;
     // alunos-geral não exige turma (turma vazia = todos os alunos)
@@ -682,12 +700,12 @@
     el('r8-preview-wrap').classList.remove('show');
 
     var p;
-    if (tipo === 'boletim')               p = gerarBoletim(turmaId, alunoId);
-    else if (tipo === 'turmas-alunos')    p = gerarTurmasAlunos(turmaId);
-    else if (tipo === 'alunos-geral')     p = gerarAlunosGeral(turmaId);
-    else if (tipo === 'frequencia-turma') p = gerarFrequencia(turmaId);
-    else if (tipo === 'resultados-turma') p = gerarResultados(turmaId);
-    else if (tipo === 'alunos-turma-campos') p = gerarAlunosCampos(turmaId);
+    if (tipo === 'boletim')               p = gerarBoletim(turmaId, alunoId, somenteAtivos);
+    else if (tipo === 'turmas-alunos')    p = gerarTurmasAlunos(turmaId, somenteAtivos);
+    else if (tipo === 'alunos-geral')     p = gerarAlunosGeral(turmaId, somenteAtivos);
+    else if (tipo === 'frequencia-turma') p = gerarFrequencia(turmaId, somenteAtivos);
+    else if (tipo === 'resultados-turma') p = gerarResultados(turmaId, somenteAtivos);
+    else if (tipo === 'alunos-turma-campos') p = gerarAlunosCampos(turmaId, somenteAtivos);
     else p = Promise.reject(new Error('Tipo desconhecido.'));
 
     p.then(function(html) {
@@ -706,9 +724,9 @@
   // =========================================================
   // 1. BOLETIM INDIVIDUAL
   // =========================================================
-  function gerarBoletim(turmaId, filtroMatId) {
+  function gerarBoletim(turmaId, filtroMatId, somenteAtivos) {
     return Promise.all([
-      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 300 }),
+      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 300, somenteAtivos: !!somenteAtivos }),
       postApi('turmas.buscar', { turmaId: turmaId }),
       postApi('cursos.listar', {}),
       postApi('avaliacoes.listar', {}),
@@ -854,10 +872,10 @@
   // =========================================================
   // 2. TURMAS COM ALUNOS
   // =========================================================
-  function gerarTurmasAlunos(turmaId) {
+  function gerarTurmasAlunos(turmaId, somenteAtivos) {
     return Promise.all([
       postApi('turmas.buscar', { turmaId: turmaId }),
-      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 300 }),
+      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 300, somenteAtivos: !!somenteAtivos }),
     ]).then(function(res) {
       var turma     = res[0].sucesso ? res[0].dados : {};
       var matriculas = (res[1].sucesso && res[1].dados) ? res[1].dados.dados||[] : [];
@@ -884,13 +902,13 @@
   // =========================================================
   // 3. LISTAGEM GERAL DE ALUNOS
   // =========================================================
-  function gerarAlunosGeral(turmaId) {
+  function gerarAlunosGeral(turmaId, somenteAtivos) {
     // Se uma turma foi selecionada, lista os alunos matriculados naquela turma.
     // Caso contrário, lista todos os alunos cadastrados na escola.
     if (turmaId) {
       return Promise.all([
         postApi('turmas.buscar', { turmaId: turmaId }),
-        postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 300 }),
+        postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 300, somenteAtivos: !!somenteAtivos }),
         postApi('alunos.listar', { tamanhoPagina: 5000 }),
       ]).then(function(res) {
         var turma      = res[0].sucesso ? (res[0].dados || {}) : {};
@@ -931,7 +949,7 @@
       });
     }
 
-    return postApi('alunos.listar', { tamanhoPagina: 5000 }).then(function(res) {
+    return postApi('alunos.listar', { tamanhoPagina: 5000, somenteAtivos: !!somenteAtivos }).then(function(res) {
       var alunos = (res.sucesso && res.dados) ? res.dados.dados||[] : [];
       var linhas = alunos.map(function(a, i) {
         return '<tr>' +
@@ -955,10 +973,10 @@
   // =========================================================
   // 4. FREQUÊNCIA POR TURMA
   // =========================================================
-  function gerarFrequencia(turmaId) {
+  function gerarFrequencia(turmaId, somenteAtivos) {
     return Promise.all([
       postApi('turmas.buscar', { turmaId: turmaId }),
-      postApi('matriculas.listar', { turmaId: turmaId, situacao:'ATIVA', tamanhoPagina: 300 }),
+      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 300, somenteAtivos: !!somenteAtivos }),
       postApi('frequencias.listar', { turmaId: turmaId }),
     ]).then(function(res) {
       var turma      = res[0].sucesso ? res[0].dados : {};
@@ -999,10 +1017,10 @@
   // =========================================================
   // 5. RESULTADOS POR TURMA
   // =========================================================
-  function gerarResultados(turmaId) {
+  function gerarResultados(turmaId, somenteAtivos) {
     return Promise.all([
       postApi('turmas.buscar', { turmaId: turmaId }),
-      postApi('matriculas.listar', { turmaId: turmaId, situacao:'ATIVA', tamanhoPagina: 300 }),
+      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 300, somenteAtivos: !!somenteAtivos }),
       postApi('cursos.listar', {}),
       postApi('avaliacoes.listar', {}),
       postApi('frequencias.listar', { turmaId: turmaId }),
@@ -1117,14 +1135,14 @@
   // =========================================================
   // 6. ALUNOS POR TURMA COM CAMPOS SELECIONADOS
   // =========================================================
-  function gerarAlunosCampos(turmaId) {
+  function gerarAlunosCampos(turmaId, somenteAtivos) {
     var camposSel = [];
     el('r8-campos-check').querySelectorAll('input:checked').forEach(function(inp){ camposSel.push(inp.value); });
     if (camposSel.length === 0) camposSel = ['NomeExibicao'];
 
     return Promise.all([
       postApi('turmas.buscar', { turmaId: turmaId }),
-      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 300 }),
+      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 300, somenteAtivos: !!somenteAtivos }),
       postApi('alunos.listar', { tamanhoPagina: 5000 }),
     ]).then(function(res) {
       var turma      = res[0].sucesso ? res[0].dados : {};
@@ -1270,6 +1288,10 @@
     var semestreId = el('r8c-semestre') ? el('r8c-semestre').value : '';
     var dimensao   = el('r8c-dimensao') ? el('r8c-dimensao').value : 'idioma';
     var filtroSit  = el('r8c-filtro-sit') ? el('r8c-filtro-sit').value : '';
+    // Padrão: exclui alunos com cadastro inativo. A situação da matrícula
+    // continua controlada pelo select "Filtrar situação da matrícula" acima,
+    // já que este relatório existe justamente para detalhar por situação.
+    var incluirInativos = el('r8c-chk-inativos') ? el('r8c-chk-inativos').checked : false;
 
     var metricas = [];
     document.querySelectorAll('.r8c-metricas-grid input[type=checkbox]').forEach(function(cb) {
@@ -1303,7 +1325,7 @@
         situacao:      filtroSit || undefined,
       }),
       postApi('turmas.listar', { semestreId: semestreId, tamanhoPagina: 300 }),
-      postApi('alunos.listar', { tamanhoPagina: 5000 }),
+      postApi('alunos.listar', { tamanhoPagina: 5000, somenteAtivos: !incluirInativos }),
     ];
     if (precisaFreq) {
       promessas.push(postApi('frequencias.listar', { semestreId: semestreId }));
@@ -1327,6 +1349,12 @@
       // Monta mapas de apoio
       var mapaAluno  = {};
       alunos.forEach(function(a) { mapaAluno[a.AlunoID] = a; });
+
+      // Exclui matrículas de alunos com cadastro inativo (mapaAluno já veio
+      // sem eles quando "Incluir alunos com cadastro inativo" está desmarcado)
+      if (!incluirInativos) {
+        matriculas = matriculas.filter(function(m) { return !!mapaAluno[m.AlunoID]; });
+      }
 
       var mapaTurma  = {};
       turmas.forEach(function(t) { mapaTurma[t.TurmaID] = t; });
