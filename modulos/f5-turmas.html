@@ -308,6 +308,10 @@
           <span class="material-icons-round">info</span>
           <span id="t5-mat-alerta-msg"></span>
         </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--c-text-2,#5C5C7A);cursor:pointer;user-select:none;margin-bottom:12px;">
+          <input type="checkbox" id="chk-mat-inativos" style="accent-color:#E63946;width:14px;height:14px;cursor:pointer;">
+          Mostrar alunos/matrículas inativos
+        </label>
         <div class="add-mat-wrap" id="add-mat-wrap">
           <div class="add-mat-titulo">Adicionar matrícula</div>
           <div class="add-mat-field">
@@ -789,6 +793,9 @@
     } else {
       el('t5-painel-acoes').style.display = 'none';
     }
+    // Reseta a checkbox de inativos ao trocar de turma — cada turma abre
+    // mostrando apenas alunos/matrículas ativos por padrão.
+    if (el('chk-mat-inativos')) el('chk-mat-inativos').checked = false;
     preencherInfo(turma);
     mostrarTab('info');
   }
@@ -934,7 +941,10 @@
   function carregarMatriculas() {
     if (!S.turmaSel) return;
     el('lista-matriculados').innerHTML = '<div class="mat-vazio">Carregando…</div>';
-    postApi('matriculas.listar', { turmaId: S.turmaSel.TurmaID, tamanhoPagina: 100 })
+    var mostrarInativos = el('chk-mat-inativos') && el('chk-mat-inativos').checked;
+    var params = { turmaId: S.turmaSel.TurmaID, tamanhoPagina: 200 };
+    if (!mostrarInativos) params.somenteAtivos = true;
+    postApi('matriculas.listar', params)
       .then(function (res) {
         if (!res.sucesso || !res.dados) {
           el('lista-matriculados').innerHTML = '<div class="mat-vazio">Erro ao carregar matrículas.</div>';
@@ -1406,6 +1416,9 @@
     el('btn-add-mat') && el('btn-add-mat').addEventListener('click', adicionarMatricula);
     el('add-mat-aluno-id') && el('add-mat-aluno-id').addEventListener('keydown', function (e) {
       if (e.key === 'Enter') adicionarMatricula();
+    });
+    el('chk-mat-inativos') && el('chk-mat-inativos').addEventListener('change', function () {
+      carregarMatriculas();
     });
 
     // Links
