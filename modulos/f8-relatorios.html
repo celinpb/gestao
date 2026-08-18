@@ -517,6 +517,10 @@
       if (res[3].sucesso && res[3].dados) state.semestres = res[3].dados || [];
       popularSelectTurmas();
       popularSelectSemestres();
+      // Repopula o filtro de professor do "Controle de registros" aqui também:
+      // se o usuário abrir esse relatório antes desta chamada terminar, o select
+      // ficava vazio para sempre, pois só era populado no clique do card.
+      crPopularProfessores();
       aplicarRestricoesPapel();
     }).catch(function(e) {
       console.error('F8 init erro:', e);
@@ -792,7 +796,10 @@
           var presencas  = freqAluno.filter(function(f){return f.Frequencia==='P';}).length;
           var faltas     = freqAluno.filter(function(f){return f.Frequencia==='F';}).length;
           var justif     = freqAluno.filter(function(f){return f.Frequencia==='J';}).length;
-          var pct        = totalAulas > 0 ? Math.round((presencas/totalAulas)*100) : 0;
+          // Faltas justificadas somam-se à presença para fins do cálculo do percentual
+          // de frequência (medida interna, não prevista na LDB — decisão institucional
+          // para não prejudicar alunos que não foram previamente informados da regra).
+          var pct        = totalAulas > 0 ? Math.round(((presencas+justif)/totalAulas)*100) : 0;
           var retidoFalta = pct < 75;
 
           // Calcula médias
@@ -992,7 +999,8 @@
         var p = freqAluno.filter(function(f){return f.Frequencia==='P';}).length;
         var f = freqAluno.filter(function(f){return f.Frequencia==='F';}).length;
         var j = freqAluno.filter(function(f){return f.Frequencia==='J';}).length;
-        var pct = totalAulas > 0 ? Math.round((p/totalAulas)*100) : 0;
+        // Faltas justificadas somam-se à presença para fins do percentual.
+        var pct = totalAulas > 0 ? Math.round(((p+j)/totalAulas)*100) : 0;
         var cor = pct < 75 ? '#E63946' : (pct < 85 ? '#D4A843' : '#2A9D8F');
         return '<tr>' +
           '<td class="c">'+(i+1)+'</td>' +
@@ -1009,7 +1017,7 @@
         '<div class="r8-titulo-rel">Frequência por turma</div>' +
         '<div class="r8-subtitulo-rel">' + turmaId + ' · ' + (turma.Estagio||'') + ' · Total de aulas: ' + totalAulas + '</div>' +
         '<table class="r8-table"><thead><tr><th class="c">#</th><th>Aluno</th><th class="c">Presenças</th><th class="c">Faltas</th><th class="c">Justif.</th><th class="c">Frequência</th><th class="c">Situação</th></tr></thead><tbody>' + linhas + '</tbody></table>' +
-        '<p style="font-size:7.5pt;color:#9898B0;">⚠ Frequência abaixo de 75% = retido por falta</p>' +
+        '<p style="font-size:7.5pt;color:#9898B0;">⚠ Frequência abaixo de 75% = retido por falta. Faltas justificadas contam como presença neste cálculo.</p>' +
         htmlRodape() + '</div>';
     });
   }
@@ -1075,7 +1083,9 @@
           var m = d.m; var notas = d.notas;
           var freqAluno = frequencias.filter(function(f){return f.MatriculaID===m.MatriculaID;});
           var presencas = freqAluno.filter(function(f){return f.Frequencia==='P';}).length;
-          var pct = totalAulas>0 ? Math.round((presencas/totalAulas)*100) : 0;
+          var justificadas = freqAluno.filter(function(f){return f.Frequencia==='J';}).length;
+          // Faltas justificadas somam-se à presença para fins do percentual.
+          var pct = totalAulas>0 ? Math.round(((presencas+justificadas)/totalAulas)*100) : 0;
           var retidoFalta = pct < 75;
 
           var mediasHtml = '';
@@ -1369,7 +1379,8 @@
           if (f.DataAula) datasAulas[f.TurmaID][String(f.DataAula).substring(0,10)] = true;
           if (!mapaFreq[f.MatriculaID]) mapaFreq[f.MatriculaID] = { presencas: 0, total: 0 };
           mapaFreq[f.MatriculaID].total++;
-          if (f.Frequencia === 'P') mapaFreq[f.MatriculaID].presencas++;
+          // Faltas justificadas somam-se à presença para fins do percentual.
+          if (f.Frequencia === 'P' || f.Frequencia === 'J') mapaFreq[f.MatriculaID].presencas++;
         });
       }
 
