@@ -1668,12 +1668,18 @@
     return dias;
   }
 
+  // Turma ativa = SituacaoTurma true/'true' e não encerrada (mesma regra de f5-turmas.html)
+  function crTurmaAtiva(t) {
+    return (t.SituacaoTurma === true || t.SituacaoTurma === 'true') &&
+      String(t.SituacaoTurma) !== 'ENCERRADA';
+  }
+
   function crPopularProfessores() {
     var sel = el('r8cr-professor');
     if (!sel) return;
     while (sel.options.length > 1) sel.remove(1);
     var vistos = {};
-    state.turmas.forEach(function(t) {
+    state.turmas.filter(crTurmaAtiva).forEach(function(t) {
       var nome = t.ProfessorNome || '';
       if (nome && !vistos[nome]) {
         vistos[nome] = true;
@@ -1742,9 +1748,10 @@
         registros[(f.TurmaID || '') + '|' + dataF] = true;
       });
 
+      var turmasAtivas = state.turmas.filter(crTurmaAtiva);
       var turmasFiltradas = profFiltro
-        ? state.turmas.filter(function(t){ return (t.ProfessorNome||'') === profFiltro; })
-        : state.turmas;
+        ? turmasAtivas.filter(function(t){ return (t.ProfessorNome||'') === profFiltro; })
+        : turmasAtivas;
 
       var resultadosDias = [];
       diasVerificar.forEach(function(diaObj) {
