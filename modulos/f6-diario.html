@@ -415,6 +415,9 @@
     el('freq-loading').style.display='flex';
     el('freq-tabela').style.display='none';
     el('historico-corpo').innerHTML='<div class="historico-vazio">Carregando…</div>';
+    // Limpa o campo de conteúdo imediatamente — evita mostrar, ainda que
+    // brevemente, o texto de outra turma/data vista antes na mesma sessão.
+    el('diario-conteudo').value=''; atualizarContador();
     var turmaId=state.turmaSel.TurmaID, data=state.dataSel;
     Promise.all([
       postApi('matriculas.listar',{turmaId:turmaId,situacao:'ATIVA',tamanhoPagina:300}),
@@ -430,13 +433,16 @@
         el('diario-header-badge').className='diario-aula-header-badge salvo';
         el('diario-header-badge').innerHTML='<span class="material-icons-round">check_circle</span><span>Já registrado'+(ts?' em '+ts:'')+'</span>';
       }
-      if(res[2].sucesso&&res[2].dados){
-        var dataBase=data.split(' ')[0];
-        var aulasData=res[2].dados.filter(function(c){return String(c.DataAula||'').indexOf(dataBase)!==-1;});
-        if(aulasData.length>0){el('diario-conteudo').value=aulasData[0].ConteudoMinistrado||'';atualizarContador();}
-        var historico=res[2].dados.filter(function(c){return String(c.DataAula||'').indexOf(dataBase)===-1;}).slice(-3).reverse();
-        renderizarHistorico(historico);
-      }
+      // Sempre define (ou limpa) o campo de conteúdo com base no que existe
+      // para ESTA turma+data — nunca deixa o valor anterior (de outra
+      // turma/data, ou de uma aula futura sem registro) permanecer visível.
+      var conteudosLista = (res[2].sucesso && res[2].dados) ? res[2].dados : [];
+      var dataBase = data.split(' ')[0];
+      var aulasData = conteudosLista.filter(function(c){return String(c.DataAula||'').indexOf(dataBase)!==-1;});
+      el('diario-conteudo').value = aulasData.length>0 ? (aulasData[0].ConteudoMinistrado||'') : '';
+      atualizarContador();
+      var historico = conteudosLista.filter(function(c){return String(c.DataAula||'').indexOf(dataBase)===-1;}).slice(-3).reverse();
+      renderizarHistorico(historico);
       calcularTotalFaltas(turmaId);
     }).catch(function(){mostrarAlerta('Erro ao carregar dados da aula.','erro');el('freq-loading').style.display='none';});
   }
