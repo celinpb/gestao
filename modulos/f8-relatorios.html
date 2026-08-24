@@ -133,6 +133,10 @@
   .r8cr-vazio{padding:20px 16px;text-align:center;font-size:13px;color:var(--c-text-3,#9898B0);}
 
   .r8-folha{background:#fff;width:210mm;min-height:297mm;margin:0 auto;padding:16mm 18mm;box-shadow:0 2px 16px rgba(0,0,0,0.15);font-family:'DM Sans',sans-serif;font-size:10pt;color:#1A1A2E;box-sizing:border-box;}
+  .r8-folha.paisagem{width:297mm;min-height:210mm;}
+  .r8-grade-freq th,.r8-grade-freq td{padding:3px 4px;font-size:7.5pt;}
+  .r8-grade-freq td.c{text-align:center;}
+  .r8-preview-wrap{overflow-x:auto;}
 
   /* Cabeçalho institucional */
   .r8-cab{display:flex;align-items:center;gap:14px;padding-bottom:10px;border-bottom:2px solid #1A1A2E;margin-bottom:12px;}
@@ -232,6 +236,16 @@
     <div class="r8-tipo-nome">Alunos por turma (campos)</div>
     <div class="r8-tipo-desc">Lista de alunos de uma turma com campos do cadastro selecionados</div>
   </div>
+  <div class="r8-tipo-card" data-tipo="conteudo-turma">
+    <div class="r8-tipo-icone"><span class="material-icons-round">import_contacts</span></div>
+    <div class="r8-tipo-nome">Conteúdos da turma</div>
+    <div class="r8-tipo-desc">Conteúdo ministrado registrado e datas futuras previstas de aula</div>
+  </div>
+  <div class="r8-tipo-card" data-tipo="grade-frequencia">
+    <div class="r8-tipo-icone"><span class="material-icons-round">grid_on</span></div>
+    <div class="r8-tipo-nome">Grade de frequência</div>
+    <div class="r8-tipo-desc">Presença/falta de cada aluno em todas as datas do semestre (paisagem)</div>
+  </div>
   <div class="r8-tipo-card" data-tipo="condensado">
     <div class="r8-tipo-icone"><span class="material-icons-round">pivot_table_chart</span></div>
     <div class="r8-tipo-nome">Relatório condensado</div>
@@ -271,9 +285,14 @@
     <div class="r8-campos-check" id="r8-campos-check"></div>
   </div>
 
-  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--c-text-2,#5C5C7A);cursor:pointer;user-select:none;margin-bottom:14px;">
+  <label id="r8-lbl-chk-inativos" style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--c-text-2,#5C5C7A);cursor:pointer;user-select:none;margin-bottom:14px;">
     <input type="checkbox" id="r8-chk-inativos" style="accent-color:#E63946;width:15px;height:15px;cursor:pointer;">
     Incluir alunos/matrículas inativos
+  </label>
+
+  <label id="r8-lbl-chk-outras-situacoes" style="display:none;align-items:center;gap:6px;font-size:13px;color:var(--c-text-2,#5C5C7A);cursor:pointer;user-select:none;margin-bottom:14px;">
+    <input type="checkbox" id="r8-chk-outras-situacoes" style="accent-color:#E63946;width:15px;height:15px;cursor:pointer;">
+    Mostrar outras situações (transferidos, cancelados, trancados, concluídos nesta turma)
   </label>
 
   <div class="r8-acoes">
@@ -619,6 +638,8 @@
       'frequencia-turma':    'Frequência por turma',
       'resultados-turma':    'Resultados por turma',
       'alunos-turma-campos': 'Alunos por turma com campos selecionados',
+      'conteudo-turma':      'Conteúdos da turma',
+      'grade-frequencia':    'Grade de frequência',
     };
     el('r8-params-titulo-txt').textContent = nomes[tipo] || tipo;
 
@@ -645,6 +666,13 @@
 
     // Cada novo tipo selecionado volta ao padrão: somente ativos.
     if (el('r8-chk-inativos')) el('r8-chk-inativos').checked = false;
+    if (el('r8-chk-outras-situacoes')) el('r8-chk-outras-situacoes').checked = false;
+
+    // "Incluir inativos" só se aplica aos relatórios que usam somenteAtivos;
+    // "Mostrar outras situações" é exclusivo da Grade de frequência.
+    var usaChkInativos = ['boletim','turmas-alunos','alunos-geral','frequencia-turma','resultados-turma','alunos-turma-campos'].indexOf(tipo) !== -1;
+    if (el('r8-lbl-chk-inativos')) el('r8-lbl-chk-inativos').style.display = usaChkInativos ? 'flex' : 'none';
+    if (el('r8-lbl-chk-outras-situacoes')) el('r8-lbl-chk-outras-situacoes').style.display = tipo === 'grade-frequencia' ? 'flex' : 'none';
 
     el('r8-params').classList.add('show');
   }
@@ -695,7 +723,7 @@
 
     if (!tipo) return;
     // alunos-geral não exige turma (turma vazia = todos os alunos)
-    var exigeTurma = ['boletim','turmas-alunos','frequencia-turma','resultados-turma','alunos-turma-campos'];
+    var exigeTurma = ['boletim','turmas-alunos','frequencia-turma','resultados-turma','alunos-turma-campos','conteudo-turma','grade-frequencia'];
     if (exigeTurma.indexOf(tipo) !== -1 && !turmaId) {
       if (typeof toast === 'function') toast('Selecione uma turma.', 'error'); return;
     }
@@ -710,6 +738,11 @@
     else if (tipo === 'frequencia-turma') p = gerarFrequencia(turmaId, somenteAtivos);
     else if (tipo === 'resultados-turma') p = gerarResultados(turmaId, somenteAtivos);
     else if (tipo === 'alunos-turma-campos') p = gerarAlunosCampos(turmaId, somenteAtivos);
+    else if (tipo === 'conteudo-turma')   p = gerarConteudoTurma(turmaId);
+    else if (tipo === 'grade-frequencia') {
+      var mostrarOutrasSituacoes = el('r8-chk-outras-situacoes') ? el('r8-chk-outras-situacoes').checked : false;
+      p = gerarGradeFrequencia(turmaId, mostrarOutrasSituacoes);
+    }
     else p = Promise.reject(new Error('Tipo desconhecido.'));
 
     p.then(function(html) {
@@ -1190,14 +1223,278 @@
   }
 
   // =========================================================
+  // 7. CONTEÚDOS DA TURMA  /  8. GRADE DE FREQUÊNCIA
+  // =========================================================
+  // Ambos precisam das datas de aula previstas para a turma no semestre
+  // inteiro (dias letivos do calendário que caem no(s) dia(s) da semana
+  // da turma). A função abaixo é compartilhada pelos dois relatórios.
+  // Reaproveita DIAS_SEMANA_NUM/crDiasTurma, já definidos mais abaixo
+  // neste mesmo arquivo (função "Controle de registros") — como são
+  // `var`/function declarations no mesmo escopo, ficam disponíveis aqui
+  // no momento da chamada, mesmo definidos depois no código-fonte.
+
+  var MESES_ABREV_R8 = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var DIAS_ABREV_R8  = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  var LABEL_SITUACAO_MAT_R8 = {
+    ATIVA: 'Ativa', TRANCADA: 'Trancada', CONCLUIDA: 'Concluída',
+    CANCELADA: 'Cancelada', TRANSFERIDA: 'Transferida',
+  };
+
+  /**
+   * Constrói a lista de datas de aula previstas para a turma no semestre,
+   * cruzando o calendário letivo (calendario.listar) com o(s) dia(s) da
+   * semana cadastrado(s) na turma. Cada item: { iso, br, data, weekday,
+   * mes (chave AAAA-MM p/ agrupar), mesLabel, futura (bool), informacao }.
+   */
+  function r8_construirDatasTurma(turma, calendario) {
+    var diasTurma = crDiasTurma(turma);
+    if (!diasTurma.length) return [];
+
+    var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    var datas = [];
+
+    calendario.forEach(function(c) {
+      if (!c.DiaLetivo) return;
+      var iso = String(c.DataAula || '').substring(0, 10); // AAAA-MM-DD
+      var p = iso.split('-');
+      if (p.length !== 3) return;
+      var dt = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]), 12, 0, 0);
+      if (isNaN(dt.getTime())) return;
+      if (diasTurma.indexOf(dt.getDay()) === -1) return;
+
+      var pad = function(n) { return String(n).padStart(2, '0'); };
+      datas.push({
+        iso: iso,
+        br: pad(dt.getDate()) + '/' + pad(dt.getMonth() + 1) + '/' + dt.getFullYear(),
+        data: dt,
+        weekday: dt.getDay(),
+        mes: p[0] + '-' + p[1],
+        mesLabel: MESES_ABREV_R8[dt.getMonth()] + '/' + String(p[0]).substring(2),
+        futura: dt.getTime() > hoje.getTime(),
+        informacao: c.Informacao || '',
+      });
+    });
+
+    datas.sort(function(a, b) { return a.data - b.data; });
+    return datas;
+  }
+
+  /**
+   * 7. CONTEÚDOS DA TURMA
+   * Lista o conteúdo ministrado registrado em cada aula já dada, marca
+   * como "Pendente" as aulas passadas sem registro, e lista as próximas
+   * datas previstas (ainda não realizadas) como "Previsto".
+   */
+  function gerarConteudoTurma(turmaId) {
+    return Promise.all([
+      postApi('turmas.buscar', { turmaId: turmaId }),
+      postApi('calendario.listar', {}),
+      postApi('conteudo.listar', { turmaId: turmaId }),
+    ]).then(function(res) {
+      var turma      = res[0].sucesso ? (res[0].dados || {}) : {};
+      var calendario = (res[1].sucesso && res[1].dados) ? res[1].dados : [];
+      var conteudos  = (res[2].sucesso && res[2].dados) ? res[2].dados : [];
+
+      var datas = r8_construirDatasTurma(turma, calendario);
+
+      var mapaConteudo = {};
+      conteudos.forEach(function(c) {
+        var br = String(c.DataAula || '').substring(0, 10);
+        if (br) mapaConteudo[br] = c.ConteudoMinistrado || '';
+      });
+
+      var subtitulo = turmaId + ' · ' + (turma.Estagio || turma.CursoID || '') +
+        (turma.ProfessorNome ? ' · Prof. ' + turma.ProfessorNome : '') +
+        ' · ' + (turma.DiaSemana || '') + (turma.Horario ? ' ' + turma.Horario : '');
+
+      if (!datas.length) {
+        return '<div class="r8-folha">' + htmlCabecalho() +
+          '<div class="r8-titulo-rel">Conteúdos ministrados</div>' +
+          '<div class="r8-subtitulo-rel">' + subtitulo + '</div>' +
+          '<div class="r8-estado" style="padding:24px 0;">' +
+            '<span class="material-icons-round" style="font-size:32px;color:#9898B0;">event_busy</span>' +
+            '<p>Nenhuma data de aula encontrada. Verifique se a turma tem "Dia de aula" cadastrado e se há dias letivos no calendário do semestre.</p>' +
+          '</div>' + htmlRodape() + '</div>';
+      }
+
+      var contReg = 0, contPend = 0, contFut = 0;
+      var corMap = { REGISTRADO: '#1A6E65', PENDENTE: '#A32D2D', PREVISTO: '#5C5C7A' };
+      var bgMap  = { REGISTRADO: 'rgba(42,157,143,0.12)', PENDENTE: 'rgba(230,57,70,0.10)', PREVISTO: '#F0EEE8' };
+      var rotuloMap = { REGISTRADO: 'Registrado', PENDENTE: 'Pendente', PREVISTO: 'Previsto' };
+
+      var linhas = datas.map(function(d, i) {
+        var conteudo = mapaConteudo[d.br];
+        var situacao;
+        if (conteudo !== undefined && conteudo !== '') { situacao = 'REGISTRADO'; contReg++; }
+        else if (d.futura)                              { situacao = 'PREVISTO';   contFut++; }
+        else                                             { situacao = 'PENDENTE';  contPend++; }
+
+        var celulaConteudo = conteudo
+          ? conteudo
+          : (d.futura
+              ? '<span style="color:#9898B0;">— aula ainda não realizada —</span>'
+              : '<span style="color:#A32D2D;">— sem registro —</span>');
+
+        return '<tr>' +
+          '<td class="c">' + (i + 1) + '</td>' +
+          '<td class="c" style="white-space:nowrap;">' + d.br + '</td>' +
+          '<td class="c">' + DIAS_ABREV_R8[d.weekday] + '</td>' +
+          '<td class="c"><span style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:7.5pt;font-weight:700;background:' + bgMap[situacao] + ';color:' + corMap[situacao] + ';">' + rotuloMap[situacao] + '</span></td>' +
+          '<td>' + celulaConteudo + '</td>' +
+        '</tr>';
+      }).join('');
+
+      var resumo = '<div style="display:flex;gap:16px;margin-bottom:10px;font-size:8.5pt;flex-wrap:wrap;">' +
+        '<span>Registrados: <strong style="color:#2A9D8F">' + contReg + '</strong></span>' +
+        '<span>Pendentes: <strong style="color:#E63946">' + contPend + '</strong></span>' +
+        '<span>Previstos (futuros): <strong style="color:#9898B0">' + contFut + '</strong></span>' +
+        '<span>Total de aulas no semestre: <strong>' + datas.length + '</strong></span>' +
+      '</div>';
+
+      return '<div class="r8-folha">' + htmlCabecalho() +
+        '<div class="r8-titulo-rel">Conteúdos ministrados</div>' +
+        '<div class="r8-subtitulo-rel">' + subtitulo + '</div>' +
+        resumo +
+        '<table class="r8-table"><thead><tr>' +
+          '<th class="c">#</th><th class="c">Data</th><th class="c">Dia</th><th class="c">Situação</th><th>Conteúdo ministrado</th>' +
+        '</tr></thead><tbody>' + linhas + '</tbody></table>' +
+        htmlRodape() + '</div>';
+    });
+  }
+
+  /**
+   * 8. GRADE DE FREQUÊNCIA
+   * Linhas = alunos (ordem alfabética). Colunas = cada data de aula
+   * prevista no semestre, agrupadas por mês nas duas primeiras linhas
+   * do cabeçalho. Célula = P/F/J registrado, ou "–" se não houver
+   * registro para aquele aluno naquela data. Paisagem (A4 landscape).
+   */
+  function gerarGradeFrequencia(turmaId, mostrarOutrasSituacoes) {
+    return Promise.all([
+      postApi('turmas.buscar', { turmaId: turmaId }),
+      postApi('matriculas.listar', { turmaId: turmaId, tamanhoPagina: 500 }),
+      postApi('calendario.listar', {}),
+      postApi('frequencias.listar', { turmaId: turmaId }),
+    ]).then(function(res) {
+      var turma        = res[0].sucesso ? (res[0].dados || {}) : {};
+      var matriculasTodas = (res[1].sucesso && res[1].dados) ? res[1].dados.dados || [] : [];
+      var calendario    = (res[2].sucesso && res[2].dados) ? res[2].dados : [];
+      var frequencias   = (res[3].sucesso && res[3].dados) ? res[3].dados : [];
+
+      // Por padrão: só matrículas ATIVA nesta turma. Com o toggle marcado,
+      // inclui também TRANSFERIDA/CANCELADA/TRANCADA/CONCLUIDA — matrículas
+      // cujo TurmaID atual continua sendo esta turma mesmo após a mudança
+      // de situação (transferência não altera o TurmaID da matrícula de
+      // origem, só cria uma nova na turma de destino).
+      var matriculas = matriculasTodas.filter(function(m) {
+        return mostrarOutrasSituacoes ? true : m.SituacaoMatricula === 'ATIVA';
+      });
+
+      matriculas.sort(function(a, b) {
+        return String(a.NomeExibicao || a.AlunoID || '').localeCompare(String(b.NomeExibicao || b.AlunoID || ''), 'pt-BR');
+      });
+
+      var datas = r8_construirDatasTurma(turma, calendario);
+
+      var subtitulo = turmaId + ' · ' + (turma.Estagio || turma.CursoID || '') +
+        (turma.ProfessorNome ? ' · Prof. ' + turma.ProfessorNome : '');
+
+      if (!matriculas.length || !datas.length) {
+        return '<div class="r8-folha paisagem">' + htmlCabecalho() +
+          '<div class="r8-titulo-rel">Grade de frequência</div>' +
+          '<div class="r8-subtitulo-rel">' + subtitulo + '</div>' +
+          '<div class="r8-estado" style="padding:24px 0;">' +
+            '<span class="material-icons-round" style="font-size:32px;color:#9898B0;">event_busy</span>' +
+            '<p>' + (!matriculas.length
+              ? 'Nenhum aluno encontrado com os filtros atuais.'
+              : 'Nenhuma data de aula encontrada. Verifique se a turma tem "Dia de aula" cadastrado e se há dias letivos no calendário do semestre.') + '</p>' +
+          '</div>' + htmlRodape() + '</div>';
+      }
+
+      // Mapa "MatriculaID|DD/MM/AAAA" → Frequencia (P/F/J)
+      var mapaFreq = {};
+      frequencias.forEach(function(f) {
+        var br = String(f.DataAula || '').substring(0, 10);
+        if (f.MatriculaID && br) mapaFreq[f.MatriculaID + '|' + br] = f.Frequencia;
+      });
+
+      // Agrupa as datas por mês (1ª linha do cabeçalho)
+      var gruposMes = [];
+      datas.forEach(function(d) {
+        var ultimo = gruposMes[gruposMes.length - 1];
+        if (ultimo && ultimo.mes === d.mes) ultimo.qtd++;
+        else gruposMes.push({ mes: d.mes, label: d.mesLabel, qtd: 1 });
+      });
+      var thMeses = gruposMes.map(function(g) {
+        return '<th class="c" colspan="' + g.qtd + '" style="background:#2D2D4A;">' + g.label + '</th>';
+      }).join('');
+
+      // 2ª linha do cabeçalho: dia/mês + abreviação do dia da semana
+      var thDatas = datas.map(function(d) {
+        return '<th class="c" style="white-space:nowrap;">' + d.br.substring(0, 5) +
+          '<br><span style="font-weight:400;opacity:0.85;">' + DIAS_ABREV_R8[d.weekday] + '</span></th>';
+      }).join('');
+
+      var CORES_FREQ = {
+        P: { bg: 'rgba(42,157,143,0.18)',  cor: '#1A6E65' },
+        F: { bg: 'rgba(230,57,70,0.14)',   cor: '#A32D2D' },
+        J: { bg: 'rgba(233,196,106,0.30)', cor: '#5C4200' },
+      };
+
+      var linhas = matriculas.map(function(m) {
+        var nome = m.NomeExibicao || m.AlunoID || m.MatriculaID;
+        var badgeSituacao = (mostrarOutrasSituacoes && m.SituacaoMatricula !== 'ATIVA')
+          ? ' <span style="font-size:6.5pt;font-weight:700;padding:1px 6px;border-radius:8px;background:#F0EEE8;color:#5C5C7A;white-space:nowrap;">' +
+            (LABEL_SITUACAO_MAT_R8[m.SituacaoMatricula] || m.SituacaoMatricula) + '</span>'
+          : '';
+        var tdNome = '<td style="white-space:nowrap;">' + nome + badgeSituacao + '</td>';
+
+        var tds = datas.map(function(d) {
+          var f = mapaFreq[m.MatriculaID + '|' + d.br];
+          if (!f) return '<td class="c" style="color:#C8C7C2;">–</td>';
+          var c = CORES_FREQ[f] || { bg: '#F5F4F0', cor: '#5C5C7A' };
+          return '<td class="c" style="background:' + c.bg + ';color:' + c.cor + ';font-weight:700;">' + f + '</td>';
+        }).join('');
+
+        return '<tr>' + tdNome + tds + '</tr>';
+      }).join('');
+
+      var legenda = '<div style="display:flex;gap:14px;margin-bottom:8px;font-size:8pt;flex-wrap:wrap;">' +
+        '<span><strong style="color:#1A6E65;">P</strong> Presença</span>' +
+        '<span><strong style="color:#A32D2D;">F</strong> Falta</span>' +
+        '<span><strong style="color:#5C4200;">J</strong> Falta justificada</span>' +
+        '<span><strong style="color:#9898B0;">–</strong> Sem registro</span>' +
+      '</div>';
+
+      return '<div class="r8-folha paisagem">' + htmlCabecalho() +
+        '<div class="r8-titulo-rel">Grade de frequência</div>' +
+        '<div class="r8-subtitulo-rel">' + subtitulo + ' · ' + matriculas.length + ' aluno(s) · ' + datas.length + ' data(s)</div>' +
+        legenda +
+        '<div style="overflow-x:auto;">' +
+          '<table class="r8-table r8-grade-freq"><thead>' +
+            '<tr><th rowspan="2" style="vertical-align:bottom;">Aluno</th>' + thMeses + '</tr>' +
+            '<tr>' + thDatas + '</tr>' +
+          '</thead><tbody>' + linhas + '</tbody></table>' +
+        '</div>' +
+        htmlRodape() + '</div>';
+    });
+  }
+
+  // =========================================================
   // IMPRESSÃO
   // =========================================================
   function imprimir() {
-  var html = el('r8-print-area').innerHTML;
+  var areaEl = el('r8-print-area');
+  var html = areaEl.innerHTML;
   if (!html) {
     if (typeof toast === 'function') toast('Gere o relatório antes de imprimir.', 'error');
     return;
   }
+  var paisagem = !!areaEl.querySelector('.r8-folha.paisagem');
+  var larguraFolha  = paisagem ? '297mm' : '210mm';
+  var alturaFolha   = paisagem ? '210mm' : '297mm';
+  var paddingImpressao = paisagem ? '10mm 12mm' : '12mm 14mm';
+  var tamanhoPagina = 'A4' + (paisagem ? ' landscape' : '');
 
   var janela = window.open('', '_blank', 'width=900,height=700');
   janela.document.write(
@@ -1207,7 +1504,8 @@
     '<style>' +
       // Estilos da folha copiados para a nova janela
       'body{margin:0;padding:0;background:#fff;font-family:"DM Sans",sans-serif;}' +
-      '.r8-folha{background:#fff;width:210mm;min-height:297mm;margin:0 auto;padding:16mm 18mm;font-family:"DM Sans",sans-serif;font-size:10pt;color:#1A1A2E;box-sizing:border-box;}' +
+      '.r8-folha{background:#fff;width:'+larguraFolha+';min-height:'+alturaFolha+';margin:0 auto;padding:16mm 18mm;font-family:"DM Sans",sans-serif;font-size:10pt;color:#1A1A2E;box-sizing:border-box;}' +
+      '.r8-grade-freq th,.r8-grade-freq td{padding:3px 4px;font-size:7.5pt;}' +
       '.r8-cab{display:flex;align-items:center;gap:14px;padding-bottom:10px;border-bottom:2px solid #1A1A2E;margin-bottom:12px;}' +
       '.r8-cab-logo{width:52px;height:52px;object-fit:contain;flex-shrink:0;}' +
       '.r8-cab-logo-placeholder{width:52px;height:52px;background:#F5F4F0;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#E63946;flex-shrink:0;}' +
@@ -1248,9 +1546,9 @@
       '.r8-com-texto{font-size:8.5pt;color:#5C5C7A;font-style:italic;line-height:1.5;background:#F8F7F3;padding:6px 10px;border-radius:4px;border-left:3px solid #E8E7E2;margin-bottom:4px;}' +
       '.r8-rodape-folha{margin-top:auto;padding-top:10px;border-top:1px solid #E8E7E2;font-size:7.5pt;color:#9898B0;display:flex;justify-content:space-between;}' +
       '@media print{' +
-        '.r8-folha{page-break-after:always;margin:0;padding:12mm 14mm;}' +
+        '.r8-folha{page-break-after:always;margin:0;padding:'+paddingImpressao+';}' +
         '.r8-folha:last-child{page-break-after:avoid;}' +
-        '@page{size:A4;margin:0;}' +
+        '@page{size:'+tamanhoPagina+';margin:0;}' +
       '}' +
     '</style>' +
     '</head><body>' +
