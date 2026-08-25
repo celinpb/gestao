@@ -1251,25 +1251,27 @@
     if (!diasTurma.length) return [];
 
     var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    var pad = function(n) { return String(n).padStart(2, '0'); };
     var datas = [];
 
     calendario.forEach(function(c) {
       if (!c.DiaLetivo) return;
-      var iso = String(c.DataAula || '').substring(0, 10); // AAAA-MM-DD
-      var p = iso.split('-');
+      // calendario.listar devolve DataAula em "DD/MM/AAAA" (m7_dataParaString),
+      // não em ISO — mesmo formato usado por frequencias.listar/conteudo.listar.
+      var br = String(c.DataAula || '').trim().substring(0, 10);
+      var p  = br.split('/');
       if (p.length !== 3) return;
-      var dt = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]), 12, 0, 0);
+      var dia = Number(p[0]), mes = Number(p[1]), ano = Number(p[2]);
+      var dt  = new Date(ano, mes - 1, dia, 12, 0, 0);
       if (isNaN(dt.getTime())) return;
       if (diasTurma.indexOf(dt.getDay()) === -1) return;
 
-      var pad = function(n) { return String(n).padStart(2, '0'); };
       datas.push({
-        iso: iso,
-        br: pad(dt.getDate()) + '/' + pad(dt.getMonth() + 1) + '/' + dt.getFullYear(),
+        br: pad(dia) + '/' + pad(mes) + '/' + ano,
         data: dt,
         weekday: dt.getDay(),
-        mes: p[0] + '-' + p[1],
-        mesLabel: MESES_ABREV_R8[dt.getMonth()] + '/' + String(p[0]).substring(2),
+        mes: ano + '-' + pad(mes),
+        mesLabel: MESES_ABREV_R8[dt.getMonth()] + '/' + String(ano).substring(2),
         futura: dt.getTime() > hoje.getTime(),
         informacao: c.Informacao || '',
       });
