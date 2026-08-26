@@ -9,6 +9,17 @@
 //   Usamos Content-Type: text/plain com JSON no corpo — o Apps Script
 //   aceita e parseia normalmente, e o navegador não faz preflight.
 // =============================================================================
+// CRONÔMETRO DE SESSÃO:
+//   O back-end usa "sliding window": toda chamada autenticada bem-sucedida
+//   renova o prazo de expiração no CacheService (ver M2_Autenticacao.gs).
+//   Para o contador regressivo da interface (Auth.getSegundosRestantes())
+//   nunca dessincronizar do servidor, replicamos esse comportamento aqui:
+//   sempre que uma resposta vier com sucesso, renovamos o relógio local
+//   (Auth.renovar()), e sempre que a resposta trouxer "duracaoSegundos"
+//   (login, definirNovaSenha, verificarSessao), atualizamos também a duração
+//   conhecida (Auth.definirDuracao()). Isso é feito de forma transparente:
+//   nenhum código que já chama postApi() precisa mudar.
+// =============================================================================
 
 // URL do Web App do Apps Script — NÃO altere após publicar
 var API_URL = 'https://script.google.com/macros/s/AKfycbzxgk_wBLI_0-U1RZ9ikgWEPgX9XHQnTvZcY6Y8WfYol1apV6JV2ddLgWjn00T9FWqG/exec';
@@ -48,6 +59,20 @@ function postApi(acao, dados) {
     if (res === null || res === undefined) {
       throw new Error('Resposta nula do servidor para ação: ' + acao);
     }
+
+    // Renovação do cronômetro de sessão (sliding window espelhado do back-end).
+    // Não interfere no valor retornado ao chamador — apenas observa a resposta.
+    if (res.sucesso && acao !== 'auth.logout' && typeof Auth !== 'undefined') {
+      var duracao = (typeof res.duracaoSegundos === 'number') ? res.duracaoSegundos :
+                    (res.dados && typeof res.dados.duracaoSegundos === 'number') ? res.dados.duracaoSegundos :
+                    null;
+      if (duracao !== null) {
+        Auth.definirDuracao(duracao);
+      } else {
+        Auth.renovar();
+      }
+    }
+
     return res;
   });
 }
