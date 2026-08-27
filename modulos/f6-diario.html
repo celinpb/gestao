@@ -13,6 +13,14 @@
   .turma-card-id{font-size:11px;font-family:var(--font-mono,monospace);color:var(--c-text-3,#9898B0);margin-bottom:4px;}
   .turma-card-estagio{font-size:14.5px;font-weight:600;color:var(--c-text-1,#1A1A2E);margin-bottom:2px;}
   .turma-card-detalhe{font-size:12px;color:var(--c-text-2,#5C5C7A);}
+  /* Turmas encerradas/inativas: exibidas com tom avermelhado sombreado quando o filtro está ligado */
+  .turma-card.turma-nao-ativa{background:rgba(230,57,70,0.045);border-color:rgba(230,57,70,0.28);}
+  .turma-card.turma-nao-ativa:hover{border-color:rgba(230,57,70,0.45);box-shadow:0 3px 10px rgba(230,57,70,0.10);}
+  .turma-card-badge-status{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:#A32D2D;background:rgba(230,57,70,0.12);border-radius:10px;padding:2px 8px;margin-top:8px;}
+  .turma-card-badge-status .material-icons-round{font-size:12px;}
+  .diario-filtro-row{display:flex;align-items:center;margin-bottom:14px;}
+  .diario-filtro-row label{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--c-text-2,#5C5C7A);cursor:pointer;user-select:none;}
+  .diario-filtro-row input[type="checkbox"]{width:15px;height:15px;accent-color:#E63946;cursor:pointer;}
   .diario-data-row{display:flex;align-items:flex-end;gap:12px;margin-bottom:28px;flex-wrap:wrap;}
   .diario-field{display:flex;flex-direction:column;gap:6px;}
   .diario-field label{font-size:11.5px;font-weight:500;color:var(--c-text-2,#5C5C7A);letter-spacing:0.3px;text-transform:uppercase;}
@@ -102,6 +110,12 @@
 <div class="diario-wrap">
   <div id="diario-step-turma">
     <div class="diario-secao-titulo">Selecione a turma</div>
+    <div class="diario-filtro-row" id="diario-filtro-row" style="display:none;">
+      <label>
+        <input type="checkbox" id="diario-chk-encerradas">
+        Mostrar turmas encerradas/inativas
+      </label>
+    </div>
     <div id="diario-turmas-loading" class="diario-loading">
       <div class="spinner-sm"></div><span>Carregando turmas…</span>
     </div>
@@ -295,20 +309,45 @@
         return;
       }
       state.turmas=res.dados.dados;
-      renderizarTurmas(state.turmas);
+      if (el('diario-filtro-row')) el('diario-filtro-row').style.display='flex';
+      renderizarTurmas();
     }).catch(function(){
       el('diario-turmas-loading').innerHTML='<span style="color:#E63946;">Erro ao carregar turmas.</span>';
     });
   }
 
-  function renderizarTurmas(turmas) {
-    var grid=el('diario-turma-grid'); grid.innerHTML='';
-    turmas.forEach(function(t){
-      var card=document.createElement('div'); card.className='turma-card'; card.dataset.turmaId=t.TurmaID;
+  // Turma "ativa" = SituacaoTurma true/'true' e diferente de 'ENCERRADA'.
+  // Qualquer outro valor (false/'false' ou 'ENCERRADA') é considerado não-ativa.
+  function turmaEstaAtiva(t) {
+    return (t.SituacaoTurma === true || t.SituacaoTurma === 'true') && String(t.SituacaoTurma) !== 'ENCERRADA';
+  }
+
+  function turmasFiltradasDiario() {
+    var mostrarNaoAtivas = el('diario-chk-encerradas') && el('diario-chk-encerradas').checked;
+    if (mostrarNaoAtivas) return state.turmas;
+    return state.turmas.filter(turmaEstaAtiva);
+  }
+
+  function renderizarTurmas() {
+    var grid=el('diario-turma-grid');
+    var lista=turmasFiltradasDiario();
+    grid.innerHTML='';
+    if (lista.length===0) {
+      grid.innerHTML='<p style="color:var(--c-text-3);font-size:13px;grid-column:1/-1;">Nenhuma turma ativa encontrada. Marque "Mostrar turmas encerradas/inativas" para ver todas.</p>';
+      grid.style.display='grid';
+      return;
+    }
+    lista.forEach(function(t){
+      var ativa = turmaEstaAtiva(t);
+      var encerrada = String(t.SituacaoTurma) === 'ENCERRADA';
+      var card=document.createElement('div');
+      card.className='turma-card'+(ativa?'':' turma-nao-ativa');
+      card.dataset.turmaId=t.TurmaID;
       card.innerHTML='<div class="turma-card-id">'+t.TurmaID+'</div>'+
         '<div class="turma-card-estagio">'+(t.Estagio||t.CursoID)+'</div>'+
         '<div class="turma-card-detalhe">'+(t.DiaSemana||'')+(t.Horario?' · '+t.Horario:'')+'</div>'+
-        '<div class="turma-card-detalhe" style="margin-top:2px;">'+(t.Modalidade||'')+'</div>';
+        '<div class="turma-card-detalhe" style="margin-top:2px;">'+(t.Modalidade||'')+'</div>'+
+        (!ativa ? '<div class="turma-card-badge-status"><span class="material-icons-round">'+(encerrada?'lock':'block')+'</span>'+(encerrada?'Encerrada':'Inativa')+'</div>' : '');
       card.addEventListener('click',function(){selecionarTurma(t);});
       grid.appendChild(card);
     });
@@ -609,6 +648,7 @@
     el('diario-data-manual')&&el('diario-data-manual').addEventListener('change',function(){
       if(this.value)el('diario-select-data').value='';
     });
+    el('diario-chk-encerradas')&&el('diario-chk-encerradas').addEventListener('change',renderizarTurmas);
     // No GitHub Pages, usuario disponivel em App.usuario
     var usuario = (typeof App !== 'undefined' && App.usuario) ? App.usuario : null;
     if (usuario) {
