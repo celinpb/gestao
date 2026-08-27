@@ -1339,7 +1339,9 @@
           '<div class="t5-trans-nome">' + (t.Estagio || t.CursoID) + '</div>' +
           '<div class="t5-trans-meta">' + t.TurmaID +
             (t.ProfessorNome ? ' · ' + t.ProfessorNome : '') +
+            (t.Modalidade    ? ' · ' + t.Modalidade    : '') +
             (t.DiaSemana     ? ' · ' + t.DiaSemana      : '') +
+            (t.Horario       ? ' · ' + t.Horario        : '') +
           '</div>' +
         '</div>' +
         '<span class="t5-trans-vagas ' + (temVaga ? 'ok' : 'cheio') + '">' +
