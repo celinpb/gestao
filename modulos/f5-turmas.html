@@ -300,6 +300,11 @@
           <div class="info-campo"><span class="info-campo-label">Vagas totais</span><span class="info-campo-valor" id="inf-vagas">—</span></div>
           <div class="info-campo"><span class="info-campo-label">Matriculados ativos</span><span class="info-campo-valor" id="inf-matriculados">—</span></div>
         </div>
+        <div class="info-grupo">
+          <div class="info-label">Período letivo</div>
+          <div class="info-campo"><span class="info-campo-label">Início</span><span class="info-campo-valor" id="inf-data-inicio">—</span></div>
+          <div class="info-campo"><span class="info-campo-label">Fim</span><span class="info-campo-valor" id="inf-data-fim">—</span></div>
+        </div>
       </div>
 
       <!-- ABA: ALUNOS -->
@@ -431,6 +436,18 @@
           <label>Vagas totais</label>
           <input type="number" class="t5-edit-input" id="cr-vagas" min="1" max="99" value="20">
         </div>
+        <div class="t5-edit-divisor">Período letivo (opcional)</div>
+        <div class="t5-edit-field">
+          <label>Data de início da turma</label>
+          <input type="date" class="t5-edit-input" id="cr-data-inicio">
+        </div>
+        <div class="t5-edit-field">
+          <label>Data de fim da turma</label>
+          <input type="date" class="t5-edit-input" id="cr-data-fim">
+        </div>
+        <div class="t5-edit-field span2" style="margin-top:-6px;">
+          <span style="font-size:11.5px;color:var(--c-text-3,#9898B0);">Deixe em branco para usar automaticamente o 1º e o último dia letivo do calendário do semestre. Preencha apenas se esta turma começar depois do início do semestre.</span>
+        </div>
       </div>
     </div>
     <div class="t5-edit-footer">
@@ -485,11 +502,23 @@
     <div class="t5-modal-header">Alterar situação da matrícula</div>
     <div class="t5-modal-corpo">
       <p id="modal-sit-aluno"></p>
-      <div class="sit-opcoes">
+      <div class="sit-opcoes" id="t5-sit-opcoes">
         <button class="sit-opcao ATIVA"     data-sit="ATIVA">✓ Ativa</button>
         <button class="sit-opcao TRANCADA"  data-sit="TRANCADA">⏸ Trancada</button>
         <button class="sit-opcao CONCLUIDA" data-sit="CONCLUIDA">🎓 Concluída</button>
         <button class="sit-opcao CANCELADA" data-sit="CANCELADA">✕ Cancelada</button>
+      </div>
+      <div id="t5-motivo-wrap" style="display:none;margin-top:14px;">
+        <label style="display:block;font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--c-text-3,#9898B0);margin-bottom:6px;">
+          Motivo do cancelamento <span style="color:#E63946;">*</span>
+        </label>
+        <textarea id="t5-motivo-texto" rows="3" placeholder="Descreva o motivo do cancelamento…"
+          style="width:100%;border:1.5px solid var(--c-border,#E8E7E2);border-radius:7px;padding:8px 10px;font-family:var(--font-sans,sans-serif);font-size:13px;color:var(--c-text-1,#1A1A2E);background:#FAFAF8;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
+        <div id="t5-motivo-erro" style="display:none;color:#E63946;font-size:11.5px;margin-top:4px;">Informe o motivo do cancelamento.</div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="btn-cancelar-t5" id="btn-t5-motivo-voltar">Voltar</button>
+          <button class="sit-opcao CANCELADA" id="btn-t5-confirmar-cancelamento" style="flex:1;">Confirmar cancelamento</button>
+        </div>
       </div>
     </div>
     <div class="t5-modal-footer">
@@ -569,6 +598,20 @@
           <input type="number" class="t5-edit-input" id="et-vagas" min="1" max="99">
         </div>
 
+        <!-- Período letivo -->
+        <div class="t5-edit-divisor">Período letivo (opcional)</div>
+        <div class="t5-edit-field">
+          <label>Data de início da turma</label>
+          <input type="date" class="t5-edit-input" id="et-data-inicio">
+        </div>
+        <div class="t5-edit-field">
+          <label>Data de fim da turma</label>
+          <input type="date" class="t5-edit-input" id="et-data-fim">
+        </div>
+        <div class="t5-edit-field span2" style="margin-top:-6px;">
+          <span style="font-size:11.5px;color:var(--c-text-3,#9898B0);">Em branco = usa automaticamente o 1º e o último dia letivo do calendário do semestre.</span>
+        </div>
+
         <!-- Links -->
         <div class="t5-edit-divisor">Links (opcional)</div>
         <div class="t5-edit-field span2">
@@ -611,6 +654,19 @@
   }
 
   function el(id) { return document.getElementById(id); }
+
+  // Conversão para uso com <input type="date">, que exige AAAA-MM-DD.
+  // O back-end trabalha e devolve datas no formato DD/MM/AAAA (m7_dataParaString).
+  function brParaIso(br) {
+    if (!br) return '';
+    var p = String(br).trim().split('/');
+    return p.length === 3 ? (p[2] + '-' + p[1].padStart(2,'0') + '-' + p[0].padStart(2,'0')) : '';
+  }
+  function isoParaBr(iso) {
+    if (!iso) return '';
+    var p = String(iso).trim().split('-');
+    return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : '';
+  }
 
   // ── estado ───────────────────────────────────────────────
   var S = {
@@ -834,6 +890,8 @@
     el('inf-prof').textContent          = t.ProfessorNome || '—';
     el('inf-vagas').textContent         = t.VagasTotais   || '—';
     el('inf-matriculados').textContent  = '…';
+    el('inf-data-inicio').textContent   = t.DataInicioTurma || 'Usa o padrão do calendário';
+    el('inf-data-fim').textContent      = t.DataFimTurma    || 'Usa o padrão do calendário';
   }
 
   // ============================================================
@@ -862,6 +920,8 @@
     el('et-whatsapp').value   = t.GrupoWhatsapp|| '';
     el('et-meet').value       = t.LinkMeet     || '';
     el('et-classroom').value  = t.LinkClassroom|| '';
+    el('et-data-inicio').value = brParaIso(t.DataInicioTurma);
+    el('et-data-fim').value    = brParaIso(t.DataFimTurma);
 
     el('t5-edit-overlay').style.display = 'flex';
   }
@@ -891,6 +951,14 @@
       return;
     }
 
+    var dataInicioIso = el('et-data-inicio').value;
+    var dataFimIso    = el('et-data-fim').value;
+    if (dataInicioIso && dataFimIso && dataInicioIso > dataFimIso) {
+      mostrarErroEdit('A data de início da turma não pode ser posterior à data de fim.');
+      btn.disabled = false; btn.classList.remove('loading');
+      return;
+    }
+
     var dados = {
       turmaId:       S.turmaSel.TurmaID,
       ProfessorID:   profId   || S.turmaSel.ProfessorID,
@@ -908,6 +976,8 @@
       GrupoWhatsapp: el('et-whatsapp').value.trim(),
       LinkMeet:      el('et-meet').value.trim(),
       LinkClassroom: el('et-classroom').value.trim(),
+      DataInicioTurma: isoParaBr(dataInicioIso),
+      DataFimTurma:    isoParaBr(dataFimIso),
     };
 
     postApi('turmas.atualizar', dados)
@@ -960,6 +1030,16 @@
       });
   }
 
+  function badgeSituacaoMatT5(m, sit) {
+    if (sit === 'CANCELADA' && (m.MotivoCancelamento || m.DataCancelamento)) {
+      var titulo = 'Cancelada em ' + (m.DataCancelamento || '—') +
+        (m.MotivoCancelamento ? '\nMotivo: ' + m.MotivoCancelamento : '') +
+        (m.CanceladoPor ? '\nPor: ' + m.CanceladoPor : '');
+      return '<span class="badge-sit-mat ' + sit + '" title="' + titulo.replace(/"/g, '&quot;') + '" style="cursor:help;border-bottom:1px dotted currentColor;">' + sit + '</span>';
+    }
+    return '<span class="badge-sit-mat ' + sit + '">' + sit + '</span>';
+  }
+
   function renderMatriculas() {
     var cont = el('lista-matriculados');
     if (!S.matriculas.length) {
@@ -976,7 +1056,7 @@
           '<div class="mat-nome">' + (m.NomeExibicao || m.AlunoID || m.MatriculaID) + '</div>' +
           '<div class="mat-id">' + m.MatriculaID + '</div>' +
         '</div>' +
-        '<span class="badge-sit-mat ' + sit + '">' + sit + '</span>' +
+        badgeSituacaoMatT5(m, sit) +
         (S.podeEditar || S.podeCriarMat
           ? '<div class="mat-acoes">' +
               '<button class="btn-mat-acao btn-sit-mat" title="Alterar situacao"><span class="material-icons-round">swap_horiz</span></button>' +
@@ -992,6 +1072,7 @@
           btnSit.addEventListener('click', function () {
             S.matriculaParaSit = mat;
             el('modal-sit-aluno').textContent = 'Aluno: ' + (mat.NomeExibicao || mat.AlunoID || mat.MatriculaID);
+            resetarModalSitT5();
             el('modal-sit-overlay').style.display = 'flex';
           });
         }(m));
@@ -1032,12 +1113,35 @@
       });
   }
 
-  function alterarSituacaoMatricula(novaSit) {
+  function resetarModalSitT5() {
+    el('t5-sit-opcoes').style.display = 'grid';
+    el('t5-motivo-wrap').style.display = 'none';
+    el('t5-motivo-texto').value = '';
+    el('t5-motivo-erro').style.display = 'none';
+  }
+
+  function fecharModalSitT5() {
+    el('modal-sit-overlay').style.display = 'none';
+    resetarModalSitT5();
+  }
+
+  function confirmarCancelamentoT5() {
+    var motivo = (el('t5-motivo-texto').value || '').trim();
+    if (!motivo) {
+      el('t5-motivo-erro').style.display = 'block';
+      return;
+    }
+    alterarSituacaoMatricula('CANCELADA', motivo);
+  }
+
+  function alterarSituacaoMatricula(novaSit, motivo) {
     if (!S.matriculaParaSit) return;
     el('modal-sit-overlay').style.display = 'none';
+    resetarModalSitT5();
     postApi('matriculas.atualizarSituacao', {
       matriculaId: S.matriculaParaSit.MatriculaID,
       novaSituacao: novaSit,
+      motivo: motivo || undefined,
     }).then(function (res) {
       if (typeof toast === 'function') toast(
         res.sucesso ? 'Situação atualizada para ' + novaSit + '.' : (res.mensagem || 'Erro.'),
@@ -1146,6 +1250,8 @@
     if (el('cr-dias-check')) {
       el('cr-dias-check').querySelectorAll('input').forEach(function (cb) { cb.checked = false; });
     }
+    if (el('cr-data-inicio')) el('cr-data-inicio').value = '';
+    if (el('cr-data-fim'))    el('cr-data-fim').value    = '';
     popularSelectProfessoresCriar();
     el('t5-criar-overlay').style.display = 'flex';
   }
@@ -1183,6 +1289,16 @@
       profNome = profSel.options[profSel.selectedIndex].text.replace(/\s*\(.*\)\s*$/, '');
     }
 
+    var dataInicioIso = el('cr-data-inicio') ? el('cr-data-inicio').value : '';
+    var dataFimIso    = el('cr-data-fim')    ? el('cr-data-fim').value    : '';
+    if (dataInicioIso && dataFimIso && dataInicioIso > dataFimIso) {
+      btn.disabled = false; btn.classList.remove('loading');
+      var a2 = el('t5-criar-alerta'); var m2 = el('t5-criar-alerta-msg');
+      a2.className = 't5-edit-alerta show erro';
+      m2.textContent = 'A data de início da turma não pode ser posterior à data de fim.';
+      return;
+    }
+
     postApi('turmas.criar', {
       CursoID:       cursoId,
       Estagio:       estagio,
@@ -1193,6 +1309,8 @@
       Turno:         el('cr-turno')   ? el('cr-turno').value           : '',
       Horario:       el('cr-horario') ? el('cr-horario').value.trim()  : '',
       VagasTotais:   parseInt(el('cr-vagas') ? el('cr-vagas').value : '20', 10) || 20,
+      DataInicioTurma: isoParaBr(dataInicioIso),
+      DataFimTurma:    isoParaBr(dataFimIso),
     }).then(function (res) {
       btn.disabled = false; btn.classList.remove('loading');
       if (!res.sucesso) {
@@ -1432,15 +1550,26 @@
       });
     });
 
-    // Situação matrícula
-    document.querySelectorAll('.sit-opcao').forEach(function (btn) {
-      btn.addEventListener('click', function () { alterarSituacaoMatricula(this.dataset.sit); });
+    // Situação matrícula — apenas as 4 opções principais em #t5-sit-opcoes
+    el('t5-sit-opcoes') && el('t5-sit-opcoes').querySelectorAll('.sit-opcao').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (this.dataset.sit === 'CANCELADA') {
+          el('t5-sit-opcoes').style.display = 'none';
+          el('t5-motivo-wrap').style.display = 'block';
+          el('t5-motivo-texto').focus();
+          return;
+        }
+        alterarSituacaoMatricula(this.dataset.sit);
+      });
     });
-    el('btn-cancelar-sit') && el('btn-cancelar-sit').addEventListener('click', function () {
-      el('modal-sit-overlay').style.display = 'none';
+    el('btn-t5-confirmar-cancelamento') && el('btn-t5-confirmar-cancelamento').addEventListener('click', confirmarCancelamentoT5);
+    el('btn-t5-motivo-voltar') && el('btn-t5-motivo-voltar').addEventListener('click', resetarModalSitT5);
+    el('t5-motivo-texto') && el('t5-motivo-texto').addEventListener('input', function () {
+      el('t5-motivo-erro').style.display = 'none';
     });
+    el('btn-cancelar-sit') && el('btn-cancelar-sit').addEventListener('click', fecharModalSitT5);
     el('modal-sit-overlay') && el('modal-sit-overlay').addEventListener('click', function (e) {
-      if (e.target === this) this.style.display = 'none';
+      if (e.target === this) fecharModalSitT5();
     });
 
     // Modal edição turma
