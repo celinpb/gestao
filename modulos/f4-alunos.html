@@ -1268,7 +1268,7 @@ function postApi(acao, dados) {
     }
     if (a.MenorBoolean) {
       html+='<div class="ficha-secao"><div class="ficha-secao-titulo">Responsável 1</div>';
-      html+=campo('Nome',a.Responsavel1Nome)+campo('Parentesco',a.Responsavel1Parentesco)+
+      html+=campo('Nome',a.Responsavel1Nome)+campo('CPF',a.Responsavel1CPF)+campo('Parentesco',a.Responsavel1Parentesco)+
             campo('Telefone',a.Responsavel1Telefone?fmtTel(a.Responsavel1Telefone):null)+
             campo('E-mail',a['Responsavel1e-mail']);
       html+='</div>';
