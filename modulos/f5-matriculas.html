@@ -151,11 +151,24 @@
     <div class="m5-modal-header">Alterar situação da matrícula</div>
     <div class="m5-modal-corpo">
       <p id="m5-sit-aluno">Selecione a nova situação:</p>
-      <div class="m5-sit-opcoes">
+      <div class="m5-sit-opcoes" id="m5-sit-opcoes">
         <button class="m5-sit-opcao ATIVA"     data-sit="ATIVA">✓ Ativa</button>
         <button class="m5-sit-opcao TRANCADA"  data-sit="TRANCADA">⏸ Trancada</button>
         <button class="m5-sit-opcao CONCLUIDA" data-sit="CONCLUIDA">🎓 Concluída</button>
         <button class="m5-sit-opcao CANCELADA" data-sit="CANCELADA">✕ Cancelada</button>
+      </div>
+      <!-- Campo de motivo — exibido apenas ao selecionar "Cancelada" -->
+      <div id="m5-motivo-wrap" style="display:none;margin-top:14px;">
+        <label style="display:block;font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--c-text-3,#9898B0);margin-bottom:6px;">
+          Motivo do cancelamento <span style="color:#E63946;">*</span>
+        </label>
+        <textarea id="m5-motivo-texto" rows="3" placeholder="Descreva o motivo do cancelamento…"
+          style="width:100%;border:1.5px solid var(--c-border,#E8E7E2);border-radius:7px;padding:8px 10px;font-family:var(--font-sans,sans-serif);font-size:13px;color:var(--c-text-1,#1A1A2E);background:#FAFAF8;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
+        <div id="m5-motivo-erro" style="display:none;color:#E63946;font-size:11.5px;margin-top:4px;">Informe o motivo do cancelamento.</div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="btn-cancelar-m5" id="btn-m5-motivo-voltar">Voltar</button>
+          <button class="m5-sit-opcao CANCELADA" id="btn-m5-confirmar-cancelamento" style="flex:1;">Confirmar cancelamento</button>
+        </div>
       </div>
     </div>
     <div class="m5-modal-footer">
@@ -288,6 +301,17 @@
     });
   }
 
+  function badgeSituacao(m) {
+    var sit = m.SituacaoMatricula || 'ATIVA';
+    if (sit === 'CANCELADA' && (m.MotivoCancelamento || m.DataCancelamento)) {
+      var titulo = 'Cancelada em ' + (m.DataCancelamento || '—') +
+        (m.MotivoCancelamento ? '\nMotivo: ' + m.MotivoCancelamento : '') +
+        (m.CanceladoPor ? '\nPor: ' + m.CanceladoPor : '');
+      return '<span class="badge-m5 ' + sit + '" title="' + titulo.replace(/"/g, '&quot;') + '" style="cursor:help;border-bottom:1px dotted currentColor;">' + sit + '</span>';
+    }
+    return '<span class="badge-m5 ' + sit + '">' + sit + '</span>';
+  }
+
   function renderizarMatriculas() {
     var lista = matriculasFiltradas();
 
@@ -313,7 +337,7 @@
             '<div style="font-size:11.5px;color:var(--c-text-3);">' + (m.AlunoID||'') + '</div></td>' +
         '<td class="m5-turma-id">' + (m.TurmaID||'—') + '</td>' +
         '<td style="font-size:13px;">' + (m.Estagio || '—') + '</td>' +
-        '<td><span class="badge-m5 ' + sit + '">' + sit + '</span></td>' +
+        '<td>' + badgeSituacao(m) + '</td>' +
         '<td>' +
           (state.podeEditar ?
             '<div class="m5-acoes">' +
@@ -328,6 +352,7 @@
         btn.addEventListener('click', function() {
           state.matriculaParaSit = m;
           el('m5-sit-aluno').textContent = 'Aluno: ' + (m.NomeExibicao || m.AlunoID || m.MatriculaID);
+          resetarModalSitM5();
           el('m5-modal-sit').style.display = 'flex';
         });
       }
@@ -371,13 +396,27 @@
     btns.appendChild(next);
   }
 
-  function alterarSituacao(novaSit) {
+  function fecharModalSitM5() {
+    el('m5-modal-sit').style.display = 'none';
+    resetarModalSitM5();
+  }
+
+  function resetarModalSitM5() {
+    el('m5-sit-opcoes').style.display = 'grid';
+    el('m5-motivo-wrap').style.display = 'none';
+    el('m5-motivo-texto').value = '';
+    el('m5-motivo-erro').style.display = 'none';
+  }
+
+  function alterarSituacao(novaSit, motivo) {
     if (!state.matriculaParaSit) return;
     el('m5-modal-sit').style.display = 'none';
+    resetarModalSitM5();
 
     postApi('matriculas.atualizarSituacao', {
       matriculaId: state.matriculaParaSit.MatriculaID,
       novaSituacao: novaSit,
+      motivo: motivo || undefined,
     })
       .then(function(res) {
         if (!res.sucesso) { if (typeof toast==='function') toast(res.mensagem||'Erro.','error'); return; }
@@ -385,6 +424,15 @@
         carregarMatriculas();
       })
       .catch(function() { if (typeof toast==='function') toast('Erro de comunicação.','error'); });
+  }
+
+  function confirmarCancelamentoM5() {
+    var motivo = (el('m5-motivo-texto').value || '').trim();
+    if (!motivo) {
+      el('m5-motivo-erro').style.display = 'block';
+      return;
+    }
+    alterarSituacao('CANCELADA', motivo);
   }
 
   // =========================================================
@@ -426,15 +474,26 @@
       });
     });
 
-    // Modal situação
-    document.querySelectorAll('.m5-sit-opcao').forEach(function(btn) {
-      btn.addEventListener('click', function() { alterarSituacao(this.dataset.sit); });
+    // Modal situação — as 4 opções principais ficam em #m5-sit-opcoes
+    el('m5-sit-opcoes') && el('m5-sit-opcoes').querySelectorAll('.m5-sit-opcao').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        if (this.dataset.sit === 'CANCELADA') {
+          el('m5-sit-opcoes').style.display = 'none';
+          el('m5-motivo-wrap').style.display = 'block';
+          el('m5-motivo-texto').focus();
+          return;
+        }
+        alterarSituacao(this.dataset.sit);
+      });
     });
-    el('btn-cancelar-m5-sit') && el('btn-cancelar-m5-sit').addEventListener('click', function() {
-      el('m5-modal-sit').style.display = 'none';
+    el('btn-m5-confirmar-cancelamento') && el('btn-m5-confirmar-cancelamento').addEventListener('click', confirmarCancelamentoM5);
+    el('btn-m5-motivo-voltar') && el('btn-m5-motivo-voltar').addEventListener('click', resetarModalSitM5);
+    el('m5-motivo-texto') && el('m5-motivo-texto').addEventListener('input', function() {
+      el('m5-motivo-erro').style.display = 'none';
     });
+    el('btn-cancelar-m5-sit') && el('btn-cancelar-m5-sit').addEventListener('click', fecharModalSitM5);
     el('m5-modal-sit') && el('m5-modal-sit').addEventListener('click', function(e) {
-      if (e.target === this) this.style.display = 'none';
+      if (e.target === this) fecharModalSitM5();
     });
   }
 
