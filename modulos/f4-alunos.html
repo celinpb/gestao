@@ -1266,6 +1266,19 @@ function postApi(acao, dados) {
       if (a.PcDLaudoURL) html+=campo('Laudo','<a href="'+a.PcDLaudoURL+'" target="_blank">Ver laudo</a>');
       html+='</div>';
     }
+    if (a.MenorBoolean) {
+      html+='<div class="ficha-secao"><div class="ficha-secao-titulo">Responsável 1</div>';
+      html+=campo('Nome',a.Responsavel1Nome)+campo('Parentesco',a.Responsavel1Parentesco)+
+            campo('Telefone',a.Responsavel1Telefone?fmtTel(a.Responsavel1Telefone):null)+
+            campo('E-mail',a['Responsavel1e-mail']);
+      html+='</div>';
+      if (a.Responsavel2Nome) {
+        html+='<div class="ficha-secao"><div class="ficha-secao-titulo">Responsável 2</div>';
+        html+=campo('Nome',a.Responsavel2Nome)+campo('Parentesco',a.Responsavel2Parentesco)+
+              campo('Telefone',a.Responsavel2Telefone?fmtTel(a.Responsavel2Telefone):null);
+        html+='</div>';
+      }
+    }
     if (a.PublicoAluno) html+='<div class="ficha-secao"><div class="ficha-secao-titulo">Público-alvo</div>'+campo('Categoria',a.PublicoAluno)+'</div>';
     html+='<div class="ficha-secao"><div class="ficha-secao-titulo">Situação</div>'+campo('Status',(a.SituacaoAluno!==false&&a.SituacaoAluno!=='false')?'Ativo':'Inativo')+campo('Cadastro',fmtData(a.InscricaoDataHora))+'</div>';
     el('painel-corpo').innerHTML=html;
