@@ -466,6 +466,11 @@
       <button class="btn-r8 btn-r8-primario" id="btn-r8-imprimir">
         <span class="material-icons-round">print</span>Imprimir / PDF
       </button>
+      <button class="btn-r8 btn-r8-sec" id="btn-r8-xlsx" style="display:none;">
+        <div class="spinner-btn"></div>
+        <span class="material-icons-round btn-txt" style="font-size:17px;">grid_on</span>
+        <span class="btn-txt">Baixar XLSX</span>
+      </button>
     </div>
   </div>
   <div id="r8-preview-conteudo"></div>
@@ -480,6 +485,7 @@
   var state = {
     tipo: null, turmas: [], config: {}, semestre: {},
     logoUrl: '', semestres: [], papel: '',
+    ultimoRelatorioTabela: null, // { cabecalhos, linhas, nomeArquivo } — usado pelo botão "Baixar XLSX"
   };
 
   var CAMPOS_DISPONIVEIS = [
@@ -492,6 +498,11 @@
     { key: 'UF',              label: 'UF' },
     { key: 'PublicoAluno',    label: 'Público-alvo' },
     { key: 'PcDBoolean',      label: 'PcD' },
+    { key: 'Responsavel1Nome',       label: 'Nome do responsável' },
+    { key: 'Responsavel1CPF',        label: 'CPF do responsável' },
+    { key: 'Responsavel1Parentesco', label: 'Parentesco do responsável' },
+    { key: 'Responsavel1Telefone',   label: 'Telefone do responsável' },
+    { key: 'Responsavel1e-mail',     label: 'E-mail do responsável' },
   ];
 
   // =========================================================
@@ -710,6 +721,46 @@
   }
 
   // =========================================================
+  // EXPORTAÇÃO XLSX — usada pelo card "Alunos por turma (campos)"
+  // Biblioteca carregada sob demanda (só quando o botão é clicado),
+  // sem impacto no carregamento normal do módulo.
+  // =========================================================
+  var LIB_XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+
+  function carregarLibXLSX(callback) {
+    if (typeof XLSX !== 'undefined') { callback(); return; }
+    var script = document.createElement('script');
+    script.src = LIB_XLSX_URL;
+    script.onload = callback;
+    script.onerror = function() {
+      if (typeof toast === 'function') toast('Erro ao carregar biblioteca de exportação XLSX. Verifique sua conexão.', 'error');
+    };
+    document.head.appendChild(script);
+  }
+
+  function baixarTabelaXLSX() {
+    if (!state.ultimoRelatorioTabela) {
+      if (typeof toast === 'function') toast('Gere o relatório antes de baixar.', 'error');
+      return;
+    }
+    var btn = el('btn-r8-xlsx');
+    if (btn) { btn.disabled = true; btn.classList.add('loading'); }
+    carregarLibXLSX(function() {
+      try {
+        var rel = state.ultimoRelatorioTabela;
+        var ws = XLSX.utils.aoa_to_sheet([rel.cabecalhos].concat(rel.linhas));
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Alunos');
+        XLSX.writeFile(wb, rel.nomeArquivo + '.xlsx');
+      } catch (e) {
+        if (typeof toast === 'function') toast('Erro ao gerar XLSX: ' + (e.message||''), 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+      }
+    });
+  }
+
+  // =========================================================
   // GERAÇÃO DOS RELATÓRIOS
   // =========================================================
   function gerarRelatorio() {
@@ -730,6 +781,8 @@
 
     var btn = el('btn-r8-gerar'); btn.disabled = true; btn.classList.add('loading');
     el('r8-preview-wrap').classList.remove('show');
+    state.ultimoRelatorioTabela = null;
+    if (el('btn-r8-xlsx')) el('btn-r8-xlsx').style.display = 'none';
 
     var p;
     if (tipo === 'boletim')               p = gerarBoletim(turmaId, alunoId, somenteAtivos);
@@ -751,6 +804,9 @@
       el('r8-print-area').innerHTML = html;
       el('r8-preview-wrap').classList.add('show');
       el('r8-preview-label').textContent = 'Pré-visualização — ' + (el('r8-params-titulo-txt').textContent||'');
+      if (el('btn-r8-xlsx')) {
+        el('btn-r8-xlsx').style.display = (tipo === 'alunos-turma-campos' && state.ultimoRelatorioTabela) ? 'inline-flex' : 'none';
+      }
       el('r8-preview-wrap').scrollIntoView({ behavior:'smooth', block:'start' });
     }).catch(function(e) {
       btn.disabled = false; btn.classList.remove('loading');
@@ -1198,20 +1254,31 @@
       var cabecalhos = ['#'].concat(camposSel.map(function(k){return labelMap[k]||k;})).concat(['Matrícula','Situação']);
       var thHtml = cabecalhos.map(function(h,i){return '<th'+(i===0?' class="c"':'')+'>'+h+'</th>';}).join('');
 
+      var linhasExport = [];
       var linhas = matriculas.map(function(m, i) {
         var aluno = alunos.find(function(a){ return a.AlunoID===m.AlunoID; }) || {};
-        var tds = ['<td class="c">'+(i+1)+'</td>'].concat(camposSel.map(function(k) {
+        var valores = camposSel.map(function(k) {
           var v = aluno[k];
-          if (k==='Telefone') v = fmtTel(v);
-          else if (k==='Nascimento') v = fmtData(v);
+          if (k==='Telefone' || k==='Responsavel1Telefone') v = v ? fmtTel(v) : '';
+          else if (k==='Nascimento') v = v ? fmtData(v) : '';
           else if (k==='PcDBoolean') v = v ? 'Sim' : 'Não';
-          return '<td>'+fmt(v)+'</td>';
-        })).concat([
-          '<td class="c">'+m.MatriculaID+'</td>',
-          '<td class="c">'+m.SituacaoMatricula+'</td>',
-        ]);
+          return v;
+        });
+        linhasExport.push([i+1].concat(valores.map(function(v){ return (v!==null&&v!==undefined)?v:''; })).concat([m.MatriculaID, m.SituacaoMatricula]));
+        var tds = ['<td class="c">'+(i+1)+'</td>'].concat(valores.map(function(v){ return '<td>'+fmt(v)+'</td>'; }))
+          .concat([
+            '<td class="c">'+m.MatriculaID+'</td>',
+            '<td class="c">'+m.SituacaoMatricula+'</td>',
+          ]);
         return '<tr>'+tds.join('')+'</tr>';
       }).join('');
+
+      // Guarda os dados desta geração para exportação em XLSX (botão "Baixar XLSX")
+      state.ultimoRelatorioTabela = {
+        cabecalhos: cabecalhos,
+        linhas: linhasExport,
+        nomeArquivo: 'Alunos_' + (turmaId||'turma') + (turma.Estagio ? '_' + String(turma.Estagio).replace(/\s+/g,'_') : ''),
+      };
 
       return '<div class="r8-folha">' + htmlCabecalho() +
         '<div class="r8-titulo-rel">Alunos da turma</div>' +
@@ -2198,6 +2265,7 @@
     });
     el('btn-r8-gerar')    && el('btn-r8-gerar').addEventListener('click', gerarRelatorio);
     el('btn-r8-imprimir') && el('btn-r8-imprimir').addEventListener('click', imprimir);
+    el('btn-r8-xlsx')     && el('btn-r8-xlsx').addEventListener('click', baixarTabelaXLSX);
     el('btn-r8-cancelar') && el('btn-r8-cancelar').addEventListener('click', function() {
       el('r8-params').classList.remove('show');
       el('r8c-painel').classList.remove('show');
@@ -2206,11 +2274,15 @@
       el('r8c-resultado').classList.remove('show');
       el('r8cr-resultado').classList.remove('show');
       state.tipo = null;
+      state.ultimoRelatorioTabela = null;
+      if (el('btn-r8-xlsx')) el('btn-r8-xlsx').style.display = 'none';
       document.querySelectorAll('.r8-tipo-card').forEach(function(c){c.classList.remove('sel');});
     });
     el('btn-r8-novo') && el('btn-r8-novo').addEventListener('click', function() {
       el('r8-preview-wrap').classList.remove('show');
       el('r8-print-area').innerHTML = '';
+      state.ultimoRelatorioTabela = null;
+      if (el('btn-r8-xlsx')) el('btn-r8-xlsx').style.display = 'none';
     });
 
     // Condensado
