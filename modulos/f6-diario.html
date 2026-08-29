@@ -370,7 +370,10 @@
   function carregarDatas(turma) {
     var sel=el('diario-select-data');
     sel.innerHTML='<option value="">Carregando datas…</option>';
-    postApi('calendario.listar',{}).then(function(res){
+    // turmaId: back-end filtra as datas pelo período letivo efetivo da turma
+    // (DataInicioTurma/DataFimTurma se definidos, senão o padrão do calendário
+    // do semestre). O filtro por dia da semana abaixo continua no front-end.
+    postApi('calendario.listar',{turmaId:turma.TurmaID}).then(function(res){
       sel.innerHTML='<option value="">Selecione uma data…</option>';
       if(!res.sucesso||!res.dados||res.dados.length===0){
         sel.innerHTML+='<option disabled>Nenhuma data encontrada</option>'; return;
