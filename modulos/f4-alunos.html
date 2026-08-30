@@ -606,6 +606,13 @@
           <span class="form-erro-msg" id="err-oco-titulo">Informe o titulo.</span>
         </div>
         <div class="form-field span2">
+          <label>Turma relacionada</label>
+          <select class="form-input" id="oco-turma">
+            <option value="">Carregando turmas...</option>
+          </select>
+          <span style="font-size:11px;color:var(--c-text-3,#9898B0);" id="oco-turma-hint"></span>
+        </div>
+        <div class="form-field span2">
           <label>Descricao <span class="req">*</span></label>
           <textarea class="form-input" id="oco-descricao" rows="4" placeholder="Detalhes da ocorrencia..." style="height:auto;resize:vertical;padding-top:9px;padding-bottom:9px;"></textarea>
           <span class="form-erro-msg" id="err-oco-desc">Informe a descricao.</span>
@@ -1131,6 +1138,8 @@ function postApi(acao, dados) {
     for (i = 0; i < cbs.length; i++) {
       var cb = el(cbs[i]); if (cb) cb.checked = false;
     }
+    // Carrega as turmas ativas do aluno para o seletor de turma relacionada
+    carregarTurmasOco();
     // Carrega professores das turmas ativas do aluno
     var sel = el('oco-dest-prof-sel');
     if (sel) {
@@ -1161,10 +1170,58 @@ function postApi(acao, dados) {
     el('oco-modal-overlay').style.display = 'none';
   }
 
+  // =========================================================
+  // OCORRENCIAS — seletor de turma relacionada
+  // =========================================================
+  function carregarTurmasOco() {
+    var sel  = el('oco-turma');
+    var hint = el('oco-turma-hint');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Carregando turmas...</option>';
+    if (hint) hint.textContent = '';
+
+    postApi('ocorrencias.turmasAtivasDoAluno', { alunoId: state.ocoAlunoId })
+      .then(function(res) {
+        var turmas = (res.sucesso && res.dados) ? res.dados : [];
+        sel.innerHTML = '';
+
+        if (turmas.length === 0) {
+          sel.innerHTML = '<option value="">Nenhuma turma ativa encontrada</option>';
+          if (hint) hint.textContent = 'A ocorrencia sera registrada sem turma associada.';
+          return;
+        }
+
+        var optVazia = document.createElement('option');
+        optVazia.value = '';
+        optVazia.textContent = 'Nao associar a uma turma especifica';
+        sel.appendChild(optVazia);
+
+        turmas.forEach(function(t) {
+          var opt = document.createElement('option');
+          opt.value       = t.TurmaID;
+          opt.textContent = t.Label || t.TurmaID;
+          sel.appendChild(opt);
+        });
+
+        if (turmas.length === 1) {
+          // Sem ambiguidade: pre-seleciona a unica turma encontrada.
+          sel.value = turmas[0].TurmaID;
+          if (hint) hint.textContent = 'Turma preenchida automaticamente.';
+        } else {
+          if (hint) hint.textContent = 'O aluno esta em mais de uma turma ativa — selecione a turma correta.';
+        }
+      })
+      .catch(function() {
+        sel.innerHTML = '<option value="">Erro ao carregar turmas</option>';
+        if (hint) hint.textContent = '';
+      });
+  }
+
   function salvarNovaOco() {
     var tipo      = el('oco-tipo')      ? el('oco-tipo').value      : '';
     var titulo    = el('oco-titulo')    ? el('oco-titulo').value.trim()    : '';
     var descricao = el('oco-descricao') ? el('oco-descricao').value.trim() : '';
+    var turmaId   = el('oco-turma')     ? el('oco-turma').value     : '';
 
     var ok = true;
     if (!tipo)     { el('err-oco-tipo').classList.add('show');  ok = false; }
@@ -1191,6 +1248,7 @@ function postApi(acao, dados) {
 
     postApi('ocorrencias.criar', {
       AlunoID:       state.ocoAlunoId,
+      TurmaID:       turmaId,
       Tipo:          tipo,
       Titulo:        titulo,
       Descricao:     descricao,
