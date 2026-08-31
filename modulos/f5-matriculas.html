@@ -64,6 +64,47 @@
   .btn-cancelar-m5{height:36px;padding:0 16px;border-radius:7px;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;font-family:var(--font-sans,sans-serif);font-size:13px;cursor:pointer;color:var(--c-text-1,#1A1A2E);}
   .btn-cancelar-m5:hover{background:#F5F4F0;}
 
+  /* Nova matrícula */
+  .btn-m5-nova{height:38px;padding:0 14px;border-radius:8px;font-family:var(--font-sans,sans-serif);font-size:13px;font-weight:500;cursor:pointer;border:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;background:#E63946;color:#fff;transition:background 150ms ease,box-shadow 150ms ease;}
+  .btn-m5-nova:hover{background:#C1121F;box-shadow:0 3px 10px rgba(230,57,70,0.25);}
+  .btn-m5-nova .material-icons-round{font-size:18px;}
+
+  .m5-nova-modal{max-width:440px;}
+  .m5-nova-field{margin-bottom:14px;position:relative;}
+  .m5-nova-field label{display:block;font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--c-text-3,#9898B0);margin-bottom:6px;}
+  .m5-nova-input,.m5-nova-select{width:100%;height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:7px;padding:0 11px;font-family:var(--font-sans,sans-serif);font-size:13.5px;color:var(--c-text-1,#1A1A2E);background:#FAFAF8;outline:none;transition:border-color 150ms ease;box-sizing:border-box;}
+  .m5-nova-input:focus,.m5-nova-select:focus{border-color:#E63946;background:#fff;}
+  .m5-nova-select{cursor:pointer;}
+  .m5-aluno-dropdown{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--c-border,#E8E7E2);border-top:none;border-radius:0 0 7px 7px;max-height:220px;overflow-y:auto;z-index:50;box-shadow:0 6px 16px rgba(26,26,46,0.10);display:none;}
+  .m5-aluno-dropdown.show{display:block;}
+  .m5-aluno-item{padding:9px 12px;cursor:pointer;font-size:13px;transition:background 100ms ease;border-bottom:1px solid #F0EEE8;}
+  .m5-aluno-item:last-child{border-bottom:none;}
+  .m5-aluno-item:hover,.m5-aluno-item.ativo{background:#F5F4F0;}
+  .m5-aluno-item .m5-ai-nome{font-weight:500;color:var(--c-text-1,#1A1A2E);}
+  .m5-aluno-item .m5-ai-id{font-size:11px;font-family:var(--font-mono,monospace);color:var(--c-text-3,#9898B0);margin-left:6px;}
+  .m5-aluno-item.vazio{color:var(--c-text-3,#9898B0);cursor:default;}
+  .m5-aluno-item.vazio:hover{background:none;}
+  .m5-aluno-selecionado{display:none;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;padding:7px 10px;background:rgba(42,157,143,0.07);border:1px solid rgba(42,157,143,0.25);border-radius:6px;font-size:12.5px;color:#1A6E65;}
+  .m5-aluno-selecionado.show{display:flex;}
+  .m5-aluno-selecionado button{border:none;background:none;cursor:pointer;color:#1A6E65;display:flex;align-items:center;}
+  .m5-aluno-selecionado button .material-icons-round{font-size:16px;}
+  .m5-nova-alerta{border-radius:8px;padding:10px 14px;font-size:13px;display:none;align-items:center;gap:8px;margin-bottom:14px;}
+  .m5-nova-alerta.show{display:flex;}
+  .m5-nova-alerta.erro{background:rgba(230,57,70,0.08);border:1px solid rgba(230,57,70,0.20);color:#B01020;}
+  .m5-nova-aviso-vaga{font-size:12.5px;color:#A32D2D;background:rgba(230,57,70,0.07);border:1px solid rgba(230,57,70,0.18);border-radius:6px;padding:10px 12px;margin-top:4px;display:none;}
+  .m5-nova-aviso-vaga.show{display:block;}
+  .m5-nova-aviso-vaga .acoes{display:flex;gap:8px;margin-top:10px;}
+  .btn-m5-forcar{height:32px;padding:0 12px;border-radius:6px;font-size:12.5px;font-weight:500;cursor:pointer;border:1.5px solid #E63946;background:#fff;color:#A32D2D;font-family:var(--font-sans,sans-serif);}
+  .btn-m5-forcar:hover{background:rgba(230,57,70,0.08);}
+  .btn-m5-forcar-cancelar{height:32px;padding:0 12px;border-radius:6px;font-size:12.5px;cursor:pointer;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;color:var(--c-text-2,#5C5C7A);font-family:var(--font-sans,sans-serif);}
+  .btn-m5-forcar-cancelar:hover{background:#F5F4F0;}
+  .btn-m5-modal-primario{height:38px;padding:0 18px;border-radius:8px;background:#E63946;color:#fff;border:none;font-family:var(--font-sans,sans-serif);font-size:13.5px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background 150ms ease;}
+  .btn-m5-modal-primario:hover:not(:disabled){background:#C1121F;}
+  .btn-m5-modal-primario:disabled{opacity:0.55;cursor:not-allowed;}
+  .btn-m5-modal-primario .spinner-btn{width:15px;height:15px;border:2px solid rgba(255,255,255,0.35);border-top-color:#fff;border-radius:50%;animation:spin-m5 0.7s linear infinite;display:none;}
+  .btn-m5-modal-primario.loading .spinner-btn{display:block;}
+  .btn-m5-modal-primario.loading .btn-txt{display:none;}
+
   /* Resumo por situação */
   .m5-resumo{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
   .m5-resumo-item{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:8px;padding:10px 16px;font-size:12px;color:var(--c-text-2,#5C5C7A);display:flex;flex-direction:column;gap:2px;cursor:pointer;transition:border-color 150ms ease;}
@@ -118,6 +159,9 @@
     <select class="m5-select" id="m5-filtro-turma">
       <option value="">Todas as turmas</option>
     </select>
+    <button class="btn-m5-nova" id="btn-m5-nova-matricula" style="display:none;">
+      <span class="material-icons-round">person_add</span>Nova matrícula
+    </button>
   </div>
 
   <!-- Tabela -->
@@ -177,6 +221,55 @@
   </div>
 </div>
 
+<!-- Modal: nova matrícula -->
+<div class="m5-modal-overlay" id="m5-modal-nova" style="display:none;">
+  <div class="m5-modal m5-nova-modal">
+    <div class="m5-modal-header">Nova matrícula</div>
+    <div class="m5-modal-corpo">
+      <div class="m5-nova-alerta erro" id="m5-nova-alerta">
+        <span class="material-icons-round">error_outline</span>
+        <span id="m5-nova-alerta-msg"></span>
+      </div>
+
+      <div class="m5-nova-field">
+        <label>Aluno <span style="color:#E63946;">*</span></label>
+        <input type="text" class="m5-nova-input" id="m5-nova-aluno-busca"
+               placeholder="Digite o nome ou o AlunoID (ex: A261.0001)…" autocomplete="off">
+        <div class="m5-aluno-dropdown" id="m5-nova-aluno-dropdown"></div>
+        <div class="m5-aluno-selecionado" id="m5-nova-aluno-selecionado">
+          <span id="m5-nova-aluno-selecionado-txt"></span>
+          <button type="button" id="m5-nova-aluno-limpar" title="Trocar aluno">
+            <span class="material-icons-round">close</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="m5-nova-field">
+        <label>Turma <span style="color:#E63946;">*</span></label>
+        <select class="m5-nova-select" id="m5-nova-turma">
+          <option value="">Selecione uma turma…</option>
+        </select>
+      </div>
+
+      <div class="m5-nova-aviso-vaga" id="m5-nova-aviso-vaga">
+        <span id="m5-nova-aviso-vaga-msg"></span>
+        <div class="acoes">
+          <button class="btn-m5-forcar-cancelar" id="btn-m5-forcar-cancelar" type="button">Cancelar</button>
+          <button class="btn-m5-forcar" id="btn-m5-forcar-confirmar" type="button">Matricular mesmo assim</button>
+        </div>
+      </div>
+    </div>
+    <div class="m5-modal-footer" style="justify-content:space-between;">
+      <button class="btn-cancelar-m5" id="btn-m5-nova-cancelar">Cancelar</button>
+      <button class="btn-m5-modal-primario" id="btn-m5-nova-salvar">
+        <div class="spinner-btn"></div>
+        <span class="material-icons-round btn-txt" style="font-size:16px;">person_add</span>
+        <span class="btn-txt">Matricular</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   'use strict';
@@ -188,10 +281,14 @@
     totalRegistros: 0, totalPaginas: 1,
     busca: '', filtroSit: '', filtroTurma: '',
     matriculaParaSit: null,
-    papel: '', podeEditar: false,
+    papel: '', podeEditar: false, podeForcarVaga: false,
+    // Estado do modal "Nova matrícula"
+    novaAlunoSel: null,     // { AlunoID, NomeExibicao } escolhido no combobox
+    novaForcarVaga: false,  // true após o usuário confirmar "matricular mesmo assim"
   };
 
   var buscarTimer = null;
+  var buscaAlunoTimer = null;
 
   // =========================================================
   // postApi — usa api.js carregado pelo index.html
@@ -208,8 +305,12 @@
   function init() {
     var usuario = (typeof App !== 'undefined' && App.usuario) ? App.usuario : null;
     if (usuario) {
-      state.papel      = usuario.Papel || '';
-      state.podeEditar = ['admin','coordenacao','secretaria'].indexOf(state.papel) !== -1;
+      state.papel         = usuario.Papel || '';
+      state.podeEditar    = ['admin','coordenacao','secretaria'].indexOf(state.papel) !== -1;
+      state.podeForcarVaga= ['admin','coordenacao'].indexOf(state.papel) !== -1;
+    }
+    if (state.podeEditar && el('btn-m5-nova-matricula')) {
+      el('btn-m5-nova-matricula').style.display = 'inline-flex';
     }
     registrarEventos();
     carregarTurmasParaFiltro();
@@ -223,14 +324,28 @@
     postApi('turmas.listar', { tamanhoPagina: 300 })
       .then(function(res) {
         if (!res.sucesso || !res.dados) return;
-        var turmas = res.dados.dados || [];
+        state.turmas = res.dados.dados || [];
+
         var sel = el('m5-filtro-turma');
-        turmas.forEach(function(t) {
+        state.turmas.forEach(function(t) {
           var opt = document.createElement('option');
           opt.value = t.TurmaID;
           opt.textContent = t.TurmaID + ' — ' + (t.Estagio || t.CursoID || '');
           sel.appendChild(opt);
         });
+
+        // Popula também o select de turma do modal "Nova matrícula"
+        var selNova = el('m5-nova-turma');
+        if (selNova) {
+          state.turmas.forEach(function(t) {
+            if (String(t.SituacaoTurma) === 'ENCERRADA') return; // não oferece turmas encerradas
+            var opt2 = document.createElement('option');
+            opt2.value = t.TurmaID;
+            opt2.textContent = t.TurmaID + ' — ' + (t.Estagio || t.CursoID || '') +
+              (t.DiaSemana ? ' · ' + t.DiaSemana : '') + (t.Horario ? ' ' + t.Horario : '');
+            selNova.appendChild(opt2);
+          });
+        }
       })
       .catch(function() {});
   }
@@ -436,6 +551,143 @@
   }
 
   // =========================================================
+  // MODAL: NOVA MATRÍCULA
+  // O aluno pode ser informado por nome (com busca/autocomplete) ou por
+  // AlunoID direto — o sistema aceita os dois, mas sempre grava apenas o
+  // AlunoID na planilha.
+  // =========================================================
+  function abrirModalNovaMatricula() {
+    state.novaAlunoSel  = null;
+    state.novaForcarVaga = false;
+    el('m5-nova-aluno-busca').value = '';
+    el('m5-nova-aluno-busca').disabled = false;
+    el('m5-nova-aluno-busca').style.display = 'block';
+    el('m5-nova-aluno-selecionado').classList.remove('show');
+    el('m5-nova-aluno-dropdown').classList.remove('show');
+    el('m5-nova-aluno-dropdown').innerHTML = '';
+    el('m5-nova-turma').value = '';
+    el('m5-nova-alerta').classList.remove('show');
+    el('m5-nova-aviso-vaga').classList.remove('show');
+    el('m5-modal-nova').style.display = 'flex';
+    el('m5-nova-aluno-busca').focus();
+  }
+
+  function fecharModalNovaMatricula() {
+    el('m5-modal-nova').style.display = 'none';
+  }
+
+  function mostrarAlertaNovaMat(msg) {
+    var a = el('m5-nova-alerta'), m = el('m5-nova-alerta-msg');
+    a.classList.add('show'); m.textContent = msg;
+  }
+
+  // ── Busca/autocomplete de aluno por nome (reaproveita alunos.listar) ──────
+  function buscarAlunosParaCombo(termo) {
+    var dropdown = el('m5-nova-aluno-dropdown');
+    if (!termo || termo.length < 2) {
+      dropdown.classList.remove('show');
+      dropdown.innerHTML = '';
+      return;
+    }
+    postApi('alunos.listar', { busca: termo, somenteAtivos: true, tamanhoPagina: 8 })
+      .then(function(res) {
+        var lista = (res.sucesso && res.dados && res.dados.dados) ? res.dados.dados : [];
+        renderizarDropdownAluno(lista, termo);
+      })
+      .catch(function() { renderizarDropdownAluno([], termo); });
+  }
+
+  function renderizarDropdownAluno(lista, termo) {
+    var dropdown = el('m5-nova-aluno-dropdown');
+    dropdown.innerHTML = '';
+
+    if (lista.length === 0) {
+      dropdown.innerHTML = '<div class="m5-aluno-item vazio">Nenhum aluno encontrado para "' + termo + '".</div>';
+      dropdown.classList.add('show');
+      return;
+    }
+
+    lista.forEach(function(a) {
+      var item = document.createElement('div');
+      item.className = 'm5-aluno-item';
+      item.innerHTML = '<span class="m5-ai-nome">' + (a.NomeExibicao || a.NomeCompleto || '—') + '</span>' +
+        '<span class="m5-ai-id">' + a.AlunoID + '</span>';
+      item.addEventListener('click', function() {
+        selecionarAlunoCombo(a.AlunoID, a.NomeExibicao || a.NomeCompleto || a.AlunoID);
+      });
+      dropdown.appendChild(item);
+    });
+    dropdown.classList.add('show');
+  }
+
+  function selecionarAlunoCombo(alunoId, nomeExibicao) {
+    state.novaAlunoSel = { AlunoID: alunoId, NomeExibicao: nomeExibicao };
+    el('m5-nova-aluno-dropdown').classList.remove('show');
+    el('m5-nova-aluno-busca').value = '';
+    el('m5-nova-aluno-busca').style.display = 'none';
+    el('m5-nova-aluno-selecionado-txt').textContent = nomeExibicao + ' (' + alunoId + ')';
+    el('m5-nova-aluno-selecionado').classList.add('show');
+  }
+
+  function limparAlunoCombo() {
+    state.novaAlunoSel = null;
+    el('m5-nova-aluno-selecionado').classList.remove('show');
+    el('m5-nova-aluno-busca').style.display = 'block';
+    el('m5-nova-aluno-busca').value = '';
+    el('m5-nova-aluno-busca').focus();
+  }
+
+  // ── Salvar nova matrícula ───────────────────────────────────────────────
+  function salvarNovaMatricula(forcarVaga) {
+    el('m5-nova-alerta').classList.remove('show');
+
+    // Resolve o AlunoID: ou veio do combobox, ou o usuário digitou um
+    // AlunoID diretamente no campo de busca (sem selecionar da lista).
+    var alunoId = state.novaAlunoSel
+      ? state.novaAlunoSel.AlunoID
+      : (el('m5-nova-aluno-busca').value || '').trim().toUpperCase();
+    var turmaId = el('m5-nova-turma').value;
+
+    if (!alunoId) { mostrarAlertaNovaMat('Informe o aluno pelo nome (e selecione na lista) ou pelo AlunoID.'); return; }
+    if (!turmaId) { mostrarAlertaNovaMat('Selecione a turma.'); return; }
+
+    el('m5-nova-aviso-vaga').classList.remove('show');
+    var btn = el('btn-m5-nova-salvar');
+    btn.disabled = true; btn.classList.add('loading');
+
+    var dados = { AlunoID: alunoId, TurmaID: turmaId };
+    if (forcarVaga) dados.forcarVaga = true;
+
+    postApi('matriculas.criar', dados)
+      .then(function(res) {
+        btn.disabled = false; btn.classList.remove('loading');
+
+        if (!res.sucesso) {
+          // Vaga acima do limite: back-end pede confirmação explícita
+          // (somente para admin/coordenação — outros papéis recebem erro comum).
+          if (res.dados && res.dados.confirmacaoNecessaria && state.podeForcarVaga) {
+            el('m5-nova-aviso-vaga-msg').textContent = res.mensagem;
+            el('m5-nova-aviso-vaga').classList.add('show');
+            return;
+          }
+          mostrarAlertaNovaMat(res.mensagem || 'Erro ao matricular.');
+          return;
+        }
+
+        fecharModalNovaMatricula();
+        var msg = 'Matrícula realizada com sucesso!';
+        if (res.dados && res.dados.vagaForcada) msg += ' (Vaga forçada.)';
+        if (typeof toast === 'function') toast(msg, 'success');
+        state.paginaAtual = 1;
+        carregarMatriculas();
+      })
+      .catch(function() {
+        btn.disabled = false; btn.classList.remove('loading');
+        mostrarAlertaNovaMat('Erro de comunicação. Tente novamente.');
+      });
+  }
+
+  // =========================================================
   // EVENTOS
   // =========================================================
   function registrarEventos() {
@@ -494,6 +746,37 @@
     el('btn-cancelar-m5-sit') && el('btn-cancelar-m5-sit').addEventListener('click', fecharModalSitM5);
     el('m5-modal-sit') && el('m5-modal-sit').addEventListener('click', function(e) {
       if (e.target === this) fecharModalSitM5();
+    });
+
+    // Modal nova matrícula
+    el('btn-m5-nova-matricula') && el('btn-m5-nova-matricula').addEventListener('click', abrirModalNovaMatricula);
+    el('btn-m5-nova-cancelar')  && el('btn-m5-nova-cancelar').addEventListener('click', fecharModalNovaMatricula);
+    el('btn-m5-nova-salvar')    && el('btn-m5-nova-salvar').addEventListener('click', function() { salvarNovaMatricula(false); });
+    el('m5-modal-nova') && el('m5-modal-nova').addEventListener('click', function(e) {
+      if (e.target === this) fecharModalNovaMatricula();
+    });
+
+    el('m5-nova-aluno-busca') && el('m5-nova-aluno-busca').addEventListener('input', function() {
+      var termo = this.value.trim();
+      clearTimeout(buscaAlunoTimer);
+      buscaAlunoTimer = setTimeout(function() { buscarAlunosParaCombo(termo); }, 300);
+    });
+    el('m5-nova-aluno-busca') && el('m5-nova-aluno-busca').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); el('m5-nova-aluno-dropdown').classList.remove('show'); }
+    });
+    document.addEventListener('click', function(e) {
+      var wrap = el('m5-nova-aluno-dropdown');
+      if (wrap && !wrap.contains(e.target) && e.target.id !== 'm5-nova-aluno-busca') {
+        wrap.classList.remove('show');
+      }
+    });
+    el('m5-nova-aluno-limpar') && el('m5-nova-aluno-limpar').addEventListener('click', limparAlunoCombo);
+
+    el('btn-m5-forcar-confirmar') && el('btn-m5-forcar-confirmar').addEventListener('click', function() {
+      salvarNovaMatricula(true);
+    });
+    el('btn-m5-forcar-cancelar') && el('btn-m5-forcar-cancelar').addEventListener('click', function() {
+      el('m5-nova-aviso-vaga').classList.remove('show');
     });
   }
 
