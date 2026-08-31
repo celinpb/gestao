@@ -120,6 +120,27 @@
   .btn-add-mat .spinner-sm{width:14px;height:14px;border:2px solid rgba(255,255,255,0.35);border-top-color:#fff;border-radius:50%;animation:spin-t5 0.7s linear infinite;display:none;}
   .btn-add-mat.loading .spinner-sm{display:block;}
   .btn-add-mat.loading .btn-txt{display:none;}
+  .add-mat-field{position:relative;}
+  .t5-aluno-dropdown{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--c-border,#E8E7E2);border-top:none;border-radius:0 0 7px 7px;max-height:200px;overflow-y:auto;z-index:50;box-shadow:0 6px 16px rgba(26,26,46,0.10);display:none;}
+  .t5-aluno-dropdown.show{display:block;}
+  .t5-aluno-item{padding:8px 10px;cursor:pointer;font-size:12.5px;transition:background 100ms ease;border-bottom:1px solid #F0EEE8;}
+  .t5-aluno-item:last-child{border-bottom:none;}
+  .t5-aluno-item:hover{background:#F5F4F0;}
+  .t5-aluno-item .m5-ai-nome{font-weight:500;color:var(--c-text-1,#1A1A2E);}
+  .t5-aluno-item .m5-ai-id{font-size:10.5px;font-family:var(--font-mono,monospace);color:var(--c-text-3,#9898B0);margin-left:6px;}
+  .t5-aluno-item.vazio{color:var(--c-text-3,#9898B0);cursor:default;}
+  .t5-aluno-item.vazio:hover{background:none;}
+  .t5-aluno-selecionado{display:none;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;padding:6px 9px;background:rgba(42,157,143,0.07);border:1px solid rgba(42,157,143,0.25);border-radius:6px;font-size:12px;color:#1A6E65;}
+  .t5-aluno-selecionado.show{display:flex;}
+  .t5-aluno-selecionado button{border:none;background:none;cursor:pointer;color:#1A6E65;display:flex;align-items:center;}
+  .t5-aluno-selecionado button .material-icons-round{font-size:15px;}
+  .t5-mat-aviso-vaga{font-size:12px;color:#A32D2D;background:rgba(230,57,70,0.07);border:1px solid rgba(230,57,70,0.18);border-radius:6px;padding:9px 10px;margin-top:8px;display:none;}
+  .t5-mat-aviso-vaga.show{display:block;}
+  .t5-mat-aviso-vaga .acoes{display:flex;gap:6px;margin-top:8px;}
+  .btn-t5-mat-forcar{height:28px;padding:0 10px;border-radius:6px;font-size:11.5px;font-weight:500;cursor:pointer;border:1.5px solid #E63946;background:#fff;color:#A32D2D;font-family:var(--font-sans,sans-serif);}
+  .btn-t5-mat-forcar:hover{background:rgba(230,57,70,0.08);}
+  .btn-t5-mat-forcar-cancelar{height:28px;padding:0 10px;border-radius:6px;font-size:11.5px;cursor:pointer;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;color:var(--c-text-2,#5C5C7A);font-family:var(--font-sans,sans-serif);}
+  .btn-t5-mat-forcar-cancelar:hover{background:#F5F4F0;}
   .t5-alerta{border-radius:7px;padding:8px 12px;font-size:12.5px;margin-bottom:10px;display:none;align-items:center;gap:7px;}
   .t5-alerta.show{display:flex;}
   .t5-alerta.erro{background:rgba(230,57,70,0.08);border:1px solid rgba(230,57,70,0.18);color:#B01020;}
@@ -320,8 +341,22 @@
         <div class="add-mat-wrap" id="add-mat-wrap">
           <div class="add-mat-titulo">Adicionar matrícula</div>
           <div class="add-mat-field">
-            <label>AlunoID</label>
-            <input type="text" class="add-mat-input" id="add-mat-aluno-id" placeholder="Ex: A261.0001">
+            <label>Aluno (nome ou AlunoID)</label>
+            <input type="text" class="add-mat-input" id="add-mat-aluno-id" placeholder="Digite o nome ou o AlunoID (ex: A261.0001)…" autocomplete="off">
+            <div class="t5-aluno-dropdown" id="add-mat-aluno-dropdown"></div>
+            <div class="t5-aluno-selecionado" id="add-mat-aluno-selecionado">
+              <span id="add-mat-aluno-selecionado-txt"></span>
+              <button type="button" id="add-mat-aluno-limpar" title="Trocar aluno">
+                <span class="material-icons-round">close</span>
+              </button>
+            </div>
+          </div>
+          <div class="t5-mat-aviso-vaga" id="t5-mat-aviso-vaga">
+            <span id="t5-mat-aviso-vaga-msg"></span>
+            <div class="acoes">
+              <button class="btn-t5-mat-forcar-cancelar" id="btn-t5-mat-forcar-cancelar" type="button">Cancelar</button>
+              <button class="btn-t5-mat-forcar" id="btn-t5-mat-forcar-confirmar" type="button">Matricular mesmo assim</button>
+            </div>
           </div>
           <button class="btn-add-mat" id="btn-add-mat">
             <div class="spinner-sm"></div>
@@ -672,10 +707,13 @@
   var S = {
     turmas: [], turmaSel: null,
     matriculas: [], matriculaParaSit: null,
-    papel: '', podeEditar: false, podeCriarMat: false,
+    papel: '', podeEditar: false, podeCriarMat: false, podeForcarVaga: false,
     professores: [], cursos: [],
     matriculaParaTrans: null, turmaTrans: null, transCursoAtual: '',
+    // Estado do combobox "Adicionar matrícula" (aba Alunos do painel de turma)
+    matAlunoSel: null,       // { AlunoID, NomeExibicao } escolhido na busca
   };
+  var buscaAlunoMatTimer = null;
 
   // ============================================================
   // INIT
@@ -688,6 +726,7 @@
       S.papel        = usuario.Papel || '';
       S.podeEditar   = S.papel === 'admin' || S.papel === 'coordenacao';
       S.podeCriarMat = S.papel === 'admin' || S.papel === 'coordenacao' || S.papel === 'secretaria';
+      S.podeForcarVaga = S.papel === 'admin' || S.papel === 'coordenacao';
       if (S.papel === 'professor') {
         var w = el('add-mat-wrap'); if (w) w.style.display = 'none';
       }
@@ -852,6 +891,11 @@
     // Reseta a checkbox de inativos ao trocar de turma — cada turma abre
     // mostrando apenas alunos/matrículas ativos por padrão.
     if (el('chk-mat-inativos')) el('chk-mat-inativos').checked = false;
+    // Reseta o combobox de "adicionar matrícula" e o aviso de vaga excedida
+    S.matAlunoSel = null;
+    if (el('add-mat-aluno-selecionado')) el('add-mat-aluno-selecionado').classList.remove('show');
+    if (el('add-mat-aluno-id')) { el('add-mat-aluno-id').style.display = 'block'; el('add-mat-aluno-id').value = ''; }
+    if (el('t5-mat-aviso-vaga')) el('t5-mat-aviso-vaga').classList.remove('show');
     preencherInfo(turma);
     mostrarTab('info');
   }
@@ -1088,23 +1132,103 @@
     });
   }
 
-  function adicionarMatricula() {
-    var alunoId = (el('add-mat-aluno-id').value || '').trim();
-    if (!alunoId) {
-      mostrarAlerta('t5-mat-alerta', 't5-mat-alerta-msg', 'Informe o AlunoID.', 'erro');
+  // ── Busca/autocomplete de aluno por nome (reaproveita alunos.listar) ──────
+  function buscarAlunosParaComboT5(termo) {
+    var dropdown = el('add-mat-aluno-dropdown');
+    if (!termo || termo.length < 2) {
+      dropdown.classList.remove('show');
+      dropdown.innerHTML = '';
       return;
     }
+    postApi('alunos.listar', { busca: termo, somenteAtivos: true, tamanhoPagina: 8 })
+      .then(function (res) {
+        var lista = (res.sucesso && res.dados && res.dados.dados) ? res.dados.dados : [];
+        renderizarDropdownAlunoT5(lista, termo);
+      })
+      .catch(function () { renderizarDropdownAlunoT5([], termo); });
+  }
+
+  function renderizarDropdownAlunoT5(lista, termo) {
+    var dropdown = el('add-mat-aluno-dropdown');
+    dropdown.innerHTML = '';
+
+    if (lista.length === 0) {
+      dropdown.innerHTML = '<div class="t5-aluno-item vazio">Nenhum aluno encontrado para "' + termo + '".</div>';
+      dropdown.classList.add('show');
+      return;
+    }
+
+    lista.forEach(function (a) {
+      var item = document.createElement('div');
+      item.className = 't5-aluno-item';
+      item.innerHTML = '<span class="m5-ai-nome">' + (a.NomeExibicao || a.NomeCompleto || '—') + '</span>' +
+        '<span class="m5-ai-id">' + a.AlunoID + '</span>';
+      item.addEventListener('click', function () {
+        selecionarAlunoComboT5(a.AlunoID, a.NomeExibicao || a.NomeCompleto || a.AlunoID);
+      });
+      dropdown.appendChild(item);
+    });
+    dropdown.classList.add('show');
+  }
+
+  function selecionarAlunoComboT5(alunoId, nomeExibicao) {
+    S.matAlunoSel = { AlunoID: alunoId, NomeExibicao: nomeExibicao };
+    el('add-mat-aluno-dropdown').classList.remove('show');
+    el('add-mat-aluno-id').value = '';
+    el('add-mat-aluno-id').style.display = 'none';
+    el('add-mat-aluno-selecionado-txt').textContent = nomeExibicao + ' (' + alunoId + ')';
+    el('add-mat-aluno-selecionado').classList.add('show');
+  }
+
+  function limparAlunoComboT5() {
+    S.matAlunoSel = null;
+    el('add-mat-aluno-selecionado').classList.remove('show');
+    el('add-mat-aluno-id').style.display = 'block';
+    el('add-mat-aluno-id').value = '';
+    el('add-mat-aluno-id').focus();
+  }
+
+  // ── Matricular ─────────────────────────────────────────────────────────
+  function adicionarMatricula(forcarVaga) {
+    // Resolve o AlunoID: veio do combobox (busca por nome) ou foi digitado
+    // diretamente como AlunoID no campo de texto — o sistema aceita os dois.
+    var alunoId = S.matAlunoSel
+      ? S.matAlunoSel.AlunoID
+      : (el('add-mat-aluno-id').value || '').trim().toUpperCase();
+
+    if (!alunoId) {
+      mostrarAlerta('t5-mat-alerta', 't5-mat-alerta-msg', 'Informe o aluno pelo nome (e selecione na lista) ou pelo AlunoID.', 'erro');
+      return;
+    }
+
+    el('t5-mat-aviso-vaga').classList.remove('show');
     var btn = el('btn-add-mat');
     btn.disabled = true; btn.classList.add('loading');
-    postApi('matriculas.criar', { AlunoID: alunoId, TurmaID: S.turmaSel.TurmaID })
+
+    var dados = { AlunoID: alunoId, TurmaID: S.turmaSel.TurmaID };
+    if (forcarVaga) dados.forcarVaga = true;
+
+    postApi('matriculas.criar', dados)
       .then(function (res) {
         btn.disabled = false; btn.classList.remove('loading');
+
         if (!res.sucesso) {
+          // Vaga acima do limite: back-end pede confirmação explícita
+          // (somente para admin/coordenação — outros papéis recebem erro comum).
+          if (res.dados && res.dados.confirmacaoNecessaria && S.podeForcarVaga) {
+            el('t5-mat-aviso-vaga-msg').textContent = res.mensagem;
+            el('t5-mat-aviso-vaga').classList.add('show');
+            return;
+          }
           mostrarAlerta('t5-mat-alerta', 't5-mat-alerta-msg', res.mensagem || 'Erro ao matricular.', 'erro');
           return;
         }
+
+        limparAlunoComboT5();
         el('add-mat-aluno-id').value = '';
-        mostrarAlerta('t5-mat-alerta', 't5-mat-alerta-msg', 'Matrícula realizada com sucesso!', 'sucesso');
+        var msg = 'Matrícula realizada com sucesso!';
+        if (res.dados && res.dados.vagaForcada) msg += ' (Vaga forçada.)';
+        mostrarAlerta('t5-mat-alerta', 't5-mat-alerta-msg', msg, 'sucesso');
         carregarMatriculas();
       })
       .catch(function () {
@@ -1533,9 +1657,27 @@
     });
 
     // Matrículas
-    el('btn-add-mat') && el('btn-add-mat').addEventListener('click', adicionarMatricula);
+    el('btn-add-mat') && el('btn-add-mat').addEventListener('click', function () { adicionarMatricula(false); });
     el('add-mat-aluno-id') && el('add-mat-aluno-id').addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') adicionarMatricula();
+      if (e.key === 'Enter') { e.preventDefault(); adicionarMatricula(false); }
+    });
+    el('add-mat-aluno-id') && el('add-mat-aluno-id').addEventListener('input', function () {
+      var termo = this.value.trim();
+      clearTimeout(buscaAlunoMatTimer);
+      buscaAlunoMatTimer = setTimeout(function () { buscarAlunosParaComboT5(termo); }, 300);
+    });
+    document.addEventListener('click', function (e) {
+      var wrap = el('add-mat-aluno-dropdown');
+      if (wrap && !wrap.contains(e.target) && e.target.id !== 'add-mat-aluno-id') {
+        wrap.classList.remove('show');
+      }
+    });
+    el('add-mat-aluno-limpar') && el('add-mat-aluno-limpar').addEventListener('click', limparAlunoComboT5);
+    el('btn-t5-mat-forcar-confirmar') && el('btn-t5-mat-forcar-confirmar').addEventListener('click', function () {
+      adicionarMatricula(true);
+    });
+    el('btn-t5-mat-forcar-cancelar') && el('btn-t5-mat-forcar-cancelar').addEventListener('click', function () {
+      el('t5-mat-aviso-vaga').classList.remove('show');
     });
     el('chk-mat-inativos') && el('chk-mat-inativos').addEventListener('change', function () {
       carregarMatriculas();
