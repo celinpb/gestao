@@ -32,6 +32,27 @@
   .btn-m5-acao{height:28px;padding:0 10px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;color:var(--c-text-2,#5C5C7A);font-family:var(--font-sans,sans-serif);display:inline-flex;align-items:center;gap:4px;transition:background 120ms ease;}
   .btn-m5-acao:hover{background:#F5F4F0;}
   .btn-m5-acao .material-icons-round{font-size:14px;}
+  .btn-m5-acao.trans{border-color:#457B9D;color:#185FA5;background:rgba(69,123,157,0.08);}
+  .btn-m5-acao.trans:hover{background:rgba(69,123,157,0.18);}
+  .btn-m5-acao.trans .material-icons-round{color:#2563A8;}
+
+  /* Modal: transferir aluno de turma */
+  .m5-trans-lista{max-height:260px;overflow-y:auto;border:1px solid var(--c-border,#E8E7E2);border-radius:7px;margin-top:6px;}
+  .m5-trans-item{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--c-border,#E8E7E2);cursor:pointer;transition:background 120ms ease;gap:8px;}
+  .m5-trans-item:last-child{border-bottom:none;}
+  .m5-trans-item:hover{background:#FAFAF8;}
+  .m5-trans-item.selecionado{background:rgba(230,57,70,0.04);border-left:3px solid #E63946;}
+  .m5-trans-nome{font-size:13px;font-weight:500;color:var(--c-text-1,#1A1A2E);}
+  .m5-trans-meta{font-size:11.5px;color:var(--c-text-3,#9898B0);}
+  .m5-trans-vagas{font-size:11px;padding:2px 7px;border-radius:4px;font-weight:600;flex-shrink:0;}
+  .m5-trans-vagas.ok{background:rgba(42,157,143,0.12);color:#1A6E65;}
+  .m5-trans-vagas.cheio{background:rgba(230,57,70,0.10);color:#A32D2D;}
+  .m5-trans-aviso{font-size:12px;color:#A32D2D;background:rgba(230,57,70,0.07);border:1px solid rgba(230,57,70,0.18);border-radius:6px;padding:8px 10px;margin-top:8px;display:none;}
+  .m5-trans-aviso.show{display:block;}
+  .m5-trans-toggle-wrap{display:none;align-items:center;gap:6px;font-size:12px;color:var(--c-text-2,#5C5C7A);cursor:pointer;}
+  .m5-trans-alerta{border-radius:7px;padding:8px 12px;font-size:12.5px;margin-bottom:10px;display:none;align-items:center;gap:7px;}
+  .m5-trans-alerta.show{display:flex;}
+  .m5-trans-alerta.erro{background:rgba(230,57,70,0.08);border:1px solid rgba(230,57,70,0.18);color:#B01020;}
 
   .m5-estado{padding:48px 24px;text-align:center;color:var(--c-text-3,#9898B0);font-size:13.5px;}
   .m5-estado .material-icons-round{font-size:36px;display:block;margin:0 auto 10px;}
@@ -270,6 +291,40 @@
   </div>
 </div>
 
+<!-- Modal: transferir aluno de turma -->
+<div class="m5-modal-overlay" id="m5-modal-trans" style="display:none;">
+  <div class="m5-modal" style="max-width:480px;">
+    <div class="m5-modal-header">Transferir aluno de turma</div>
+    <div class="m5-modal-corpo">
+      <p id="m5-trans-aluno" style="font-size:13px;color:var(--c-text-2,#5C5C7A);margin-bottom:12px;"></p>
+      <div class="m5-trans-alerta erro" id="m5-trans-alerta">
+        <span class="material-icons-round">error_outline</span>
+        <span id="m5-trans-alerta-msg"></span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <label style="font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--c-text-3,#9898B0);">Turma de destino</label>
+        <label id="m5-trans-toggle-wrap" class="m5-trans-toggle-wrap">
+          <span>Outros cursos</span>
+          <input type="checkbox" id="m5-trans-outros-cursos" style="accent-color:#E63946;width:14px;height:14px;">
+        </label>
+      </div>
+      <div class="m5-trans-lista" id="m5-trans-lista-turmas">
+        <div class="mat-vazio" style="padding:24px 0;text-align:center;color:var(--c-text-3,#9898B0);font-size:13px;">Carregando turmas...</div>
+      </div>
+      <div class="m5-trans-aviso" id="m5-trans-aviso-vaga">
+        Turma sem vagas. Apenas coordenação e admin podem forçar esta transferência.
+      </div>
+    </div>
+    <div class="m5-modal-footer" style="gap:8px;">
+      <button class="btn-cancelar-m5" id="btn-cancelar-m5-trans">Cancelar</button>
+      <button class="btn-m5-modal-primario" id="btn-confirmar-m5-trans" disabled>
+        <span class="material-icons-round" style="font-size:16px;">swap_horiz</span>
+        Confirmar transferência
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   'use strict';
@@ -285,6 +340,8 @@
     // Estado do modal "Nova matrícula"
     novaAlunoSel: null,     // { AlunoID, NomeExibicao } escolhido no combobox
     novaForcarVaga: false,  // true após o usuário confirmar "matricular mesmo assim"
+    // Estado do modal "Transferir de turma"
+    matriculaParaTrans: null, turmaTrans: null, transCursoAtual: '',
   };
 
   var buscarTimer = null;
@@ -459,10 +516,15 @@
               '<button class="btn-m5-acao" data-mat="' + m.MatriculaID + '">' +
                 '<span class="material-icons-round">swap_horiz</span>Situação' +
               '</button>' +
+              (sit === 'ATIVA'
+                ? '<button class="btn-m5-acao trans" data-mat-trans="' + m.MatriculaID + '">' +
+                    '<span class="material-icons-round">compare_arrows</span>Transferir' +
+                  '</button>'
+                : '') +
             '</div>' : '') +
         '</td>';
 
-      var btn = tr.querySelector('.btn-m5-acao');
+      var btn = tr.querySelector('.btn-m5-acao:not(.trans)');
       if (btn) {
         btn.addEventListener('click', function() {
           state.matriculaParaSit = m;
@@ -470,6 +532,11 @@
           resetarModalSitM5();
           el('m5-modal-sit').style.display = 'flex';
         });
+      }
+
+      var btnTrans = tr.querySelector('.btn-m5-acao.trans');
+      if (btnTrans) {
+        btnTrans.addEventListener('click', function() { abrirModalTransferir(m); });
       }
 
       tbody.appendChild(tr);
@@ -688,6 +755,148 @@
   }
 
   // =========================================================
+  // MODAL: TRANSFERIR ALUNO DE TURMA
+  // Reaproveita exatamente as mesmas regras já usadas em f5-turmas.html:
+  // - Turma atual e turmas encerradas/inativas ficam fora da lista;
+  // - Secretaria só vê turmas do mesmo curso e com vaga disponível;
+  // - Admin/coordenação veem turmas do mesmo curso por padrão, com opção
+  //   "Outros cursos" para ver turmas de outros idiomas/cursos também;
+  // - Se admin/coordenação escolher uma turma sem vaga, um aviso aparece,
+  //   mas a transferência é permitida (back-end registra vaga forçada).
+  // =========================================================
+  function abrirModalTransferir(mat) {
+    state.matriculaParaTrans = mat;
+    state.turmaTrans         = null;
+    var turmaAtual = state.turmas.find(function(t) { return t.TurmaID === mat.TurmaID; });
+    state.transCursoAtual = turmaAtual ? (turmaAtual.CursoID || '') : '';
+
+    el('m5-trans-aluno').textContent =
+      'Aluno: ' + (mat.NomeExibicao || mat.AlunoID) +
+      ' — Turma atual: ' + (mat.TurmaID || '—');
+    el('m5-trans-alerta').classList.remove('show');
+    el('m5-trans-aviso-vaga').classList.remove('show');
+    el('btn-confirmar-m5-trans').disabled = true;
+    el('m5-trans-lista-turmas').innerHTML =
+      '<div class="mat-vazio" style="padding:24px 0;text-align:center;color:var(--c-text-3,#9898B0);font-size:13px;">Carregando turmas...</div>';
+
+    // Toggle "outros cursos": visível apenas para admin/coordenação
+    var toggle = el('m5-trans-toggle-wrap');
+    if (toggle) toggle.style.display = state.podeForcarVaga ? 'flex' : 'none';
+    var cb = el('m5-trans-outros-cursos');
+    if (cb) cb.checked = false;
+
+    el('m5-modal-trans').style.display = 'flex';
+    carregarTurmasParaTransferenciaM5();
+  }
+
+  function fecharModalTransferir() {
+    el('m5-modal-trans').style.display = 'none';
+    state.matriculaParaTrans = null;
+    state.turmaTrans         = null;
+  }
+
+  function carregarTurmasParaTransferenciaM5() {
+    postApi('turmas.listar', { tamanhoPagina: 300 })
+      .then(function(res) {
+        if (!res.sucesso || !res.dados) { renderizarTurmasTransferenciaM5([]); return; }
+        var todas        = res.dados.dados || [];
+        var mat          = state.matriculaParaTrans;
+        var turmaAtualId = mat ? mat.TurmaID : '';
+        var outrosCursos = el('m5-trans-outros-cursos') && el('m5-trans-outros-cursos').checked;
+        var ehSecretaria = state.papel === 'secretaria';
+
+        var filtradas = todas.filter(function(t) {
+          if (t.TurmaID === turmaAtualId) return false;
+          if (String(t.SituacaoTurma) === 'ENCERRADA') return false;
+          if (!(t.SituacaoTurma === true || t.SituacaoTurma === 'true')) return false;
+          if (ehSecretaria) {
+            if (t.CursoID !== state.transCursoAtual) return false;
+            var livre = (Number(t.VagasTotais) || 0) - (Number(t._matriculasAtivas) || 0);
+            if (livre <= 0) return false;
+          }
+          if (!ehSecretaria && !outrosCursos) {
+            if (t.CursoID !== state.transCursoAtual) return false;
+          }
+          return true;
+        });
+        renderizarTurmasTransferenciaM5(filtradas);
+      })
+      .catch(function() { renderizarTurmasTransferenciaM5([]); });
+  }
+
+  function renderizarTurmasTransferenciaM5(turmas) {
+    var cont = el('m5-trans-lista-turmas');
+    if (!turmas.length) {
+      cont.innerHTML = '<div class="mat-vazio" style="padding:24px 0;text-align:center;color:var(--c-text-3,#9898B0);font-size:13px;">Nenhuma turma disponível para transferência.</div>';
+      return;
+    }
+    cont.innerHTML = '';
+    turmas.forEach(function(t) {
+      var vagas   = Number(t.VagasTotais)      || 0;
+      var ocup    = Number(t._matriculasAtivas) || 0;
+      var livre   = vagas - ocup;
+      var temVaga = livre > 0;
+      var div = document.createElement('div');
+      div.className = 'm5-trans-item';
+      div.innerHTML =
+        '<div style="flex:1;min-width:0;">' +
+          '<div class="m5-trans-nome">' + (t.Estagio || t.CursoID) + '</div>' +
+          '<div class="m5-trans-meta">' + t.TurmaID +
+            (t.ProfessorNome ? ' · ' + t.ProfessorNome : '') +
+            (t.DiaSemana     ? ' · ' + t.DiaSemana      : '') +
+          '</div>' +
+        '</div>' +
+        '<span class="m5-trans-vagas ' + (temVaga ? 'ok' : 'cheio') + '">' +
+          (temVaga ? livre + ' vaga(s)' : 'Sem vagas') +
+        '</span>';
+      (function(turma, tv) {
+        div.addEventListener('click', function() {
+          cont.querySelectorAll('.m5-trans-item').forEach(function(el2) {
+            el2.classList.remove('selecionado');
+          });
+          div.classList.add('selecionado');
+          state.turmaTrans = turma;
+          if (!tv) {
+            el('m5-trans-aviso-vaga').classList.add('show');
+          } else {
+            el('m5-trans-aviso-vaga').classList.remove('show');
+          }
+          el('btn-confirmar-m5-trans').disabled = false;
+        });
+      }(t, temVaga));
+      cont.appendChild(div);
+    });
+  }
+
+  function confirmarTransferenciaM5() {
+    if (!state.matriculaParaTrans || !state.turmaTrans) return;
+    var btn = el('btn-confirmar-m5-trans');
+    btn.disabled = true;
+    el('m5-trans-alerta').classList.remove('show');
+
+    postApi('matriculas.transferir', {
+      matriculaOrigemId: state.matriculaParaTrans.MatriculaID,
+      turmaDestinoId:    state.turmaTrans.TurmaID,
+    }).then(function(res) {
+      btn.disabled = false;
+      if (!res.sucesso) {
+        el('m5-trans-alerta').classList.add('show');
+        el('m5-trans-alerta-msg').textContent = res.mensagem || 'Erro ao transferir.';
+        return;
+      }
+      fecharModalTransferir();
+      var msgToast = 'Transferência realizada com sucesso.';
+      if (res.dados && res.dados.vagaForcada) msgToast += ' (Vaga forçada.)';
+      if (typeof toast === 'function') toast(msgToast, 'success');
+      carregarMatriculas();
+    }).catch(function() {
+      btn.disabled = false;
+      el('m5-trans-alerta').classList.add('show');
+      el('m5-trans-alerta-msg').textContent = 'Erro de comunicação. Tente novamente.';
+    });
+  }
+
+  // =========================================================
   // EVENTOS
   // =========================================================
   function registrarEventos() {
@@ -777,6 +986,21 @@
     });
     el('btn-m5-forcar-cancelar') && el('btn-m5-forcar-cancelar').addEventListener('click', function() {
       el('m5-nova-aviso-vaga').classList.remove('show');
+    });
+
+    // Modal transferir de turma
+    el('m5-trans-outros-cursos') && el('m5-trans-outros-cursos').addEventListener('change', function() {
+      state.turmaTrans = null;
+      el('btn-confirmar-m5-trans').disabled = true;
+      el('m5-trans-aviso-vaga').classList.remove('show');
+      el('m5-trans-lista-turmas').innerHTML =
+        '<div class="mat-vazio" style="padding:24px 0;text-align:center;color:var(--c-text-3,#9898B0);font-size:13px;">Carregando turmas...</div>';
+      carregarTurmasParaTransferenciaM5();
+    });
+    el('btn-cancelar-m5-trans')  && el('btn-cancelar-m5-trans').addEventListener('click', fecharModalTransferir);
+    el('btn-confirmar-m5-trans') && el('btn-confirmar-m5-trans').addEventListener('click', confirmarTransferenciaM5);
+    el('m5-modal-trans') && el('m5-modal-trans').addEventListener('click', function(e) {
+      if (e.target === this) fecharModalTransferir();
     });
   }
 
