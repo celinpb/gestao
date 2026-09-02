@@ -93,6 +93,11 @@
     <span id="cfg-alerta-global-msg"></span>
   </div>
 
+  <div id="cfg-acesso-negado" class="tabela-estado" style="display:none;padding:48px 24px;text-align:center;color:var(--c-text-3,#9898B0);">
+    <span class="material-icons-round" style="font-size:36px;display:block;margin:0 auto 10px;">lock</span>
+    <p>Esta área é restrita ao perfil administrador.</p>
+  </div>
+
   <div id="cfg-loading" class="cfg-spinner">
     <div class="cfg-spinner-anim"></div><span>Carregando configurações…</span>
   </div>
@@ -277,6 +282,19 @@
   // INIT
   // =========================================================
   function init() {
+    // Bloqueio client-side (defesa em profundidade). A validação real e
+    // definitiva já está no back-end: m4_getConfig/m4_salvarConfig chamam
+    // m3_autenticarEAutorizar(token, 'Config', 'Read'/'Update'). Hoje a aba
+    // Papeis libera 'Config'/'Read' também para coordenacao — verifique essa
+    // célula na planilha, pois este bloqueio aqui não impede uma chamada
+    // direta a postApi('sistema.config', {}) pelo console do navegador.
+    var _usuario = (typeof App !== 'undefined') ? App.usuario : null;
+    if (!_usuario || _usuario.Papel !== 'admin') {
+      el('cfg-loading').style.display = 'none';
+      el('cfg-conteudo').style.display = 'none';
+      el('cfg-acesso-negado').style.display = 'block';
+      return;
+    }
     postApi('sistema.config', {})
       .then(function(res) {
         el('cfg-loading').style.display = 'none';
