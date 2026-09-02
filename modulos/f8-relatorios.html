@@ -131,6 +131,12 @@
   .r8cr-badge.pend{background:rgba(230,57,70,0.10);color:#A32D2D;}
   .r8cr-badge .material-icons-round{font-size:12px;}
   .r8cr-vazio{padding:20px 16px;text-align:center;font-size:13px;color:var(--c-text-3,#9898B0);}
+  .r8cr-aviso{display:none;align-items:center;gap:8px;background:rgba(233,196,106,0.15);border:1px solid rgba(212,168,67,0.45);color:#7A5C00;border-radius:8px;padding:10px 14px;font-size:12.5px;margin-bottom:14px;}
+  .r8cr-aviso.show{display:flex;}
+  .r8cr-aviso .material-icons-round{font-size:17px;flex-shrink:0;color:#B8860B;}
+  .r8cr-select.erro,.r8cr-input.erro{border-color:#E63946;box-shadow:0 0 0 3px rgba(230,57,70,0.10);}
+  .r8cr-turma-meta{font-size:11.5px;color:rgba(255,255,255,0.55);margin-top:1px;}
+  .r8cr-req{color:#E63946;margin-left:2px;}
 
   .r8-folha{background:#fff;width:210mm;min-height:297mm;margin:0 auto;padding:16mm 18mm;box-shadow:0 2px 16px rgba(0,0,0,0.15);font-family:'DM Sans',sans-serif;font-size:10pt;color:#1A1A2E;box-sizing:border-box;}
   .r8-folha.paisagem{width:297mm;min-height:210mm;}
@@ -319,6 +325,7 @@
       <select class="r8cr-select" id="r8cr-modo">
         <option value="data">Por data específica</option>
         <option value="semana">Por semana</option>
+        <option value="semestre">Desde o início do semestre até hoje</option>
       </select>
     </div>
     <div class="r8cr-field" id="r8cr-data-wrap">
@@ -330,11 +337,15 @@
       <input type="date" class="r8cr-input" id="r8cr-semana-data">
     </div>
     <div class="r8cr-field">
-      <label>Filtrar por professor (opcional)</label>
+      <label id="r8cr-professor-label">Filtrar por professor (opcional)</label>
       <select class="r8cr-select" id="r8cr-professor">
         <option value="">Todos os professores</option>
       </select>
     </div>
+  </div>
+  <div class="r8cr-aviso" id="r8cr-aviso-prof">
+    <span class="material-icons-round">warning</span>
+    <span>Neste modo, é <strong>obrigatório</strong> escolher um professor — gerar "desde o início do semestre" para todos os professores de uma vez não é viável.</span>
   </div>
   <div class="r8cr-acoes">
     <button class="btn-r8 btn-r8-primario" id="r8cr-btn-gerar">
@@ -638,6 +649,9 @@
 
     if (tipo === 'controle-registros') {
       crPopularProfessores();
+      if (el('r8cr-modo')) el('r8cr-modo').value = 'data';
+      if (el('r8cr-professor')) el('r8cr-professor').value = '';
+      crAtualizarCamposModo('data');
       el('r8cr-painel').classList.add('show');
       return;
     }
@@ -2041,6 +2055,22 @@
       String(t.SituacaoTurma) !== 'ENCERRADA';
   }
 
+  // Ajusta quais campos ficam visíveis conforme o modo escolhido, e liga/desliga
+  // o aviso de professor obrigatório (exclusivo do modo "semestre").
+  function crAtualizarCamposModo(modo) {
+    var porSemana   = modo === 'semana';
+    var porSemestre = modo === 'semestre';
+    if (el('r8cr-data-wrap'))   el('r8cr-data-wrap').style.display   = (porSemana || porSemestre) ? 'none'  : 'block';
+    if (el('r8cr-semana-wrap')) el('r8cr-semana-wrap').style.display = porSemana ? 'block' : 'none';
+    if (el('r8cr-aviso-prof'))  el('r8cr-aviso-prof').classList.toggle('show', porSemestre);
+    var lbl = el('r8cr-professor-label');
+    if (lbl) lbl.innerHTML = porSemestre
+      ? 'Professor <span class="r8cr-req">*</span>'
+      : 'Filtrar por professor (opcional)';
+    var selProf = el('r8cr-professor');
+    if (selProf) selProf.classList.remove('erro');
+  }
+
   function crPopularProfessores() {
     var sel = el('r8cr-professor');
     if (!sel) return;
@@ -2066,6 +2096,18 @@
   function gerarControleRegistros() {
     var modo       = el('r8cr-modo').value;
     var profFiltro = el('r8cr-professor').value;
+
+    if (modo === 'semestre') {
+      if (!profFiltro) {
+        if (el('r8cr-professor')) el('r8cr-professor').classList.add('erro');
+        if (typeof toast === 'function') toast('Selecione um professor — obrigatório neste modo.', 'error');
+        return;
+      }
+      if (el('r8cr-professor')) el('r8cr-professor').classList.remove('erro');
+      gerarControleRegistrosSemestre(profFiltro);
+      return;
+    }
+
     var dataInput  = modo === 'semana' ? el('r8cr-semana-data').value : el('r8cr-data').value;
 
     if (!dataInput) {
@@ -2207,6 +2249,120 @@
     crMontarImpressao(titulo, html);
   }
 
+  // =========================================================
+  // CONTROLE DE REGISTROS — MODO "DESDE O INÍCIO DO SEMESTRE"
+  // Agrupa por turma (não por dia): para cada turma do professor
+  // selecionado, lista as datas previstas de aula (reaproveitando
+  // r8_construirDatasTurma, que cruza o calendário letivo com o(s)
+  // dia(s) da semana da turma) entre o início do semestre e hoje,
+  // marcando cada uma como registrada ou pendente.
+  // =========================================================
+  function gerarControleRegistrosSemestre(profFiltro) {
+    var btn = el('r8cr-btn-gerar');
+    btn.disabled = true; btn.classList.add('loading');
+    el('r8cr-resultado').classList.remove('show');
+
+    var turmasDoProf = state.turmas.filter(crTurmaAtiva).filter(function(t) {
+      return (t.ProfessorNome || '') === profFiltro;
+    });
+
+    if (!turmasDoProf.length) {
+      btn.disabled = false; btn.classList.remove('loading');
+      if (typeof toast === 'function') toast('Nenhuma turma ativa encontrada para este professor.', 'error');
+      return;
+    }
+
+    Promise.all([
+      postApi('calendario.listar', {}),
+      postApi('frequencias.listar', {}),
+    ]).then(function(res) {
+      btn.disabled = false; btn.classList.remove('loading');
+
+      var calendario  = (res[0].sucesso && res[0].dados) ? res[0].dados : [];
+      var frequencias = (res[1].sucesso && res[1].dados) ? res[1].dados : [];
+
+      // Mapa de registros: "TurmaID|DD/MM/AAAA" → true (mesma convenção dos demais modos)
+      var registros = {};
+      frequencias.forEach(function(f) {
+        var dataF = String(f.DataAula || '').substring(0, 10);
+        registros[(f.TurmaID || '') + '|' + dataF] = true;
+      });
+
+      // "Início do semestre" = primeiro dia letivo (DiaLetivo=true) do calendário carregado.
+      var inicioData = null;
+      calendario.forEach(function(c) {
+        if (!c.DiaLetivo) return;
+        var d = crParsearData(String(c.DataAula || '').substring(0, 10));
+        if (d && (!inicioData || d < inicioData)) inicioData = d;
+      });
+      var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+
+      var turmasComDatas = turmasDoProf.map(function(t) {
+        var datas = r8_construirDatasTurma(t, calendario)
+          .filter(function(d) { return !d.futura; })
+          .map(function(d) {
+            return { dataStr: d.br, weekday: d.weekday, registrado: !!registros[t.TurmaID + '|' + d.br] };
+          });
+        var countReg = datas.filter(function(d) { return d.registrado; }).length;
+        return { turma: t, datas: datas, countReg: countReg, countPend: datas.length - countReg };
+      });
+
+      turmasComDatas.sort(function(a, b) {
+        return (a.turma.TurmaID || '').localeCompare(b.turma.TurmaID || '', 'pt-BR');
+      });
+
+      renderizarControleRegistrosSemestre(turmasComDatas, profFiltro, inicioData, hoje);
+    }).catch(function(e) {
+      btn.disabled = false; btn.classList.remove('loading');
+      if (typeof toast === 'function') toast('Erro ao gerar: ' + (e.message || ''), 'error');
+    });
+  }
+
+  function renderizarControleRegistrosSemestre(turmasComDatas, profFiltro, inicioData, hoje) {
+    var inicioStr = inicioData ? crFmtData(inicioData) : '—';
+    var hojeStr    = crFmtData(hoje);
+    var titulo = 'Controle de registros — Prof. ' + profFiltro + ' — de ' + inicioStr + ' até ' + hojeStr;
+    el('r8cr-resultado-titulo').textContent = titulo;
+
+    var html = '';
+    turmasComDatas.forEach(function(item) {
+      var t = item.turma;
+      html += '<div class="r8cr-secao">';
+      html += '<div class="r8cr-secao-header">' +
+        '<div>' +
+          '<span class="r8cr-secao-dia">' + (t.TurmaID || '—') + '</span>' +
+          '<div class="r8cr-turma-meta">' + (t.DiaSemana || '—') + ' · ' + (t.Modalidade || '—') + ' · ' + (t.Horario || '—') + '</div>' +
+        '</div>' +
+        '<div class="r8cr-secao-counts">' +
+          '<span class="r8cr-count ok">' + item.countReg + ' em dia</span>' +
+          '<span class="r8cr-count pend">' + item.countPend + ' pendente(s)</span>' +
+        '</div></div>';
+
+      if (!item.datas.length) {
+        html += '<div class="r8cr-vazio">Nenhuma aula prevista entre o início do semestre e hoje para esta turma.</div>';
+      } else {
+        html += '<table class="r8cr-tabela"><thead><tr><th>Data</th><th>Dia</th><th>Situação</th></tr></thead><tbody>';
+        item.datas.forEach(function(d) {
+          html += '<tr>' +
+            '<td style="font-family:var(--font-mono,monospace);font-size:12px;">' + d.dataStr + '</td>' +
+            '<td>' + NOMES_DIA_CR[d.weekday] + '</td>' +
+            '<td><span class="r8cr-badge ' + (d.registrado ? 'ok' : 'pend') + '">' +
+              '<span class="material-icons-round">' + (d.registrado ? 'check_circle' : 'schedule') + '</span>' +
+              (d.registrado ? 'Em dia' : 'Pendente') + '</span></td></tr>';
+        });
+        html += '</tbody></table>';
+      }
+      html += '</div>';
+    });
+
+    if (!html) html = '<div class="r8cr-vazio">Nenhuma turma ativa encontrada para este professor.</div>';
+
+    el('r8cr-corpo').innerHTML = html;
+    el('r8cr-resultado').classList.add('show');
+    el('r8cr-resultado').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    crMontarImpressao(titulo, html);
+  }
+
   function crMontarImpressao(titulo, corpoHtml) {
     var cfg = state.config; var sem = state.semestre;
     var logoUrl = state.logoUrl || '';
@@ -2244,7 +2400,7 @@
       '.r8-titulo-rel{font-size:12pt;font-weight:700;margin:12px 0 10px;}' +
       '.r8cr-secao{margin-bottom:12px;border:1px solid #E8E7E2;border-radius:6px;overflow:hidden;}' +
       '.r8cr-secao-header{background:#1A1A2E;color:#fff;padding:6px 10px;display:flex;justify-content:space-between;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
-      '.r8cr-secao-dia{font-size:9pt;font-weight:600;}.r8cr-secao-counts{display:flex;gap:10px;font-size:8pt;}' +
+      '.r8cr-secao-dia{font-size:9pt;font-weight:600;}.r8cr-turma-meta{font-size:7.5pt;color:rgba(255,255,255,0.65);margin-top:1px;}.r8cr-secao-counts{display:flex;gap:10px;font-size:8pt;}' +
       '.r8cr-prof-header{background:#F0EEE8;padding:5px 10px;font-size:8.5pt;font-weight:600;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
       '.r8cr-tabela{width:100%;border-collapse:collapse;font-size:8pt;}' +
       '.r8cr-tabela th{background:#F8F7F3;padding:4px 8px;text-align:left;font-size:7pt;font-weight:600;border-bottom:1px solid #E8E7E2;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
@@ -2305,9 +2461,7 @@
       document.querySelectorAll('.r8-tipo-card').forEach(function(c){c.classList.remove('sel');});
     });
     el('r8cr-modo') && el('r8cr-modo').addEventListener('change', function() {
-      var porSemana = this.value === 'semana';
-      el('r8cr-data-wrap').style.display   = porSemana ? 'none'  : 'block';
-      el('r8cr-semana-wrap').style.display = porSemana ? 'block' : 'none';
+      crAtualizarCamposModo(this.value);
     });
   }
 
