@@ -324,9 +324,14 @@ function renderizarMenuFallback() {
       { id: 'matriculas', label: 'Matrículas',     icone: 'assignment'   },
       { id: 'diario',     label: 'Diário de aula', icone: 'menu_book'    },
       { id: 'notas',      label: 'Notas',          icone: 'grade'        },
-      { id: 'relatorios', label: 'Relatórios',     icone: 'summarize'    },
-      { id: 'config',     label: 'Configurações',  icone: 'settings'     }
+      { id: 'relatorios', label: 'Relatórios',     icone: 'summarize'    }
     );
+    // ATENÇÃO: 'config' é EXCLUSIVO de admin (ver m3_menuPorPapel em
+    // M3_Permissoes.gs — é o único item ali restrito só a admin).
+    // Não mover este item para dentro do bloco acima.
+    if (papel === 'admin') {
+      itens.push({ id: 'config', label: 'Configurações', icone: 'settings' });
+    }
   } else if (papel === 'professor') {
     itens.push(
       { id: 'alunos',     label: 'Alunos',         icone: 'school'    },
