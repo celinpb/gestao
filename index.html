@@ -161,6 +161,7 @@ var MODULOS = {
   diario:     'modulos/f6-diario.html',
   notas:      'modulos/f7-notas.html',
   relatorios: 'modulos/f8-relatorios.html',
+  auditoria:  'modulos/f10-auditoria.html',
   config:     'modulos/f-config.html',
 };
 
@@ -329,10 +330,12 @@ function renderizarMenuFallback() {
       { id: 'notas',      label: 'Notas',          icone: 'grade'        },
       { id: 'relatorios', label: 'Relatórios',     icone: 'summarize'    }
     );
-    // ATENÇÃO: 'config' é EXCLUSIVO de admin (ver m3_menuPorPapel em
-    // M3_Permissoes.gs — é o único item ali restrito só a admin).
-    // Não mover este item para dentro do bloco acima.
+    // ATENÇÃO: 'auditoria' e 'config' são EXCLUSIVOS de admin ('config' ver
+    // m3_menuPorPapel em M3_Permissoes.gs; 'auditoria' é decisão da etapa 9 —
+    // a tabela `auditoria` também só é legível por admin, via RLS).
+    // Não mover estes itens para dentro do bloco acima.
     if (papel === 'admin') {
+      itens.push({ id: 'auditoria', label: 'Auditoria', icone: 'history' });
       itens.push({ id: 'config', label: 'Configurações', icone: 'settings' });
     }
   } else if (papel === 'professor') {
