@@ -1,0 +1,537 @@
+<!--
+  F10_Auditoria.html
+  Consulta do registro de auditoria (tabela `auditoria`). Somente admin.
+  Os registros são gravados automaticamente pelo banco (gatilhos — ver
+  claude/etapa9-auditoria.sql) e pela Edge Function alunos-sensiveis; esta
+  tela só lê. Nada aqui altera ou exclui registros.
+-->
+<style>
+  .au-filtros{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:10px;padding:16px 18px;margin-bottom:16px;}
+  .au-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:14px;}
+  .au-field{display:flex;flex-direction:column;gap:5px;min-width:0;}
+  .au-field.largo{grid-column:span 2;}
+  @media(max-width:560px){.au-field.largo{grid-column:auto;}}
+  .au-field label{font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--c-text-3,#9898B0);}
+  .au-input{height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:7px;padding:0 11px;font-family:var(--font-sans,sans-serif);font-size:13.5px;color:var(--c-text-1,#1A1A2E);background:#FAFAF8;outline:none;width:100%;transition:border-color 150ms ease;min-width:0;}
+  .au-input:focus{border-color:#E63946;background:#fff;}
+  select.au-input{cursor:pointer;}
+  .au-acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .btn-au{height:36px;padding:0 14px;border-radius:8px;font-family:var(--font-sans,sans-serif);font-size:13px;font-weight:500;cursor:pointer;border:none;display:inline-flex;align-items:center;gap:6px;transition:background 150ms ease;white-space:nowrap;}
+  .btn-au .material-icons-round{font-size:17px;}
+  .btn-au-primario{background:#E63946;color:#fff;}
+  .btn-au-primario:hover{background:#C1121F;}
+  .btn-au-sec{background:#fff;color:var(--c-text-1,#1A1A2E);border:1.5px solid var(--c-border,#E8E7E2);}
+  .btn-au-sec:hover{background:#F5F4F0;}
+  .btn-au:disabled{opacity:0.55;cursor:not-allowed;}
+  .btn-au .spinner-btn{width:14px;height:14px;border:2px solid rgba(0,0,0,0.15);border-top-color:#E63946;border-radius:50%;animation:spin-au 0.7s linear infinite;display:none;}
+  .btn-au.loading .spinner-btn{display:block;}
+  .btn-au.loading .btn-txt{display:none;}
+  .au-aviso-info{font-size:12px;color:var(--c-text-3,#9898B0);margin-left:auto;}
+
+  .au-card{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:10px;overflow:hidden;}
+  .au-tabela-wrap{overflow-x:auto;}
+  .au-tabela{width:100%;border-collapse:collapse;font-size:13px;}
+  .au-tabela thead tr{background:#F8F7F3;border-bottom:1px solid var(--c-border,#E8E7E2);}
+  .au-tabela th{padding:10px 14px;font-size:11px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:var(--c-text-3,#9898B0);text-align:left;white-space:nowrap;}
+  .au-tabela tbody tr{border-bottom:1px solid var(--c-border,#E8E7E2);cursor:pointer;transition:background 120ms ease;}
+  .au-tabela tbody tr:last-child{border-bottom:none;}
+  .au-tabela tbody tr:hover{background:#FAFAF8;}
+  .au-tabela td{padding:10px 14px;color:var(--c-text-1,#1A1A2E);vertical-align:top;}
+  .au-data{font-family:var(--font-mono,monospace);font-size:12px;color:var(--c-text-2,#5C5C7A);white-space:nowrap;}
+  .au-usuario{white-space:nowrap;}
+  .au-usuario-nome{font-weight:500;}
+  .au-papel{font-size:11px;color:var(--c-text-3,#9898B0);}
+  .au-acao{white-space:nowrap;}
+  .au-acao-label{font-weight:500;}
+  .au-registro{font-family:var(--font-mono,monospace);font-size:12px;color:var(--c-text-2,#5C5C7A);white-space:nowrap;}
+  .au-desc{color:var(--c-text-2,#5C5C7A);line-height:1.45;min-width:260px;}
+  .au-tipo{display:inline-flex;padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:600;margin-top:3px;}
+  .au-tipo.CREATE{background:rgba(42,157,143,0.12);color:#1A6E65;}
+  .au-tipo.UPDATE{background:rgba(69,123,157,0.12);color:#185FA5;}
+  .au-tipo.DELETE{background:rgba(230,57,70,0.10);color:#A32D2D;}
+
+  .au-estado{padding:48px 24px;text-align:center;color:var(--c-text-3,#9898B0);font-size:13.5px;}
+  .au-estado .material-icons-round{font-size:36px;display:block;margin:0 auto 10px;}
+  .au-spinner{width:24px;height:24px;border:2.5px solid var(--c-border,#E8E7E2);border-top-color:#E63946;border-radius:50%;animation:spin-au 0.7s linear infinite;margin:0 auto 10px;}
+  @keyframes spin-au{to{transform:rotate(360deg);}}
+
+  .au-paginacao{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--c-border,#E8E7E2);font-size:12.5px;color:var(--c-text-2,#5C5C7A);flex-wrap:wrap;gap:8px;}
+  .au-pag-btns{display:flex;gap:4px;}
+  .btn-au-pag{min-width:30px;height:30px;padding:0 6px;border-radius:6px;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;font-size:12px;font-family:var(--font-sans,sans-serif);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--c-text-1,#1A1A2E);}
+  .btn-au-pag:hover:not(:disabled){background:#F5F4F0;}
+  .btn-au-pag:disabled{opacity:0.4;cursor:not-allowed;}
+  .btn-au-pag.ativa{background:#E63946;border-color:#E63946;color:#fff;}
+  .btn-au-pag .material-icons-round{font-size:16px;}
+
+  /* Detalhe */
+  .au-overlay{position:fixed;inset:0;background:rgba(26,26,46,0.45);z-index:200;display:none;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;backdrop-filter:blur(2px);}
+  .au-overlay.show{display:flex;}
+  .au-modal{background:#fff;border-radius:14px;width:100%;max-width:760px;box-shadow:0 12px 48px rgba(26,26,46,0.18);overflow:hidden;animation:au-in 220ms cubic-bezier(0.34,1.3,0.64,1);}
+  @keyframes au-in{from{opacity:0;transform:translateY(16px) scale(0.97);}to{opacity:1;transform:none;}}
+  .au-modal-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 20px;border-bottom:1px solid var(--c-border,#E8E7E2);}
+  .au-modal-titulo{font-size:15px;font-weight:600;color:var(--c-text-1,#1A1A2E);}
+  .au-btn-fechar{width:30px;height:30px;border-radius:6px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--c-text-3,#9898B0);flex-shrink:0;}
+  .au-btn-fechar:hover{background:#F5F4F0;}
+  .au-modal-corpo{padding:18px 20px;}
+  .au-meta{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px 18px;margin-bottom:14px;}
+  .au-meta-item{font-size:12.5px;min-width:0;}
+  .au-meta-label{font-size:10.5px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:var(--c-text-3,#9898B0);margin-bottom:2px;}
+  .au-meta-valor{color:var(--c-text-1,#1A1A2E);word-break:break-word;}
+  .au-desc-box{font-size:13px;line-height:1.55;background:#F8F7F3;border-radius:6px;padding:10px 12px;margin-bottom:16px;color:var(--c-text-1,#1A1A2E);word-break:break-word;}
+  .au-secao-titulo{font-size:10.5px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:var(--c-text-3,#9898B0);margin-bottom:8px;}
+  .au-diff-wrap{overflow-x:auto;border:1px solid var(--c-border,#E8E7E2);border-radius:8px;}
+  table.au-diff{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.au-diff th,table.au-diff td{padding:8px 12px;border-bottom:1px solid var(--c-border,#E8E7E2);text-align:left;vertical-align:top;}
+  table.au-diff tr:last-child td{border-bottom:none;}
+  table.au-diff th{font-size:10.5px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;color:var(--c-text-3,#9898B0);background:#FAFAF8;}
+  table.au-diff td.campo{font-weight:500;color:var(--c-text-1,#1A1A2E);white-space:nowrap;}
+  table.au-diff td.antes{color:#A32D2D;word-break:break-word;}
+  table.au-diff td.depois{color:#1A6E65;word-break:break-word;}
+  .au-vazio-val{color:var(--c-text-3,#9898B0);font-style:italic;}
+  .au-id-extra{font-family:var(--font-mono,monospace);font-size:10.5px;color:var(--c-text-3,#9898B0);}
+
+  .au-negado{padding:48px 24px;text-align:center;color:var(--c-text-3,#9898B0);}
+  .au-negado .material-icons-round{font-size:36px;display:block;margin:0 auto 10px;}
+</style>
+
+<div id="au-negado" class="au-negado" style="display:none;">
+  <span class="material-icons-round">lock</span>
+  <p>Esta área é restrita ao perfil administrador.</p>
+</div>
+
+<div id="au-conteudo" style="display:none;">
+  <div class="au-filtros">
+    <div class="au-grid">
+      <div class="au-field">
+        <label for="au-de">De</label>
+        <input type="date" class="au-input" id="au-de">
+      </div>
+      <div class="au-field">
+        <label for="au-ate">Até</label>
+        <input type="date" class="au-input" id="au-ate">
+      </div>
+      <div class="au-field">
+        <label for="au-usuario">Usuário</label>
+        <select class="au-input" id="au-usuario"><option value="">Todos</option></select>
+      </div>
+      <div class="au-field">
+        <label for="au-modulo">Módulo</label>
+        <select class="au-input" id="au-modulo"><option value="">Todos</option></select>
+      </div>
+      <div class="au-field">
+        <label for="au-acao">Ação</label>
+        <select class="au-input" id="au-acao"><option value="">Todas</option></select>
+      </div>
+      <div class="au-field">
+        <label for="au-tipo">Tipo</label>
+        <select class="au-input" id="au-tipo">
+          <option value="">Todos</option>
+          <option value="CREATE">Criação</option>
+          <option value="UPDATE">Alteração</option>
+          <option value="DELETE">Exclusão</option>
+        </select>
+      </div>
+      <div class="au-field largo">
+        <label for="au-busca">Buscar</label>
+        <input type="text" class="au-input" id="au-busca" placeholder="Código do registro (A262.0001, M262.1870…), nome ou trecho da descrição">
+      </div>
+    </div>
+    <div class="au-acoes">
+      <button class="btn-au btn-au-primario" id="au-btn-filtrar">
+        <span class="material-icons-round">search</span>Filtrar
+      </button>
+      <button class="btn-au btn-au-sec" id="au-btn-limpar">
+        <span class="material-icons-round">filter_alt_off</span>Limpar filtros
+      </button>
+      <button class="btn-au btn-au-sec" id="au-btn-xlsx">
+        <div class="spinner-btn"></div>
+        <span class="material-icons-round btn-txt">grid_on</span><span class="btn-txt">Exportar XLSX</span>
+      </button>
+      <span class="au-aviso-info">Os registros são gravados automaticamente e não podem ser alterados.</span>
+    </div>
+  </div>
+
+  <div class="au-card">
+    <div id="au-estado" class="au-estado"><div class="au-spinner"></div><p>Carregando…</p></div>
+    <div class="au-tabela-wrap">
+      <table class="au-tabela" id="au-tabela" style="display:none;">
+        <thead>
+          <tr><th>Data / hora</th><th>Usuário</th><th>Ação</th><th>Registro</th><th>Descrição</th></tr>
+        </thead>
+        <tbody id="au-tbody"></tbody>
+      </table>
+    </div>
+    <div class="au-paginacao" id="au-paginacao" style="display:none;">
+      <span id="au-pag-info">—</span>
+      <div class="au-pag-btns" id="au-pag-btns"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Detalhe de um registro -->
+<div class="au-overlay" id="au-overlay">
+  <div class="au-modal" role="dialog" aria-labelledby="au-modal-titulo">
+    <div class="au-modal-header">
+      <span class="au-modal-titulo" id="au-modal-titulo">Registro</span>
+      <button class="au-btn-fechar" id="au-btn-fechar" title="Fechar"><span class="material-icons-round">close</span></button>
+    </div>
+    <div class="au-modal-corpo" id="au-modal-corpo"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var S = {
+    pagina: 1, tamanhoPagina: 50, totalPaginas: 1, totalRegistros: 0,
+    linhas: [], filtros: {},
+    mapas: { usuarios: {}, turmas: {}, cursos: {}, semestres: {} }
+  };
+
+  function postApi(a,d){ return window.postApi(a,d); }
+  function el(id){ return document.getElementById(id); }
+  function val(id){ return el(id) ? el(id).value.trim() : ''; }
+  function esc(s){ return (s===null||s===undefined) ? '' : String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  // ── Rótulos ──────────────────────────────────────────────────────────────
+  var MODULOS = [
+    {v:'Alunos', l:'Alunos'}, {v:'Matriculas', l:'Matrículas'}, {v:'Turmas', l:'Turmas'},
+    {v:'Ocorrencias', l:'Ocorrências'}, {v:'Usuarios', l:'Usuários'}, {v:'Semestres', l:'Semestres'},
+    {v:'Cursos', l:'Cursos'}, {v:'Avaliacoes', l:'Avaliações'}, {v:'PublicoAlvo', l:'Público-alvo'},
+    {v:'Config', l:'Configurações'}
+  ];
+  var ROTULO_MODULO = {}; MODULOS.forEach(function(m){ ROTULO_MODULO[m.v]=m.l; });
+
+  var ACOES = [
+    ['Alunos','alunos.criar','Aluno cadastrado'], ['Alunos','alunos.atualizar','Aluno atualizado'],
+    ['Alunos','alunos.atualizarSensiveis','Dados protegidos alterados'],
+    ['Alunos','alunos.inativar','Aluno inativado'], ['Alunos','alunos.inativarAutomatico','Aluno inativado (automático)'],
+    ['Alunos','alunos.ativar','Aluno reativado'], ['Alunos','alunos.excluir','Aluno excluído'],
+    ['Matriculas','matriculas.criar','Matrícula criada'], ['Matriculas','matriculas.atualizarSituacao','Situação da matrícula alterada'],
+    ['Matriculas','matriculas.transferir','Transferência de turma'], ['Matriculas','matriculas.atualizar','Matrícula atualizada'],
+    ['Matriculas','matriculas.excluir','Matrícula excluída'],
+    ['Turmas','turmas.criar','Turma criada'], ['Turmas','turmas.atualizar','Turma atualizada'],
+    ['Turmas','turmas.encerrar','Turma encerrada'], ['Turmas','turmas.reabrir','Turma reaberta'], ['Turmas','turmas.excluir','Turma excluída'],
+    ['Ocorrencias','ocorrencias.criar','Ocorrência registrada'], ['Ocorrencias','ocorrencias.atualizarStatus','Status de ocorrência alterado'],
+    ['Ocorrencias','ocorrencias.atualizar','Ocorrência atualizada'], ['Ocorrencias','ocorrencias.excluir','Ocorrência excluída'],
+    ['Usuarios','usuarios.criar','Usuário criado'], ['Usuarios','usuarios.atualizar','Usuário atualizado'],
+    ['Usuarios','usuarios.inativar','Usuário inativado'], ['Usuarios','usuarios.ativar','Usuário reativado'], ['Usuarios','usuarios.excluir','Usuário excluído'],
+    ['Semestres','semestres.criar','Semestre registrado'], ['Semestres','semestres.atualizar','Semestre atualizado'], ['Semestres','semestres.excluir','Semestre excluído'],
+    ['Cursos','cursos.criar','Curso criado'], ['Cursos','cursos.atualizar','Curso atualizado'], ['Cursos','cursos.excluir','Curso excluído'],
+    ['Avaliacoes','avaliacoes.criar','Avaliação criada'], ['Avaliacoes','avaliacoes.atualizar','Avaliação atualizada'], ['Avaliacoes','avaliacoes.excluir','Avaliação excluída'],
+    ['PublicoAlvo','publicoAlvo.criar','Tipo de público-alvo criado'], ['PublicoAlvo','publicoAlvo.atualizar','Tipo de público-alvo atualizado'],
+    ['PublicoAlvo','publicoAlvo.ativar','Tipo de público-alvo ativado'], ['PublicoAlvo','publicoAlvo.inativar','Tipo de público-alvo inativado'],
+    ['Config','config.salvar','Configurações salvas']
+  ];
+  var ROTULO_ACAO = { salvar_sensiveis: 'Dados protegidos alterados' };
+  ACOES.forEach(function(a){ ROTULO_ACAO[a[1]] = a[2]; });
+
+  var ROTULO_TIPO = { CREATE:'Criação', UPDATE:'Alteração', DELETE:'Exclusão' };
+  var ROTULO_PAPEL = { admin:'Admin', coordenacao:'Coordenação', professor:'Professor', secretaria:'Secretaria', sistema:'Sistema' };
+
+  var ROTULO_CAMPO = {
+    id:'ID interno', external_id:'Código', nome:'Nome', nome_completo:'Nome completo', nome_social:'Nome social',
+    login:'Login', email:'E-mail', papel:'Papel', telefone:'Telefone', nascimento:'Nascimento',
+    nascimento_uf:'UF de nascimento', nascimento_municipio:'Município de nascimento', genero:'Gênero', raca:'Raça/Cor',
+    estado_civil:'Estado civil', estrangeiro:'Estrangeiro', municipio:'Município', uf:'UF', bairro:'Bairro',
+    pcd:'PcD', pcd_tipo:'Tipo de deficiência', situacao_ativo:'Ativo', inscricao_data_hora:'Inscrição',
+    auth_user_id:'Conta de acesso', situacao:'Situação', motivo_cancelamento:'Motivo do cancelamento',
+    data_cancelamento:'Data do cancelamento', data_matricula:'Data da matrícula', cancelado_por_id:'Cancelado por',
+    aluno_id:'Aluno', turma_id:'Turma', semestre_id:'Semestre', semestre_ref_id:'Semestre', curso_id:'Curso',
+    professor_id:'Professor', turma_origem_id:'Turma de origem', turma_destino_id:'Turma de destino',
+    matricula_origem_id:'Matrícula de origem', matricula_destino_id:'Matrícula de destino',
+    estagio:'Estágio', modalidade:'Modalidade', dia_semana:'Dias de aula', turno:'Turno', horario:'Horário',
+    vagas_totais:'Vagas', grupo_whatsapp:'WhatsApp', link_meet:'Google Meet', link_classroom:'Classroom',
+    data_inicio:'Início', data_fim:'Fim', tipo:'Tipo', titulo:'Título', descricao:'Descrição', status:'Status',
+    criado_por_id:'Criado por', rotulo:'Rótulo', semestre_atual:'Semestre atual', edicao_ativa:'Edição aberta',
+    visualizacao_ativa:'Visível', sigla:'Sigla', idioma_id:'Idioma', ativo:'Ativo', prioritario:'Prioritário',
+    ordem:'Ordem', idade_minima_meses:'Idade mínima (meses)', idade_maxima_meses:'Idade máxima (meses)',
+    componente_nota:'Componente', quantidade_notas:'Qtd. de notas', nota_minima:'Nota mínima', nota_maxima:'Nota máxima',
+    nota_aprovacao:'Nota de aprovação', nota_obrigatoria:'Nota obrigatória', nome_escola:'Nome da escola',
+    sigla_escola:'Sigla da escola', endereco:'Endereço', site:'Site', logo_url:'Logo', campos_alterados:'Campos alterados'
+  };
+
+  // Campos-id que conseguimos traduzir para algo legível
+  var MAPA_POR_CAMPO = {
+    professor_id:'usuarios', criado_por_id:'usuarios', cancelado_por_id:'usuarios', usuario_id:'usuarios',
+    turma_id:'turmas', turma_origem_id:'turmas', turma_destino_id:'turmas',
+    curso_id:'cursos', semestre_id:'semestres', semestre_ref_id:'semestres'
+  };
+
+  // ── Formatação ───────────────────────────────────────────────────────────
+  function fmtDataHora(iso){
+    if(!iso) return '—';
+    var d = new Date(iso);
+    if(isNaN(d.getTime())) return String(iso);
+    return d.toLocaleString('pt-BR', { timeZone:'America/Fortaleza', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  }
+  function hojeISO(){ return new Date().toLocaleDateString('en-CA', { timeZone:'America/Fortaleza' }); }
+  function diasAtrasISO(n){ var d=new Date(); d.setDate(d.getDate()-n); return d.toLocaleDateString('en-CA', { timeZone:'America/Fortaleza' }); }
+
+  // Valor → HTML legível (para o quadro antes/depois)
+  function fmtValor(campo, v){
+    if(v===null || v===undefined || v==='') return '<span class="au-vazio-val">vazio</span>';
+    if(typeof v==='boolean') return v ? 'Sim' : 'Não';
+    if(Array.isArray(v)){
+      if(campo==='campos_alterados') return esc(v.join(', '));
+      return esc(v.join(', '));
+    }
+    if(typeof v==='object') return '<code>'+esc(JSON.stringify(v))+'</code>';
+    var s = String(v);
+    var mapa = MAPA_POR_CAMPO[campo];
+    if(mapa && S.mapas[mapa][s]) return esc(S.mapas[mapa][s])+' <span class="au-id-extra">'+esc(s.substring(0,8))+'…</span>';
+    if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return esc(fmtDataHora(s));
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s)){ var p=s.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+    return esc(s);
+  }
+  // Valor → texto puro (exportação)
+  function txtJson(o){ return (o===null||o===undefined) ? '' : JSON.stringify(o); }
+
+  // ── Inicialização ────────────────────────────────────────────────────────
+  function init(){
+    var u = (typeof App!=='undefined' && App.usuario) ? App.usuario : null;
+    var papel = u ? (u.papel || '') : '';
+    if(papel !== 'admin'){
+      el('au-negado').style.display='block';
+      return;
+    }
+    el('au-conteudo').style.display='block';
+    el('au-de').value = diasAtrasISO(30);
+    el('au-ate').value = hojeISO();
+    popularModulos();
+    popularAcoes();
+    registrarEventos();
+    carregarMapas();
+    aplicarFiltros();
+  }
+
+  function popularModulos(){
+    var sel = el('au-modulo');
+    MODULOS.forEach(function(m){ var o=document.createElement('option'); o.value=m.v; o.textContent=m.l; sel.appendChild(o); });
+  }
+
+  function popularAcoes(){
+    var sel = el('au-acao'); var modulo = val('au-modulo'); var atual = sel.value;
+    sel.innerHTML = '<option value="">Todas</option>';
+    ACOES.forEach(function(a){
+      if(modulo && a[0]!==modulo) return;
+      var o=document.createElement('option'); o.value=a[1]; o.textContent=a[2]; sel.appendChild(o);
+    });
+    if(atual && Array.prototype.some.call(sel.options, function(o){ return o.value===atual; })) sel.value = atual;
+  }
+
+  // Nomes legíveis para ids (usuários, turmas, cursos, semestres) — só para
+  // enfeitar o detalhe; se alguma chamada falhar, o detalhe mostra o id cru.
+  function carregarMapas(){
+    Promise.all([
+      postApi('usuarios.listar',{}), postApi('turmas.listar',{}),
+      postApi('cursos.listar',{}),   postApi('semestres.listar',{})
+    ]).then(function(r){
+      var usuarios = (r[0].sucesso && r[0].dados) ? r[0].dados : [];
+      usuarios.forEach(function(x){ S.mapas.usuarios[x.id] = x.nome || x.login || x.id; });
+      ((r[1].sucesso && r[1].dados) || []).forEach(function(x){ S.mapas.turmas[x.id] = x.external_id || x.id; });
+      ((r[2].sucesso && r[2].dados) || []).forEach(function(x){ S.mapas.cursos[x.id] = (x.sigla ? x.sigla+' — ' : '')+(x.nome||''); });
+      ((r[3].sucesso && r[3].dados) || []).forEach(function(x){ S.mapas.semestres[x.id] = x.rotulo || x.external_id || x.id; });
+      var sel = el('au-usuario');
+      usuarios.slice().sort(function(a,b){ return (a.nome||'').localeCompare(b.nome||'','pt-BR'); }).forEach(function(x){
+        var o=document.createElement('option'); o.value=x.id;
+        o.textContent=(x.nome||x.login)+' ('+(ROTULO_PAPEL[x.papel]||x.papel||'—')+')';
+        sel.appendChild(o);
+      });
+    }).catch(function(){});
+  }
+
+  // ── Consulta ─────────────────────────────────────────────────────────────
+  function lerFiltros(){
+    return {
+      de: val('au-de'), ate: val('au-ate'), usuario_id: val('au-usuario'),
+      modulo: val('au-modulo'), acao: val('au-acao'), tipo_operacao: val('au-tipo'), busca: val('au-busca')
+    };
+  }
+
+  function aplicarFiltros(){
+    var de = val('au-de'), ate = val('au-ate');
+    if(de && ate && de > ate){ if(typeof toast==='function') toast('A data "De" é posterior à data "Até".','error'); return; }
+    S.filtros = lerFiltros();
+    S.pagina = 1;
+    carregar();
+  }
+
+  function carregar(){
+    mostrarEstado('<div class="au-spinner"></div><p>Carregando…</p>');
+    postApi('auditoria.listar', Object.assign({}, S.filtros, { pagina:S.pagina, tamanhoPagina:S.tamanhoPagina }))
+      .then(function(res){
+        if(!res.sucesso){ mostrarEstado('<span class="material-icons-round">error_outline</span><p>'+esc(res.mensagem||'Erro ao carregar a auditoria.')+'</p>'); return; }
+        S.linhas = (res.dados && res.dados.dados) || [];
+        S.totalRegistros = (res.dados && res.dados.totalRegistros) || 0;
+        S.totalPaginas = (res.dados && res.dados.totalPaginas) || 1;
+        if(!S.linhas.length){ mostrarEstado('<span class="material-icons-round">history</span><p>Nenhum registro encontrado para os filtros escolhidos.</p>'); return; }
+        renderTabela();
+        renderPaginacao();
+      })
+      .catch(function(e){ mostrarEstado('<span class="material-icons-round">error_outline</span><p>Erro de comunicação: '+esc(e.message||'tente novamente.')+'</p>'); });
+  }
+
+  function mostrarEstado(html){
+    el('au-estado').style.display='block'; el('au-estado').innerHTML=html;
+    el('au-tabela').style.display='none'; el('au-paginacao').style.display='none';
+  }
+
+  function renderTabela(){
+    el('au-estado').style.display='none';
+    el('au-tabela').style.display='table';
+    var tbody = el('au-tbody'); tbody.innerHTML='';
+    S.linhas.forEach(function(r, i){
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="au-data">'+esc(fmtDataHora(r.criado_em))+'</td>'+
+        '<td class="au-usuario"><div class="au-usuario-nome">'+esc(r.usuario_nome||'—')+'</div><div class="au-papel">'+esc(ROTULO_PAPEL[r.papel]||r.papel||'')+'</div></td>'+
+        '<td class="au-acao"><div class="au-acao-label">'+esc(ROTULO_ACAO[r.acao]||r.acao||'—')+'</div>'+
+          '<span class="au-tipo '+esc(r.tipo_operacao)+'">'+esc(ROTULO_TIPO[r.tipo_operacao]||r.tipo_operacao||'')+'</span></td>'+
+        '<td class="au-registro">'+esc(r.entidade_id||'—')+'</td>'+
+        '<td class="au-desc">'+esc(r.descricao||'')+'</td>';
+      tr.addEventListener('click', function(){ abrirDetalhe(S.linhas[i]); });
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderPaginacao(){
+    el('au-paginacao').style.display='flex';
+    var ini=(S.pagina-1)*S.tamanhoPagina+1, fim=Math.min(S.pagina*S.tamanhoPagina, S.totalRegistros);
+    el('au-pag-info').textContent = ini+'–'+fim+' de '+S.totalRegistros+' registro(s)';
+    var btns = el('au-pag-btns'); btns.innerHTML='';
+    function botao(html, pg, desab, ativa){
+      var b=document.createElement('button'); b.className='btn-au-pag'+(ativa?' ativa':''); b.innerHTML=html; b.disabled=!!desab;
+      b.addEventListener('click', function(){ S.pagina=pg; carregar(); });
+      btns.appendChild(b);
+    }
+    botao('<span class="material-icons-round">chevron_left</span>', S.pagina-1, S.pagina<=1);
+    var ini2=Math.max(1,S.pagina-2), fim2=Math.min(S.totalPaginas, ini2+4);
+    for(var p=ini2; p<=fim2; p++) botao(String(p), p, false, p===S.pagina);
+    botao('<span class="material-icons-round">chevron_right</span>', S.pagina+1, S.pagina>=S.totalPaginas);
+  }
+
+  // ── Detalhe ──────────────────────────────────────────────────────────────
+  function abrirDetalhe(r){
+    el('au-modal-titulo').textContent = ROTULO_ACAO[r.acao] || r.acao || 'Registro';
+    var html = '<div class="au-meta">'+
+      meta('Data / hora', esc(fmtDataHora(r.criado_em)))+
+      meta('Usuário', esc(r.usuario_nome||'—')+' <span class="au-papel">('+esc(ROTULO_PAPEL[r.papel]||r.papel||'—')+')</span>')+
+      meta('Módulo', esc(ROTULO_MODULO[r.modulo]||r.modulo||'—'))+
+      meta('Tipo', '<span class="au-tipo '+esc(r.tipo_operacao)+'">'+esc(ROTULO_TIPO[r.tipo_operacao]||r.tipo_operacao||'—')+'</span>')+
+      meta('Registro', '<span class="au-registro">'+esc(r.entidade_id||'—')+'</span>')+
+      meta('Semestre', esc(r.semestre_id ? (S.mapas.semestres[r.semestre_id]||r.semestre_id) : '—'))+
+      meta('Código da ação', '<span class="au-registro">'+esc(r.acao||'—')+'</span>')+
+    '</div>';
+    html += '<div class="au-secao-titulo">Descrição</div><div class="au-desc-box">'+esc(r.descricao||'—')+'</div>';
+    html += quadroDados(r);
+    el('au-modal-corpo').innerHTML = html;
+    el('au-overlay').classList.add('show');
+  }
+  function meta(l, v){ return '<div class="au-meta-item"><div class="au-meta-label">'+l+'</div><div class="au-meta-valor">'+v+'</div></div>'; }
+
+  function quadroDados(r){
+    var antes = r.dados_antigos || null, depois = r.dados_novos || null;
+    if(!antes && !depois) return '<p class="au-vazio-val" style="font-size:12.5px;">Este registro não guardou os dados alterados.</p>';
+    var chaves = [];
+    [antes, depois].forEach(function(o){ if(o && typeof o==='object') Object.keys(o).forEach(function(k){ if(chaves.indexOf(k)===-1) chaves.push(k); }); });
+    var titulo, cab, linhas='';
+    if(r.tipo_operacao==='UPDATE' && antes && depois){
+      titulo = 'Campos alterados';
+      cab = '<tr><th>Campo</th><th>Antes</th><th>Depois</th></tr>';
+      chaves.forEach(function(k){
+        linhas += '<tr><td class="campo">'+esc(ROTULO_CAMPO[k]||k)+'</td><td class="antes">'+fmtValor(k, antes[k])+'</td><td class="depois">'+fmtValor(k, depois[k])+'</td></tr>';
+      });
+    } else {
+      var obj = depois || antes;
+      titulo = r.tipo_operacao==='DELETE' ? 'Dados do registro excluído' : 'Dados registrados';
+      cab = '<tr><th>Campo</th><th>Valor</th></tr>';
+      chaves.forEach(function(k){
+        linhas += '<tr><td class="campo">'+esc(ROTULO_CAMPO[k]||k)+'</td><td>'+fmtValor(k, obj[k])+'</td></tr>';
+      });
+    }
+    return '<div class="au-secao-titulo">'+titulo+'</div><div class="au-diff-wrap"><table class="au-diff"><thead>'+cab+'</thead><tbody>'+linhas+'</tbody></table></div>';
+  }
+
+  function fecharDetalhe(){ el('au-overlay').classList.remove('show'); }
+
+  // ── Exportação XLSX (mesma biblioteca e padrão de f8-relatorios.html) ────
+  function carregarLibXLSX(){
+    if(window.XLSX) return Promise.resolve(window.XLSX);
+    if(window.__xlsxCarregando) return window.__xlsxCarregando;
+    window.__xlsxCarregando = new Promise(function(resolve, reject){
+      var s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload=function(){ resolve(window.XLSX); };
+      s.onerror=function(){ window.__xlsxCarregando=null; reject(new Error('Não foi possível carregar a biblioteca de exportação XLSX.')); };
+      document.head.appendChild(s);
+    });
+    return window.__xlsxCarregando;
+  }
+
+  var LIMITE_EXPORTACAO = 10000;
+
+  function exportarXLSX(){
+    var filtros = lerFiltros();
+    var btn = el('au-btn-xlsx'); btn.disabled=true; btn.classList.add('loading');
+    var fim = function(){ btn.disabled=false; btn.classList.remove('loading'); };
+    var acumulado = [];
+    function pagina(p){
+      return postApi('auditoria.listar', Object.assign({}, filtros, { pagina:p, tamanhoPagina:500 })).then(function(res){
+        if(!res.sucesso) throw new Error(res.mensagem||'Erro ao buscar registros.');
+        var d = (res.dados && res.dados.dados) || [];
+        acumulado = acumulado.concat(d);
+        var total = (res.dados && res.dados.totalRegistros) || 0;
+        if(p===1 && total > LIMITE_EXPORTACAO){
+          if(!confirm('A consulta tem '+total+' registros. Serão exportados só os '+LIMITE_EXPORTACAO+' mais recentes. Para exportar tudo, reduza o período. Continuar?')) throw new Error('__cancelado');
+        }
+        var totalPaginas = (res.dados && res.dados.totalPaginas) || 1;
+        if(p < totalPaginas && acumulado.length < LIMITE_EXPORTACAO) return pagina(p+1);
+        return acumulado.slice(0, LIMITE_EXPORTACAO);
+      });
+    }
+    Promise.all([carregarLibXLSX(), pagina(1)]).then(function(r){
+      var XLSX=r[0], linhas=r[1];
+      if(!linhas.length){ fim(); if(typeof toast==='function') toast('Nenhum registro para exportar.','info'); return; }
+      var aoa = [['Data/hora','Usuário','Papel','Ação','Código da ação','Módulo','Tipo','Registro','Descrição','Dados antes','Dados depois']];
+      linhas.forEach(function(x){
+        aoa.push([
+          fmtDataHora(x.criado_em), x.usuario_nome||'', ROTULO_PAPEL[x.papel]||x.papel||'',
+          ROTULO_ACAO[x.acao]||x.acao||'', x.acao||'', ROTULO_MODULO[x.modulo]||x.modulo||'',
+          ROTULO_TIPO[x.tipo_operacao]||x.tipo_operacao||'', x.entidade_id||'', x.descricao||'',
+          txtJson(x.dados_antigos), txtJson(x.dados_novos)
+        ]);
+      });
+      var ws = XLSX.utils.aoa_to_sheet(aoa);
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Auditoria');
+      XLSX.writeFile(wb, 'auditoria_'+(filtros.de||'inicio')+'_a_'+(filtros.ate||hojeISO())+'.xlsx');
+      fim();
+    }).catch(function(e){
+      fim();
+      if(e && e.message==='__cancelado') return;
+      if(typeof toast==='function') toast((e&&e.message)||'Erro ao exportar.','error');
+    });
+  }
+
+  // ── Eventos ──────────────────────────────────────────────────────────────
+  function registrarEventos(){
+    el('au-btn-filtrar').addEventListener('click', aplicarFiltros);
+    el('au-busca').addEventListener('keydown', function(e){ if(e.key==='Enter') aplicarFiltros(); });
+    el('au-modulo').addEventListener('change', popularAcoes);
+    el('au-btn-limpar').addEventListener('click', function(){
+      el('au-de').value=diasAtrasISO(30); el('au-ate').value=hojeISO();
+      ['au-usuario','au-modulo','au-tipo','au-busca'].forEach(function(id){ el(id).value=''; });
+      popularAcoes(); el('au-acao').value='';
+      aplicarFiltros();
+    });
+    el('au-btn-xlsx').addEventListener('click', exportarXLSX);
+    el('au-btn-fechar').addEventListener('click', fecharDetalhe);
+    el('au-overlay').addEventListener('click', function(e){ if(e.target===this) fecharDetalhe(); });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape' && el('au-overlay') && el('au-overlay').classList.contains('show')) fecharDetalhe(); });
+  }
+
+  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }
+}());
+</script>
