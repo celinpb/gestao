@@ -145,6 +145,9 @@ async function postApi(acao, dados) {
     if (acao === 'publicoAlvo.listar') return await _publicoAlvoListar(sb, dados);
     if (acao === 'publicoAlvo.salvar') return await _publicoAlvoSalvar(sb, dados);
 
+    // ── AUDITORIA (leitura — só admin, pelo RLS) ──────────────────────────────
+    if (acao === 'auditoria.listar') return await _auditoriaListar(sb, dados);
+
     // ── RELATÓRIOS ────────────────────────────────────────────────────────────
     // ── COMENTÁRIOS ───────────────────────────────────────────────────────────
     if (acao === 'comentarios.listar') return await _comentariosListar(sb, dados);
@@ -515,17 +518,35 @@ async function _alunosAtualizar(sb, dados) {
   return _ok(null, 'Aluno atualizado.');
 }
 
+// Inativar / reativar aluno passam pela função `alunos_alterar_situacao` do
+// banco (claude/etapa9-auditoria.sql) em vez de um UPDATE direto: é o único
+// jeito de o MOTIVO digitado na tela chegar até o registro de auditoria (o
+// gatilho de auditoria roda dentro do banco e não enxerga o que o navegador
+// mandou). A função respeita o RLS de `alunos` de quem chamou e devolve
+// false quando nenhuma linha foi alterada (sem permissão ou aluno inexistente).
+async function _alunosAlterarSituacao(sb, alunoId, ativo, motivo, automatico) {
+  var res = await sb.rpc('alunos_alterar_situacao', {
+    p_aluno_id:   alunoId,
+    p_ativo:      ativo,
+    p_motivo:     motivo || null,
+    p_automatico: !!automatico,
+  });
+  if (res.error) return { ok: false, mensagem: res.error.message };
+  if (res.data !== true) return { ok: false, mensagem: 'Nenhuma alteração gravada — verifique se você tem permissão para alterar este aluno.' };
+  return { ok: true };
+}
+
 async function _alunosInativar(sb, dados) {
   if (!dados.id) return _err('ID é obrigatório.', 400);
-  var res = await sb.from('alunos').update({ situacao_ativo: false }).eq('id', dados.id);
-  if (res.error) return _err(res.error.message);
+  var r = await _alunosAlterarSituacao(sb, dados.id, false, dados.motivo, false);
+  if (!r.ok) return _err(r.mensagem, 403);
   return _ok(null, 'Aluno inativado.');
 }
 
 async function _alunosAtivar(sb, dados) {
   if (!dados.id) return _err('ID é obrigatório.', 400);
-  var res = await sb.from('alunos').update({ situacao_ativo: true }).eq('id', dados.id);
-  if (res.error) return _err(res.error.message);
+  var r = await _alunosAlterarSituacao(sb, dados.id, true, dados.motivo, false);
+  if (!r.ok) return _err(r.mensagem, 403);
   return _ok(null, 'Aluno reativado.');
 }
 
@@ -863,7 +884,7 @@ async function _matriculasAtualizarSituacao(sb, dados) {
   // Buscar a matrícula ANTES de atualizar — a cascata de inativação do aluno
   // (abaixo) só se aplica quando ela estava ATIVA antes deste cancelamento
   // (cancelar uma matrícula já TRANCADA/CONCLUIDA não deve disparar nada).
-  var atual = await sb.from('matriculas').select('id, aluno_id, semestre_id, situacao').eq('id', dados.id).single();
+  var atual = await sb.from('matriculas').select('id, external_id, aluno_id, semestre_id, situacao').eq('id', dados.id).single();
   if (atual.error || !atual.data) return _err('Matrícula não encontrada.', 404);
 
   var res = await sb.from('matriculas').update(campos).eq('id', dados.id);
@@ -880,7 +901,9 @@ async function _matriculasAtualizarSituacao(sb, dados) {
   // que é sempre uma ação explícita e não olha matrículas.
   var aviso = '';
   if (dados.situacao === 'CANCELADA' && atual.data.situacao === 'ATIVA') {
-    aviso = await _inativarAlunoSeSemMatriculaAtiva(sb, atual.data.aluno_id, atual.data.semestre_id, dados.id);
+    var motivoCascata = 'última matrícula ativa do semestre (' + (atual.data.external_id || atual.data.id) + ') foi cancelada' +
+      (dados.motivo_cancelamento ? ': ' + dados.motivo_cancelamento : '');
+    aviso = await _inativarAlunoSeSemMatriculaAtiva(sb, atual.data.aluno_id, atual.data.semestre_id, dados.id, motivoCascata);
   }
   return _ok(null, 'Situação da matrícula atualizada.' + aviso);
 }
@@ -893,7 +916,7 @@ async function _matriculasAtualizarSituacao(sb, dados) {
 // permissão de UPDATE em `alunos`), devolve um aviso e a matrícula já
 // cancelada continua válida.
 // -----------------------------------------------------------------------------
-async function _inativarAlunoSeSemMatriculaAtiva(sb, alunoId, semestreId, matriculaExcluidaId) {
+async function _inativarAlunoSeSemMatriculaAtiva(sb, alunoId, semestreId, matriculaExcluidaId, motivo) {
   var outras = await sb.from('matriculas').select('id', { count: 'exact', head: true })
     .eq('aluno_id', alunoId).eq('semestre_id', semestreId).eq('situacao', 'ATIVA')
     .neq('id', matriculaExcluidaId);
@@ -903,10 +926,12 @@ async function _inativarAlunoSeSemMatriculaAtiva(sb, alunoId, semestreId, matric
   }
   if ((outras.count || 0) > 0) return ''; // aluno ainda tem outra matrícula ATIVA neste semestre — não inativa.
 
-  var upd = await sb.from('alunos').update({ situacao_ativo: false }).eq('id', alunoId);
-  if (upd.error) {
-    console.error('_inativarAlunoSeSemMatriculaAtiva erro ao inativar aluno:', upd.error);
-    return ' Atenção: não foi possível inativar automaticamente o cadastro do aluno — ' + upd.error.message;
+  // automatico=true: a auditoria registra como 'alunos.inativarAutomatico',
+  // com o motivo do cancelamento (como fazia o sistema antigo).
+  var upd = await _alunosAlterarSituacao(sb, alunoId, false, motivo, true);
+  if (!upd.ok) {
+    console.error('_inativarAlunoSeSemMatriculaAtiva erro ao inativar aluno:', upd.mensagem);
+    return ' Atenção: não foi possível inativar automaticamente o cadastro do aluno — ' + upd.mensagem;
   }
   return ' O cadastro do aluno foi inativado automaticamente (esta era sua última matrícula ativa no semestre).';
 }
@@ -1251,6 +1276,49 @@ async function _publicoAlvoSalvar(sb, dados) {
     return _err('Nenhuma alteração gravada. Somente o administrador pode alterar os tipos de público-alvo.', 403);
   }
   return _ok(res.data[0], dados.id ? 'Tipo atualizado.' : 'Tipo criado.');
+}
+
+// =============================================================================
+// AUDITORIA
+// =============================================================================
+// A tabela `auditoria` é preenchida automaticamente por gatilhos no banco
+// (claude/etapa9-auditoria.sql) e pela Edge Function alunos-sensiveis — nada
+// aqui grava nela. Só leitura, e só admin enxerga linhas (RLS
+// auditoria_select); para os demais papéis a consulta simplesmente volta vazia.
+//
+// Filtros (todos opcionais): de / ate ('AAAA-MM-DD', fuso de Fortaleza),
+// usuario_id, modulo, acao, tipo_operacao, busca (registro ou descrição).
+// Paginação igual a _alunosListar: pagina / tamanhoPagina → { dados,
+// totalRegistros, totalPaginas }.
+// -----------------------------------------------------------------------------
+async function _auditoriaListar(sb, dados) {
+  dados = dados || {};
+  var pagina = parseInt(dados.pagina, 10) || 1;
+  var tamanhoPagina = Math.min(parseInt(dados.tamanhoPagina, 10) || 50, 500);
+  var de = (pagina - 1) * tamanhoPagina;
+  var ate = de + tamanhoPagina - 1;
+
+  var query = sb.from('auditoria')
+    .select('id, criado_em, usuario_id, usuario_nome, papel, acao, modulo, tipo_operacao, entidade_id, descricao, dados_antigos, dados_novos, semestre_id', { count: 'exact' })
+    .order('criado_em', { ascending: false });
+  if (dados.de)            query = query.gte('criado_em', dados.de + 'T00:00:00-03:00');
+  if (dados.ate)           query = query.lte('criado_em', dados.ate + 'T23:59:59.999-03:00');
+  if (dados.usuario_id)    query = query.eq('usuario_id', dados.usuario_id);
+  if (dados.modulo)        query = query.eq('modulo', dados.modulo);
+  if (dados.acao)          query = query.eq('acao', dados.acao);
+  if (dados.tipo_operacao) query = query.eq('tipo_operacao', dados.tipo_operacao);
+  if (dados.busca) {
+    // Vírgulas e parênteses quebrariam a sintaxe do filtro .or() do PostgREST.
+    var b = String(dados.busca).replace(/[,()%*]/g, ' ').trim();
+    if (b) query = query.or('entidade_id.ilike.%' + b + '%,descricao.ilike.%' + b + '%,usuario_nome.ilike.%' + b + '%');
+  }
+  query = query.range(de, ate);
+
+  var res = await query;
+  if (res.error) return _err(res.error.message);
+  var totalRegistros = typeof res.count === 'number' ? res.count : (res.data || []).length;
+  var totalPaginas = Math.max(1, Math.ceil(totalRegistros / tamanhoPagina));
+  return _ok({ dados: res.data || [], totalRegistros: totalRegistros, totalPaginas: totalPaginas });
 }
 
 // =============================================================================
