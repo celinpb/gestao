@@ -1208,9 +1208,13 @@
         '<button type="button" class="btn-cpf-abrir" data-id="' + escHtml(a.id) + '">' +
         '<span class="material-icons-round">open_in_new</span>Abrir cadastro existente</button></div>';
     });
+    var menor = el('f-menor') && el('f-menor').checked;
     html += '<div class="cpf-existente-dica">' + (editando
       ? 'Confira o número: dois alunos não podem ter o mesmo CPF. Se for a mesma pessoa, use o cadastro existente.'
       : 'Se for um aluno que está voltando, continue pelo cadastro existente (ele mantém o código; se estiver inativo, use "Ativar" na ficha). Se o CPF foi digitado errado, corrija-o.') +
+      (menor
+        ? '<br><strong>Aluno menor de idade:</strong> se este for o CPF do responsável (ex.: irmãos com o mesmo responsável), é possível salvar mesmo assim — o sistema pede confirmação.'
+        : ' <em>Exceção: aluno menor de idade sem CPF próprio pode usar o CPF do responsável — marque "Menor de idade" para poder salvar.</em>') +
       '</div>';
     box.innerHTML = html;
     box.style.display = 'block';
@@ -1331,12 +1335,22 @@
     var btn=el('btn-salvar-modal'); btn.disabled=true; btn.classList.add('loading');
     // Última checagem do CPF antes de gravar (caso o campo não tenha perdido o foco).
     verificarCpf().then(function(achados) {
+      // Exceção (06/10): aluno menor de idade sem CPF próprio usa o CPF do
+      // responsável — o mesmo CPF pode estar em irmãos. Permite salvar após
+      // confirmação explícita.
+      if (achados.length && el('f-menor') && el('f-menor').checked) {
+        var nomes = achados.map(function(a) { return normalizar(a).NomeExibicao; }).join(', ');
+        if (confirm('Este CPF já está no cadastro de: ' + nomes + '.\n\nComo o aluno é menor de idade, o CPF pode ser do responsável (ex.: irmãos).\nSalvar mesmo assim?')) {
+          gravarModal(btn);
+          return;
+        }
+      }
       if (achados.length) {
         btn.disabled=false; btn.classList.remove('loading');
         mostrarAba('pessoal');
         mostrarAlertaModal(state.modoModal === 'editar'
-          ? 'Este CPF já pertence a outro aluno. Confira o número antes de salvar.'
-          : 'Já existe cadastro com este CPF. Abra o cadastro existente ou corrija o CPF.', 'erro');
+          ? 'Este CPF já pertence a outro aluno. Confira o número antes de salvar (aluno menor de idade com o CPF do responsável: marque "Menor de idade").'
+          : 'Já existe cadastro com este CPF. Abra o cadastro existente ou corrija o CPF (aluno menor de idade com o CPF do responsável: marque "Menor de idade").', 'erro');
         return;
       }
       gravarModal(btn);
@@ -1730,7 +1744,7 @@
     el('f-estrangeiro')       && el('f-estrangeiro').addEventListener('change',function(){ el('campo-passaporte').style.display=this.value==='true'?'block':'none'; });
     el('f-pcd')               && el('f-pcd').addEventListener('change',function(){ var s=this.checked?'block':'none'; el('campo-pcd-tipo').style.display=s; el('campo-pcd-laudo').style.display=s; });
     el('f-povo')              && el('f-povo').addEventListener('change',function(){ el('campo-povo-tipo').style.display=this.checked?'block':'none'; });
-    el('f-menor')             && el('f-menor').addEventListener('change',function(){ el('campos-responsaveis').style.display=this.checked?'block':'none'; });
+    el('f-menor')             && el('f-menor').addEventListener('change',function(){ el('campos-responsaveis').style.display=this.checked?'block':'none'; mostrarCpfExistente(_cpfVerificado.achados || []); });
     function mascaraCPF(input){ input.addEventListener('input',function(){ var v=this.value.replace(/\D/g,'').substring(0,11); if(v.length>9)v=v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4'); else if(v.length>6)v=v.replace(/(\d{3})(\d{3})(\d{0,3})/,'$1.$2.$3'); else if(v.length>3)v=v.replace(/(\d{3})(\d{0,3})/,'$1.$2'); this.value=v; }); }
     el('f-cpf')      && mascaraCPF(el('f-cpf'));
     if (el('f-cpf')) {
