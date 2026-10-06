@@ -71,7 +71,9 @@
     .toast.error .material-icons-round{color:var(--c-danger);}
     .toast.info .material-icons-round{color:var(--c-info);}
     @keyframes toast-in{from{opacity:0;transform:translateX(20px) scale(0.96);}to{opacity:1;transform:translateX(0) scale(1);}}
-    #login-overlay{position:fixed;inset:0;background:var(--c-bg);z-index:500;display:flex;align-items:center;justify-content:center;}
+    #login-overlay{position:fixed;inset:0;background:var(--c-bg);z-index:500;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+    /* Tela de login maior que a janela (ex.: "Defina sua senha" em tela baixa): rola em vez de cortar */
+    #login-overlay > *{flex-shrink:0;width:100%;}
     @media(max-width:768px){
       :root{--sidebar-w:0px;}
       #app{grid-template-columns:1fr;grid-template-areas:"header" "main";}
