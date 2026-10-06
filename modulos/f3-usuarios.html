@@ -1,7 +1,12 @@
 <!--
-  F3_Usuarios.html
-  Gerenciamento de usuários do sistema.
-  Visível apenas para admin e coordenação.
+  f3-usuarios.html — versão 2 (etapa 10: acesso por e-mail)
+  Gerenciamento de usuários do sistema. Visível para admin e coordenação.
+
+  Regras (aplicadas também no servidor e no banco):
+    - coordenação não edita, inativa nem reenvia acesso de administradores,
+      e não pode dar o papel de administrador;
+    - ninguém altera o próprio papel nem inativa a si mesmo;
+    - "Senha provisória" (plano B, quando o e-mail não chega) só para admin.
 -->
 <style>
   .u3-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
@@ -10,50 +15,67 @@
   .u3-busca{width:100%;height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:8px;padding:0 12px 0 36px;font-family:var(--font-sans,sans-serif);font-size:13.5px;color:var(--c-text-1,#1A1A2E);background:#fff;outline:none;transition:border-color 150ms ease;}
   .u3-busca:focus{border-color:#E63946;box-shadow:0 0 0 3px rgba(230,57,70,0.09);}
   .u3-busca::placeholder{color:var(--c-text-3,#9898B0);}
+  .u3-select{height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:8px;padding:0 11px;font-family:var(--font-sans,sans-serif);font-size:13px;background:#fff;outline:none;cursor:pointer;color:var(--c-text-1,#1A1A2E);}
   .btn-u3{height:38px;padding:0 14px;border-radius:8px;font-family:var(--font-sans,sans-serif);font-size:13px;font-weight:500;cursor:pointer;border:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;transition:background 150ms ease,box-shadow 150ms ease;}
   .btn-u3 .material-icons-round{font-size:17px;}
   .btn-u3-primario{background:#E63946;color:#fff;}
   .btn-u3-primario:hover{background:#C1121F;box-shadow:0 3px 10px rgba(230,57,70,0.25);}
   .btn-u3-secundario{background:#fff;color:var(--c-text-1,#1A1A2E);border:1.5px solid var(--c-border,#E8E7E2);}
   .btn-u3-secundario:hover{background:#F5F4F0;}
+  .btn-u3-secundario.ativo{background:#1A1A2E;color:#fff;border-color:#1A1A2E;}
+  .btn-u3:disabled{opacity:0.55;cursor:not-allowed;}
 
-  .u3-card{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:10px;overflow:hidden;}
+  .u3-card{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:10px;overflow-x:auto;}
   .u3-tabela{width:100%;border-collapse:collapse;font-size:13.5px;}
   .u3-tabela thead tr{background:#F8F7F3;border-bottom:1px solid var(--c-border,#E8E7E2);}
-  .u3-tabela th{padding:10px 16px;font-size:11px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:var(--c-text-3,#9898B0);text-align:left;white-space:nowrap;}
+  .u3-tabela th{padding:10px 14px;font-size:11px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:var(--c-text-3,#9898B0);text-align:left;white-space:nowrap;}
   .u3-tabela tbody tr{border-bottom:1px solid var(--c-border,#E8E7E2);transition:background 120ms ease;}
   .u3-tabela tbody tr:last-child{border-bottom:none;}
   .u3-tabela tbody tr:hover{background:#FAFAF8;}
-  .u3-tabela td{padding:11px 16px;color:var(--c-text-1,#1A1A2E);vertical-align:middle;}
+  .u3-tabela tbody tr.inativo td{opacity:0.6;}
+  .u3-tabela tbody tr.inativo td.u3-acoes-td{opacity:1;}
+  .u3-tabela td{padding:10px 14px;color:var(--c-text-1,#1A1A2E);vertical-align:middle;}
+  .u3-usuario-cel{display:flex;align-items:center;min-width:180px;}
   .u3-nome{font-weight:500;}
-  .u3-login{font-family:var(--font-mono,monospace);font-size:12px;color:var(--c-text-3,#9898B0);}
-  .u3-email{font-size:13px;color:var(--c-text-2,#5C5C7A);}
+  .u3-codigo{display:block;font-family:var(--font-mono,monospace);font-size:11px;color:var(--c-text-3,#9898B0);}
+  .u3-login{font-family:var(--font-mono,monospace);font-size:12px;color:var(--c-text-2,#5C5C7A);}
+  .u3-email{font-size:13px;color:var(--c-text-2,#5C5C7A);word-break:break-all;}
 
-  .badge-papel{display:inline-flex;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600;}
+  .badge-papel{display:inline-flex;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600;white-space:nowrap;}
   .badge-papel.admin{background:#1A1A2E;color:#fff;}
   .badge-papel.coordenacao{background:rgba(69,123,157,0.15);color:#185FA5;}
   .badge-papel.professor{background:rgba(42,157,143,0.12);color:#1A6E65;}
   .badge-papel.secretaria{background:rgba(233,196,106,0.22);color:#5C4200;}
 
-  .badge-u3-sit{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;}
+  .badge-u3-sit{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap;}
   .badge-u3-sit.ativo{background:rgba(42,157,143,0.12);color:#1A6E65;}
   .badge-u3-sit.inativo{background:rgba(230,57,70,0.10);color:#A32D2D;}
-  .badge-u3-sit .material-icons-round{font-size:11px;}
 
-  .u3-acoes{display:flex;gap:5px;justify-content:flex-end;}
+  .badge-acesso{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap;}
+  .badge-acesso .material-icons-round{font-size:12px;}
+  .badge-acesso.ativo{background:rgba(42,157,143,0.12);color:#1A6E65;}
+  .badge-acesso.convite_pendente,.badge-acesso.senha_pendente{background:rgba(233,196,106,0.25);color:#5C4200;}
+  .badge-acesso.sem_conta{background:#F0EFEA;color:#5C5C7A;}
+  .badge-acesso.desconhecido{background:#F0EFEA;color:#9898B0;}
+  .u3-ultimo{display:block;font-size:11px;color:var(--c-text-3,#9898B0);margin-top:3px;white-space:nowrap;}
+
+  .u3-acoes{display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap;}
   .btn-u3-linha{height:28px;padding:0 9px;border-radius:5px;font-size:11.5px;cursor:pointer;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;color:var(--c-text-2,#5C5C7A);font-family:var(--font-sans,sans-serif);display:inline-flex;align-items:center;gap:3px;transition:background 120ms ease;white-space:nowrap;}
   .btn-u3-linha:hover{background:#F5F4F0;}
+  .btn-u3-linha:disabled{opacity:0.5;cursor:wait;}
   .btn-u3-linha .material-icons-round{font-size:14px;}
   .btn-u3-linha.perigo{border-color:rgba(230,57,70,0.25);color:#A32D2D;}
   .btn-u3-linha.perigo:hover{background:rgba(230,57,70,0.06);}
+  .btn-u3-linha.ok{border-color:rgba(42,157,143,0.35);color:#1A6E65;}
+  .btn-u3-linha.ok:hover{background:rgba(42,157,143,0.06);}
 
   .u3-estado{padding:48px 24px;text-align:center;color:var(--c-text-3,#9898B0);font-size:13.5px;}
   .u3-estado .material-icons-round{font-size:36px;display:block;margin:0 auto 10px;}
   .u3-spinner{width:24px;height:24px;border:2.5px solid var(--c-border,#E8E7E2);border-top-color:#E63946;border-radius:50%;animation:spin-u3 0.7s linear infinite;margin:0 auto 10px;}
   @keyframes spin-u3{to{transform:rotate(360deg);}}
+  .u3-rodape{font-size:12px;color:var(--c-text-3,#9898B0);margin-top:10px;}
 
-  /* Avatar inline */
-  .u3-avatar{width:30px;height:30px;border-radius:50%;background:#1A1A2E;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;margin-right:8px;vertical-align:middle;letter-spacing:-0.3px;flex-shrink:0;}
+  .u3-avatar{width:30px;height:30px;border-radius:50%;background:#1A1A2E;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;margin-right:9px;letter-spacing:-0.3px;flex-shrink:0;}
 
   /* Modal */
   .u3-modal-overlay{position:fixed;inset:0;background:rgba(26,26,46,0.45);z-index:200;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;backdrop-filter:blur(2px);animation:fade-u3 180ms ease;}
@@ -70,7 +92,6 @@
   .u3-modal-alerta{border-radius:8px;padding:10px 14px;font-size:13px;display:none;align-items:center;gap:8px;margin-bottom:14px;}
   .u3-modal-alerta.show{display:flex;}
   .u3-modal-alerta.erro{background:rgba(230,57,70,0.08);border:1px solid rgba(230,57,70,0.20);color:#B01020;}
-  .u3-modal-alerta.sucesso{background:rgba(42,157,143,0.08);border:1px solid rgba(42,157,143,0.20);color:#1A6E65;}
   .u3-modal-alerta .material-icons-round{font-size:16px;flex-shrink:0;}
 
   .u3-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
@@ -80,6 +101,7 @@
   .u3-field label .req{color:#E63946;margin-left:2px;}
   .u3-input{height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:7px;padding:0 11px;font-family:var(--font-sans,sans-serif);font-size:13.5px;color:var(--c-text-1,#1A1A2E);background:#FAFAF8;outline:none;transition:border-color 150ms ease;width:100%;}
   .u3-input:focus{border-color:#E63946;box-shadow:0 0 0 3px rgba(230,57,70,0.09);background:#fff;}
+  .u3-input:disabled{opacity:0.6;cursor:not-allowed;}
   .u3-input.erro{border-color:#E63946;}
   select.u3-input{cursor:pointer;}
   .u3-erro-msg{font-size:11.5px;color:#E63946;margin-top:2px;display:none;}
@@ -96,28 +118,52 @@
   .btn-u3-modal-sec{background:#fff;color:var(--c-text-1,#1A1A2E);border:1.5px solid var(--c-border,#E8E7E2);}
   .btn-u3-modal-sec:hover{background:#F5F4F0;}
 
-  /* Aviso primeiro acesso */
-  .senha-padrao-aviso{background:#FAEEDA;border:1px solid rgba(233,196,106,0.5);border-radius:8px;padding:10px 14px;font-size:12.5px;color:#5C4200;display:flex;align-items:center;gap:8px;margin-top:14px;}
-  .senha-padrao-aviso .material-icons-round{font-size:16px;flex-shrink:0;}
+  .u3-aviso{background:#FAEEDA;border:1px solid rgba(233,196,106,0.5);border-radius:8px;padding:10px 14px;font-size:12.5px;color:#5C4200;display:flex;align-items:flex-start;gap:8px;margin-top:14px;line-height:1.5;}
+  .u3-aviso .material-icons-round{font-size:16px;flex-shrink:0;margin-top:1px;}
+
+  .u3-senha-box{display:flex;align-items:center;gap:8px;margin:14px 0;}
+  .u3-senha-valor{flex:1;font-family:var(--font-mono,monospace);font-size:18px;letter-spacing:1px;background:#F5F4F0;border:1.5px dashed var(--c-border,#E8E7E2);border-radius:8px;padding:10px 12px;text-align:center;user-select:all;}
+  .u3-texto{font-size:13.5px;color:var(--c-text-2,#5C5C7A);line-height:1.6;}
+
+  .u3-negado{padding:48px 24px;text-align:center;color:var(--c-text-3,#9898B0);}
+
+  @media (max-width:560px){
+    .u3-form-grid{grid-template-columns:1fr;}
+    .u3-field.span2{grid-column:span 1;}
+  }
 </style>
 
-<div>
+<div id="u3-negado" class="u3-negado" style="display:none;">
+  <span class="material-icons-round" style="font-size:36px;">lock</span>
+  <p>Esta tela é restrita a administradores e coordenação.</p>
+</div>
+
+<div id="u3-conteudo" style="display:none;">
   <div class="u3-toolbar">
     <div class="u3-busca-wrap">
       <span class="material-icons-round">search</span>
-      <input type="text" class="u3-busca" id="u3-busca" placeholder="Buscar por nome, login ou e-mail…">
+      <input type="text" class="u3-busca" id="u3-busca" placeholder="Buscar por nome, login, e-mail ou código…">
     </div>
-    <select style="height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:8px;padding:0 11px;font-family:var(--font-sans,sans-serif);font-size:13px;background:#fff;outline:none;cursor:pointer;" id="u3-filtro-papel">
+    <select class="u3-select" id="u3-filtro-papel">
       <option value="">Todos os papéis</option>
       <option value="admin">Admin</option>
       <option value="coordenacao">Coordenação</option>
       <option value="professor">Professor</option>
       <option value="secretaria">Secretaria</option>
     </select>
-    <button class="btn-u3 btn-u3-secundario" id="btn-u3-inativos">
-      <span class="material-icons-round">filter_list</span>Exibir inativos
+    <select class="u3-select" id="u3-filtro-acesso">
+      <option value="">Qualquer acesso</option>
+      <option value="ativo">Acesso ativo</option>
+      <option value="pendente">Pendente (convite ou senha)</option>
+      <option value="sem_conta">Sem acesso ainda</option>
+    </select>
+    <button class="btn-u3 btn-u3-secundario" id="btn-u3-inativos" type="button">
+      <span class="material-icons-round">visibility</span><span id="u3-inativos-txt">Exibir inativos</span>
     </button>
-    <button class="btn-u3 btn-u3-primario" id="btn-u3-novo">
+    <button class="btn-u3 btn-u3-secundario" id="btn-u3-convites" type="button" style="display:none;">
+      <span class="material-icons-round">outgoing_mail</span><span id="u3-convites-txt">Enviar convites pendentes</span>
+    </button>
+    <button class="btn-u3 btn-u3-primario" id="btn-u3-novo" type="button">
       <span class="material-icons-round">person_add</span>Novo usuário
     </button>
   </div>
@@ -133,6 +179,7 @@
           <th>Login</th>
           <th>E-mail</th>
           <th>Papel</th>
+          <th>Acesso</th>
           <th>Situação</th>
           <th></th>
         </tr>
@@ -140,14 +187,15 @@
       <tbody id="u3-tbody"></tbody>
     </table>
   </div>
+  <div class="u3-rodape" id="u3-rodape"></div>
 </div>
 
-<!-- MODAL -->
+<!-- MODAL: novo / editar -->
 <div class="u3-modal-overlay" id="u3-modal-overlay" style="display:none;">
   <div class="u3-modal">
     <div class="u3-modal-header">
       <span class="u3-modal-titulo" id="u3-modal-titulo">Novo usuário</span>
-      <button class="btn-fechar-u3" id="btn-fechar-u3">
+      <button class="btn-fechar-u3" id="btn-fechar-u3" type="button">
         <span class="material-icons-round">close</span>
       </button>
     </div>
@@ -164,34 +212,29 @@
         </div>
         <div class="u3-field">
           <label>Login <span class="req">*</span></label>
-          <input type="text" class="u3-input" id="fu-login" placeholder="Ex: joao.silva" autocapitalize="none">
-          <span class="u3-erro-msg" id="err-fu-login">Informe o login.</span>
+          <input type="text" class="u3-input" id="fu-login" placeholder="Ex: joao.silva" autocapitalize="none" autocomplete="off">
+          <span class="u3-erro-msg" id="err-fu-login"></span>
         </div>
         <div class="u3-field">
           <label>Papel <span class="req">*</span></label>
-          <select class="u3-input" id="fu-papel">
-            <option value="">Selecione…</option>
-            <option value="admin">Admin</option>
-            <option value="coordenacao">Coordenação</option>
-            <option value="professor">Professor</option>
-            <option value="secretaria">Secretaria</option>
-          </select>
+          <select class="u3-input" id="fu-papel"></select>
           <span class="u3-erro-msg" id="err-fu-papel">Selecione o papel.</span>
         </div>
         <div class="u3-field span2">
-          <label>E-mail institucional <span class="req">*</span></label>
-          <input type="email" class="u3-input" id="fu-email" placeholder="usuario@professor.pb.gov.br">
+          <label>E-mail <span class="req">*</span></label>
+          <input type="email" class="u3-input" id="fu-email" placeholder="usuario@professor.pb.gov.br" autocomplete="off">
           <span class="u3-erro-msg" id="err-fu-email">Informe um e-mail válido.</span>
+          <span class="u3-hint" id="fu-email-hint"></span>
         </div>
       </div>
-      <div class="senha-padrao-aviso" id="u3-aviso-senha" style="display:none;">
-        <span class="material-icons-round">info</span>
-        O usuário receberá a senha padrão do sistema e será solicitado a trocá-la no primeiro acesso.
+      <div class="u3-aviso" id="u3-aviso-novo" style="display:none;">
+        <span class="material-icons-round">mail</span>
+        <span>O usuário receberá um e-mail com um link para criar a própria senha. O link vale por tempo limitado; se vencer, use “Reenviar acesso”.</span>
       </div>
     </div>
     <div class="u3-modal-footer">
-      <button class="btn-u3-modal btn-u3-modal-sec" id="btn-u3-cancelar">Cancelar</button>
-      <button class="btn-u3-modal btn-u3-modal-primario" id="btn-u3-salvar">
+      <button class="btn-u3-modal btn-u3-modal-sec" id="btn-u3-cancelar" type="button">Cancelar</button>
+      <button class="btn-u3-modal btn-u3-modal-primario" id="btn-u3-salvar" type="button">
         <div class="spinner-btn"></div>
         <span class="material-icons-round btn-txt" style="font-size:16px;">save</span>
         <span class="btn-txt">Salvar</span>
@@ -200,125 +243,366 @@
   </div>
 </div>
 
+<!-- MODAL: senha provisória (só admin) -->
+<div class="u3-modal-overlay" id="u3-senha-overlay" style="display:none;">
+  <div class="u3-modal">
+    <div class="u3-modal-header">
+      <span class="u3-modal-titulo">Senha provisória</span>
+      <button class="btn-fechar-u3" id="btn-fechar-senha" type="button">
+        <span class="material-icons-round">close</span>
+      </button>
+    </div>
+    <div class="u3-modal-corpo">
+      <p class="u3-texto" id="u3-senha-para"></p>
+      <div class="u3-senha-box">
+        <div class="u3-senha-valor" id="u3-senha-valor"></div>
+        <button class="btn-u3 btn-u3-secundario" id="btn-u3-copiar" type="button">
+          <span class="material-icons-round">content_copy</span>Copiar
+        </button>
+      </div>
+      <div class="u3-aviso">
+        <span class="material-icons-round">warning_amber</span>
+        <span>Esta senha aparece <strong>só agora</strong> e não fica guardada em lugar nenhum. Passe-a ao usuário por um canal seguro (pessoalmente ou por mensagem direta). No primeiro acesso ele terá de criar uma senha própria.</span>
+      </div>
+    </div>
+    <div class="u3-modal-footer">
+      <button class="btn-u3-modal btn-u3-modal-primario" id="btn-u3-senha-ok" type="button">
+        <span class="btn-txt">Pronto</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   'use strict';
-  var state = { usuarios:[], usuarioSel:null, busca:'', filtroPapel:'', papel:'', isAdmin:false, modo:'novo' };
-  function postApi(a,d){ return window.postApi(a,d); }
+  var ROTULO_PAPEL = { admin:'Admin', coordenacao:'Coordenação', professor:'Professor', secretaria:'Secretaria' };
+  var COR_PAPEL    = { admin:'#1A1A2E', coordenacao:'#185FA5', professor:'#2A9D8F', secretaria:'#D4A843' };
+  var ACESSO = {
+    ativo:            { txt:'Ativo',             ic:'check_circle',  dica:'Já criou a própria senha.' },
+    convite_pendente: { txt:'Convite pendente',  ic:'schedule_send', dica:'Recebeu o convite mas ainda não abriu o link.' },
+    senha_pendente:   { txt:'Senha pendente',    ic:'key',           dica:'Ainda não criou a própria senha (usa senha provisória ou não concluiu o link).' },
+    sem_conta:        { txt:'Sem acesso',        ic:'mail_outline',  dica:'Ainda não recebeu convite.' },
+    desconhecido:     { txt:'—',                 ic:'help_outline',  dica:'Não foi possível consultar a situação do acesso.' }
+  };
+  var RE_LOGIN = /^[a-z0-9._-]{3,40}$/;
+  var RE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  var state = { usuarios:[], usuarioSel:null, busca:'', filtroPapel:'', filtroAcesso:'',
+                exibirInativos:false, papel:'', meuId:null, isAdmin:false, modo:'novo', salvando:false };
+
   function el(id){ return document.getElementById(id); }
-  function val(id){ return el(id)?el(id).value.trim():''; }
+  function val(id){ return el(id) ? el(id).value.trim() : ''; }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function iniciais(n){ return (n||'').split(' ').filter(Boolean).slice(0,2).map(function(p){return p[0];}).join('').toUpperCase()||'?'; }
+  function aviso(msg, tipo){ if (typeof toast === 'function') toast(msg, tipo || 'success', tipo === 'error' ? 7000 : 5000); else alert(msg); }
+  function dataHora(iso){
+    if (!iso) return '';
+    var d = new Date(iso); if (isNaN(d)) return '';
+    return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+  }
+
   function norm(u){
-    if(!u) return u;
-    return { id:u.id, UsuarioID:u.external_id||u.id, Nome:u.nome||'', Login:u.login||'', Email:u.email||'', Papel:u.papel||'', SituacaoUsuario:u.situacao_ativo!==false };
+    return {
+      id: u.id, codigo: u.external_id || '', nome: u.nome || '', login: u.login || '', email: u.email || '',
+      papel: u.papel || '', ativo: u.situacao_ativo !== false,
+      acesso: u.acesso || null
+    };
   }
+
+  // O que quem está logado pode fazer com este usuário
+  function podeMexer(u){ return state.isAdmin || u.papel !== 'admin'; }
+  function souEu(u){ return state.meuId && u.id === state.meuId; }
+
+  // ── Inicialização ──────────────────────────────────────────────────────
   function init(){
-    var u=(typeof App!=='undefined'&&App.usuario)?App.usuario:null;
-    if(u){ state.papel=u.papel||u.Papel||''; state.isAdmin=state.papel==='admin'; }
-    registrarEventos(); carregarUsuarios();
+    var u = (typeof App !== 'undefined' && App.usuario) ? App.usuario : null;
+    state.papel  = u ? (u.papel || u.Papel || '') : '';
+    state.meuId  = u ? u.id : null;
+    state.isAdmin = state.papel === 'admin';
+    if (state.papel !== 'admin' && state.papel !== 'coordenacao') {
+      el('u3-negado').style.display = 'block';
+      return;
+    }
+    el('u3-conteudo').style.display = 'block';
+    if (state.isAdmin) el('btn-u3-convites').style.display = 'inline-flex';
+    // Coordenação não vê "Admin" no filtro? Vê (pode haver admins na lista),
+    // mas não consegue escolhê-lo ao criar/editar.
+    registrarEventos();
+    carregarUsuarios();
   }
+
   function carregarUsuarios(){
     setEstado('carregando');
-    postApi('usuarios.listar',{}).then(function(res){
-      if(!res.sucesso){ setEstado('erro',res.mensagem); return; }
-      state.usuarios=(res.dados||[]).map(norm); renderizar();
-    }).catch(function(e){ setEstado('erro',e.message||'Erro.'); });
+    postApi('usuarios.listar', { comAcesso: true }).then(function(res){
+      if (!res.sucesso){ setEstado('erro', res.mensagem); return; }
+      state.usuarios = (res.dados || []).map(norm);
+      renderizar();
+    }).catch(function(e){ setEstado('erro', e.message || 'Erro.'); });
   }
+
+  function statusAcesso(u){ return (u.acesso && u.acesso.status) || 'desconhecido'; }
+
   function filtrados(){
-    var b=state.busca.toLowerCase();
+    var b = state.busca.toLowerCase();
     return state.usuarios.filter(function(u){
-      if(state.filtroPapel&&u.Papel!==state.filtroPapel) return false;
-      if(!b) return true;
-      return (u.Nome||'').toLowerCase().indexOf(b)!==-1||(u.Login||'').toLowerCase().indexOf(b)!==-1||(u.Email||'').toLowerCase().indexOf(b)!==-1;
-    });
+      if (!state.exibirInativos && !u.ativo) return false;
+      if (state.filtroPapel && u.papel !== state.filtroPapel) return false;
+      if (state.filtroAcesso){
+        var st = statusAcesso(u);
+        if (state.filtroAcesso === 'pendente' && st !== 'convite_pendente' && st !== 'senha_pendente') return false;
+        if (state.filtroAcesso !== 'pendente' && st !== state.filtroAcesso) return false;
+      }
+      if (!b) return true;
+      return [u.nome, u.login, u.email, u.codigo].some(function(x){ return (x||'').toLowerCase().indexOf(b) !== -1; });
+    }).sort(function(a, b2){ return (a.nome||'').localeCompare(b2.nome||'', 'pt-BR'); });
   }
+
+  function atualizarRodape(lista){
+    var ativos = state.usuarios.filter(function(u){ return u.ativo; });
+    var inativos = state.usuarios.length - ativos.length;
+    var semConta = ativos.filter(function(u){ return statusAcesso(u) === 'sem_conta'; }).length;
+    el('u3-rodape').textContent = lista.length + ' usuário(s) na lista · ' + ativos.length + ' ativo(s)' +
+      (inativos ? ' · ' + inativos + ' inativo(s)' + (state.exibirInativos ? '' : ' ocultos') : '');
+    el('u3-convites-txt').textContent = 'Enviar convites pendentes (' + semConta + ')';
+    el('btn-u3-convites').disabled = semConta === 0;
+  }
+
+  function botao(acao, id, icone, texto, classe){
+    return '<button class="btn-u3-linha' + (classe ? ' ' + classe : '') + '" type="button" data-id="' + esc(id) + '" data-acao="' + acao + '">' +
+      '<span class="material-icons-round">' + icone + '</span>' + texto + '</button>';
+  }
+
   function renderizar(){
-    var lista=filtrados(); var tbody=el('u3-tbody'); if(!tbody) return;
-    tbody.innerHTML='';
-    if(!lista.length){ setEstado('vazio'); return; }
+    var lista = filtrados(); var tbody = el('u3-tbody'); if (!tbody) return;
+    tbody.innerHTML = '';
+    atualizarRodape(lista);
+    if (!lista.length){ setEstado('vazio'); return; }
     setEstado('tabela');
     lista.forEach(function(u){
-      var ativo=u.SituacaoUsuario;
-      var pLabel={admin:'Admin',coordenacao:'Coordenação',professor:'Professor',secretaria:'Secretaria'}[u.Papel]||u.Papel;
-      var cor={admin:'#1A1A2E',coordenacao:'#185FA5',professor:'#2A9D8F',secretaria:'#D4A843'}[u.Papel]||'#888';
-      var tr=document.createElement('tr');
-      if(!ativo) tr.classList.add('inativo');
-      tr.innerHTML='<td><span class="u3-avatar" style="background:'+cor+'">'+iniciais(u.Nome)+'</span><span class="u3-nome">'+(u.Nome||'—')+'</span></td>'+
-        '<td class="u3-login">'+(u.Login||'—')+'</td>'+
-        '<td><span class="badge-papel badge-'+u.Papel+'">'+pLabel+'</span></td>'+
-        '<td>'+(u.Email||'—')+'</td>'+
-        '<td><span class="badge-sit '+(ativo?'ativo':'inativo')+'">'+(ativo?'Ativo':'Inativo')+'</span></td>'+
-        '<td class="u3-acoes">'+
-          '<button class="btn-u3-linha" data-id="'+u.id+'" data-acao="editar"><span class="material-icons-round">edit</span>Editar</button>'+
-          '<button class="btn-u3-linha" data-id="'+u.id+'" data-acao="senha"><span class="material-icons-round">lock_reset</span>Senha</button>'+
-          (state.isAdmin&&ativo?'<button class="btn-u3-linha perigo" data-id="'+u.id+'" data-acao="inativar"><span class="material-icons-round">person_off</span>Inativar</button>':'')+
-        '</td>';
+      var st = statusAcesso(u); var info = ACESSO[st] || ACESSO.desconhecido;
+      var ultimo = u.acesso && u.acesso.ultimo_acesso ? 'último acesso: ' + dataHora(u.acesso.ultimo_acesso) : '';
+      var mexe = podeMexer(u);
+      var acoes = '';
+      if (mexe) acoes += botao('editar', u.id, 'edit', 'Editar');
+      if (mexe && u.ativo) acoes += botao('reenviar', u.id, 'forward_to_inbox', st === 'sem_conta' ? 'Enviar acesso' : 'Reenviar acesso');
+      if (state.isAdmin && u.ativo) acoes += botao('provisoria', u.id, 'key', 'Senha provisória');
+      if (mexe && !souEu(u)) acoes += u.ativo ? botao('inativar', u.id, 'person_off', 'Inativar', 'perigo')
+                                             : botao('reativar', u.id, 'person_add_alt', 'Reativar', 'ok');
+
+      var tr = document.createElement('tr');
+      if (!u.ativo) tr.classList.add('inativo');
+      tr.innerHTML =
+        '<td><div class="u3-usuario-cel"><span class="u3-avatar" style="background:' + (COR_PAPEL[u.papel]||'#888') + '">' + esc(iniciais(u.nome)) + '</span>' +
+          '<div><span class="u3-nome">' + esc(u.nome || '—') + (souEu(u) ? ' <span class="u3-codigo" style="display:inline">(você)</span>' : '') + '</span>' +
+          '<span class="u3-codigo">' + esc(u.codigo) + '</span></div></div></td>' +
+        '<td class="u3-login">' + esc(u.login || '—') + '</td>' +
+        '<td class="u3-email">' + esc(u.email || '—') + '</td>' +
+        '<td><span class="badge-papel ' + esc(u.papel) + '">' + esc(ROTULO_PAPEL[u.papel] || u.papel || '—') + '</span></td>' +
+        '<td><span class="badge-acesso ' + st + '" title="' + esc(info.dica) + '"><span class="material-icons-round">' + info.ic + '</span>' + info.txt + '</span>' +
+          (ultimo ? '<span class="u3-ultimo">' + esc(ultimo) + '</span>' : '') + '</td>' +
+        '<td><span class="badge-u3-sit ' + (u.ativo ? 'ativo' : 'inativo') + '">' + (u.ativo ? 'Ativo' : 'Inativo') + '</span></td>' +
+        '<td class="u3-acoes-td"><div class="u3-acoes">' + acoes + '</div></td>';
       tbody.appendChild(tr);
     });
-    tbody.querySelectorAll('button[data-acao]').forEach(function(btn){
-      btn.addEventListener('click',function(){
-        var u=state.usuarios.find(function(x){return x.id===btn.dataset.id;});
-        if(!u) return;
-        if(btn.dataset.acao==='editar')   abrirModal('editar',u);
-        if(btn.dataset.acao==='senha')    redefinirSenha(u);
-        if(btn.dataset.acao==='inativar') inativar(u);
-      });
+  }
+
+  function setEstado(estado, msg){
+    var t = el('u3-tabela'), e = el('u3-estado');
+    if (estado === 'tabela'){ if (t) t.style.display = 'table'; if (e) e.style.display = 'none'; return; }
+    if (t) t.style.display = 'none';
+    if (!e) return;
+    e.style.display = 'block';
+    if (estado === 'carregando') e.innerHTML = '<div class="u3-spinner"></div><p>Carregando usuários…</p>';
+    else if (estado === 'erro') e.innerHTML = '<span class="material-icons-round">error_outline</span><p>' + esc(msg || 'Erro ao carregar.') + '</p>';
+    else e.innerHTML = '<span class="material-icons-round">person_search</span><p>Nenhum usuário encontrado.</p>';
+  }
+
+  // ── Modal novo / editar ────────────────────────────────────────────────
+  function montarPapeis(atual){
+    var sel = el('fu-papel');
+    sel.innerHTML = '<option value="">Selecione…</option>';
+    ['admin','coordenacao','professor','secretaria'].forEach(function(p){
+      if (p === 'admin' && !state.isAdmin && atual !== 'admin') return;
+      var o = document.createElement('option'); o.value = p; o.textContent = ROTULO_PAPEL[p];
+      sel.appendChild(o);
     });
+    sel.value = atual || '';
   }
-  function setEstado(estado,msg){
-    var t=el('u3-tabela'),e=el('u3-estado');
-    if(estado==='tabela'){if(t)t.style.display='table';if(e)e.style.display='none';return;}
-    if(t)t.style.display='none';
-    if(e){e.style.display='block';e.innerHTML=estado==='carregando'?'<div class="u3-spinner"></div><p>Carregando…</p>':'<p>'+(msg||'Nenhum usuário encontrado.')+'</p>';}
+
+  function limparErros(){
+    ['nome','login','papel','email'].forEach(function(c){
+      if (el('err-fu-' + c)) el('err-fu-' + c).classList.remove('show');
+      if (el('fu-' + c)) el('fu-' + c).classList.remove('erro');
+    });
+    el('u3-modal-alerta').className = 'u3-modal-alerta';
   }
-  function abrirModal(modo,u){
-    state.modo=modo; state.usuarioSel=u||null;
-    el('u3-modal-titulo').textContent=modo==='novo'?'Novo usuário':'Editar usuário';
-    el('fu-nome').value=u?(u.Nome||''):'';
-    el('fu-login').value=u?(u.Login||''):'';
-    el('fu-email').value=u?(u.Email||''):'';
-    el('fu-papel').value=u?(u.Papel||''):'';
-    if(el('u3-modal-alerta')) el('u3-modal-alerta').classList.remove('show','erro','sucesso');
-    if(el('u3-modal-overlay')) el('u3-modal-overlay').style.display='flex';
+
+  function abrirModal(modo, u){
+    state.modo = modo; state.usuarioSel = u || null;
+    limparErros();
+    el('u3-modal-titulo').textContent = modo === 'novo' ? 'Novo usuário' : 'Editar usuário — ' + (u.codigo || '');
+    el('fu-nome').value  = u ? u.nome  : '';
+    el('fu-login').value = u ? u.login : '';
+    el('fu-email').value = u ? u.email : '';
+    montarPapeis(u ? u.papel : '');
+    el('fu-papel').disabled = !!(u && souEu(u));
+    el('fu-papel').title = (u && souEu(u)) ? 'Você não pode alterar o seu próprio papel.' : '';
+    el('fu-email-hint').textContent = (u && statusAcesso(u) !== 'sem_conta')
+      ? 'Se mudar o e-mail, o usuário passa a entrar com o novo e-mail (o login continua o mesmo).' : '';
+    el('u3-aviso-novo').style.display = modo === 'novo' ? 'flex' : 'none';
+    el('u3-modal-overlay').style.display = 'flex';
+    el('fu-nome').focus();
   }
-  function fecharModal(){ if(el('u3-modal-overlay')) el('u3-modal-overlay').style.display='none'; }
+  function fecharModal(){ if (!state.salvando) el('u3-modal-overlay').style.display = 'none'; }
+
+  function erroCampo(c, msg){
+    if (msg) el('err-fu-' + c).textContent = msg;
+    el('err-fu-' + c).classList.add('show'); el('fu-' + c).classList.add('erro');
+  }
+  function mostrarAlerta(msg){ el('u3-modal-alerta').className = 'u3-modal-alerta show erro'; el('u3-modal-alerta-msg').textContent = msg; }
+
   function salvar(){
-    var nome=val('fu-nome'),email=val('fu-email'),papel=val('fu-papel');
-    if(!nome||!email||!papel){mostrarAlerta('Nome, e-mail e papel são obrigatórios.');return;}
-    var dados={nome:nome,login:val('fu-login')||email,email:email,papel:papel};
-    var acao=state.modo==='novo'?'usuarios.criar':'usuarios.atualizar';
-    if(state.modo==='editar') dados.id=state.usuarioSel.id;
-    postApi(acao,dados).then(function(res){
-      if(!res.sucesso){mostrarAlerta(res.mensagem||'Erro ao salvar.');return;}
-      fecharModal();
-      if(typeof toast==='function') toast(state.modo==='novo'?'Usuário criado! Convite enviado por e-mail.':'Usuário atualizado.','success');
+    if (state.salvando) return;
+    limparErros();
+    var nome = val('fu-nome'), login = val('fu-login').toLowerCase(), email = val('fu-email').toLowerCase(), papel = val('fu-papel');
+    var ok = true;
+    if (!nome){ erroCampo('nome'); ok = false; }
+    if (!login){ erroCampo('login', 'Informe o login.'); ok = false; }
+    else if (!RE_LOGIN.test(login)){ erroCampo('login', 'Use 3 a 40 letras minúsculas, números, ponto, hífen ou sublinhado (sem espaços nem acentos).'); ok = false; }
+    if (!papel){ erroCampo('papel'); ok = false; }
+    if (!RE_EMAIL.test(email)){ erroCampo('email'); ok = false; }
+    if (!ok) return;
+
+    var dados = { nome: nome, login: login, email: email };
+    if (!el('fu-papel').disabled) dados.papel = papel;
+    var acao = state.modo === 'novo' ? 'usuarios.criar' : 'usuarios.atualizar';
+    if (state.modo === 'editar') dados.id = state.usuarioSel.id;
+    else dados.papel = papel;
+
+    var btn = el('btn-u3-salvar');
+    state.salvando = true; btn.disabled = true; btn.classList.add('loading');
+    postApi(acao, dados).then(function(res){
+      if (!res.sucesso){ mostrarAlerta(res.mensagem || 'Erro ao salvar.'); return; }
+      state.salvando = false; fecharModal();
+      var atencao = (res.mensagem || '').indexOf('ATENÇÃO') !== -1;
+      aviso(res.mensagem || 'Salvo.', atencao ? 'error' : 'success');
       carregarUsuarios();
-    }).catch(function(){mostrarAlerta('Erro de comunicação.');});
+    }).catch(function(){ mostrarAlerta('Erro de comunicação.'); })
+      .finally(function(){ state.salvando = false; btn.disabled = false; btn.classList.remove('loading'); });
   }
-  function mostrarAlerta(msg){ var a=el('u3-modal-alerta'),m=el('u3-modal-alerta-msg');if(!a)return;a.className='u3-modal-alerta show erro';if(m)m.textContent=msg; }
-  function redefinirSenha(u){
-    if(!confirm('Enviar e-mail de redefinição de senha para '+u.Nome+'?')) return;
-    postApi('usuarios.redefinirSenha',{email:u.Email}).then(function(res){
-      if(typeof toast==='function') toast(res.sucesso?'E-mail enviado.':res.mensagem,'success');
-    });
+
+  // ── Ações da linha ─────────────────────────────────────────────────────
+  function comBotao(btn, promessa){
+    btn.disabled = true;
+    return promessa.finally(function(){ btn.disabled = false; });
   }
-  function inativar(u){
-    if(!confirm('Inativar o usuário '+u.Nome+'?')) return;
-    postApi('usuarios.inativar',{id:u.id}).then(function(res){
-      if(!res.sucesso){if(typeof toast==='function')toast(res.mensagem,'error');return;}
-      if(typeof toast==='function')toast('Usuário inativado.','success');
+
+  function reenviar(u, btn){
+    var st = statusAcesso(u);
+    var texto = st === 'ativo'
+      ? 'Enviar para ' + u.email + ' um link para ' + u.nome + ' criar uma nova senha?\n\nA senha atual continua valendo até ele criar a nova.'
+      : 'Enviar para ' + u.email + ' o convite de acesso de ' + u.nome + '?';
+    if (!confirm(texto)) return;
+    comBotao(btn, postApi('usuarios.reenviarAcesso', { id: u.id }).then(function(res){
+      aviso(res.mensagem || (res.sucesso ? 'Enviado.' : 'Erro ao enviar.'), res.sucesso ? 'success' : 'error');
+      if (res.sucesso) carregarUsuarios();
+    }));
+  }
+
+  function senhaProvisoria(u, btn){
+    if (!confirm('Gerar uma senha provisória para ' + u.nome + '?\n\nUse só quando o e-mail não chegar. ' +
+                 'A senha atual dele deixa de valer, e ele terá de criar uma nova no primeiro acesso.')) return;
+    comBotao(btn, postApi('usuarios.senhaProvisoria', { id: u.id }).then(function(res){
+      if (!res.sucesso){ aviso(res.mensagem || 'Erro ao gerar senha.', 'error'); return; }
+      var d = res.dados || {};
+      el('u3-senha-para').innerHTML = 'Senha provisória de <strong>' + esc(u.nome) + '</strong> — entrar com o login <strong>' +
+        esc(d.login || u.login) + '</strong> (ou o e-mail ' + esc(d.email || u.email) + '):';
+      el('u3-senha-valor').textContent = d.senha || '';
+      el('u3-senha-overlay').style.display = 'flex';
       carregarUsuarios();
-    });
+    }));
   }
+
+  function fecharSenha(){
+    el('u3-senha-valor').textContent = '';
+    el('u3-senha-overlay').style.display = 'none';
+  }
+
+  function copiarSenha(){
+    var s = el('u3-senha-valor').textContent;
+    var feito = function(){ aviso('Senha copiada.'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).then(feito, function(){ selecionar(); });
+    else selecionar();
+    function selecionar(){
+      var r = document.createRange(); r.selectNodeContents(el('u3-senha-valor'));
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      aviso('Selecionei a senha: use Ctrl+C para copiar.');
+    }
+  }
+
+  function alterarSituacao(u, ativo, btn){
+    var texto = ativo
+      ? 'Reativar o usuário ' + u.nome + '?\n\nEle volta a conseguir entrar com a senha que já tinha.'
+      : 'Inativar o usuário ' + u.nome + '?\n\nEle deixa de conseguir entrar no sistema (inclusive se estiver com o sistema aberto agora, no próximo carregamento). O histórico dele é mantido.';
+    if (!confirm(texto)) return;
+    comBotao(btn, postApi(ativo ? 'usuarios.ativar' : 'usuarios.inativar', { id: u.id }).then(function(res){
+      aviso(res.mensagem || (res.sucesso ? 'Feito.' : 'Erro.'), res.sucesso ? 'success' : 'error');
+      if (res.sucesso) carregarUsuarios();
+    }));
+  }
+
+  function convidarPendentes(){
+    var pend = state.usuarios.filter(function(u){ return u.ativo && statusAcesso(u) === 'sem_conta'; });
+    if (!pend.length) return;
+    if (!confirm('Enviar o convite de acesso por e-mail para ' + pend.length + ' usuário(s) ativo(s) que ainda não têm acesso?\n\n' +
+                 'Se o limite de e-mails por hora for atingido, o envio para e você pode rodar de novo mais tarde (quem já recebeu não recebe de novo).')) return;
+    var btn = el('btn-u3-convites');
+    comBotao(btn, postApi('usuarios.convidarPendentes', {}).then(function(res){
+      var d = res.dados || {};
+      var msg = res.mensagem || '';
+      if (d.falhas && d.falhas.length){
+        msg += '\n\nCom problema:\n' + d.falhas.map(function(f){ return '• ' + f.usuario + ': ' + f.motivo; }).join('\n');
+        alert(msg);
+      } else {
+        aviso(msg || (res.sucesso ? 'Convites enviados.' : 'Erro.'), res.sucesso && !d.parouPorLimite ? 'success' : 'error');
+      }
+      carregarUsuarios();
+    }));
+  }
+
+  // ── Eventos ────────────────────────────────────────────────────────────
   function registrarEventos(){
-    el('u3-busca')&&el('u3-busca').addEventListener('input',function(){state.busca=this.value.trim();renderizar();});
-    el('u3-filtro-papel')&&el('u3-filtro-papel').addEventListener('change',function(){state.filtroPapel=this.value;renderizar();});
-    el('btn-u3-novo')&&el('btn-u3-novo').addEventListener('click',function(){abrirModal('novo');});
-    el('btn-fechar-u3')&&el('btn-fechar-u3').addEventListener('click',fecharModal);
-    el('btn-u3-cancelar')&&el('btn-u3-cancelar').addEventListener('click',fecharModal);
-    el('btn-u3-salvar')&&el('btn-u3-salvar').addEventListener('click',salvar);
-    el('u3-modal-overlay')&&el('u3-modal-overlay').addEventListener('click',function(e){if(e.target===this)fecharModal();});
+    el('u3-busca').addEventListener('input', function(){ state.busca = this.value.trim(); renderizar(); });
+    el('u3-filtro-papel').addEventListener('change', function(){ state.filtroPapel = this.value; renderizar(); });
+    el('u3-filtro-acesso').addEventListener('change', function(){ state.filtroAcesso = this.value; renderizar(); });
+    el('btn-u3-inativos').addEventListener('click', function(){
+      state.exibirInativos = !state.exibirInativos;
+      this.classList.toggle('ativo', state.exibirInativos);
+      el('u3-inativos-txt').textContent = state.exibirInativos ? 'Ocultar inativos' : 'Exibir inativos';
+      renderizar();
+    });
+    el('btn-u3-convites').addEventListener('click', convidarPendentes);
+    el('btn-u3-novo').addEventListener('click', function(){ abrirModal('novo'); });
+    el('btn-fechar-u3').addEventListener('click', fecharModal);
+    el('btn-u3-cancelar').addEventListener('click', fecharModal);
+    el('btn-u3-salvar').addEventListener('click', salvar);
+    el('u3-modal-overlay').addEventListener('click', function(e){ if (e.target === this) fecharModal(); });
+    el('btn-fechar-senha').addEventListener('click', fecharSenha);
+    el('btn-u3-senha-ok').addEventListener('click', fecharSenha);
+    el('btn-u3-copiar').addEventListener('click', copiarSenha);
+    el('u3-tbody').addEventListener('click', function(e){
+      var btn = e.target.closest('button[data-acao]'); if (!btn) return;
+      var u = state.usuarios.find(function(x){ return x.id === btn.dataset.id; }); if (!u) return;
+      var a = btn.dataset.acao;
+      if (a === 'editar')     abrirModal('editar', u);
+      if (a === 'reenviar')   reenviar(u, btn);
+      if (a === 'provisoria') senhaProvisoria(u, btn);
+      if (a === 'inativar')   alterarSituacao(u, false, btn);
+      if (a === 'reativar')   alterarSituacao(u, true, btn);
+    });
   }
-  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}else{init();}
+
+  if (document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }
 }());
 </script>
