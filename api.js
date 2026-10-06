@@ -147,6 +147,7 @@ async function postApi(acao, dados) {
     if (acao === 'alunos.inativarAluno') return await _alunosInativar(sb, dados);
     if (acao === 'alunos.ativarAluno')   return await _alunosAtivar(sb, dados);
     if (acao === 'alunos.buscarSensiveis') return await _alunosSensiveisBuscar(sb, dados);
+    if (acao === 'alunos.buscarPorCpf')    return await _alunosBuscarPorCpf(sb, dados);
 
     // ── CURSOS ────────────────────────────────────────────────────────────────
     if (acao === 'cursos.listar')    return await _cursosListar(sb, dados);
@@ -557,6 +558,18 @@ async function _alunosBuscar(sb, dados) {
     .or('nome_completo.ilike.%' + dados.termo + '%,nome_social.ilike.%' + dados.termo + '%')
     .order('nome_completo')
     .limit(100);
+  if (res.error) return _err(res.error.message);
+  return _ok(res.data || []);
+}
+
+// Procura cadastro(s) com o mesmo CPF (aluno que volta). A comparação é
+// feita no banco, pela função alunos_buscar_por_cpf (etapa 11), que só
+// responde para admin/coordenação/secretaria e devolve os dados públicos do
+// aluno — nunca o CPF. Só dígitos; CPF incompleto devolve lista vazia.
+async function _alunosBuscarPorCpf(sb, dados) {
+  var cpf = String(dados.cpf || '').replace(/\D/g, '');
+  if (cpf.length !== 11) return _ok([]);
+  var res = await sb.rpc('alunos_buscar_por_cpf', { p_cpf: cpf });
   if (res.error) return _err(res.error.message);
   return _ok(res.data || []);
 }
