@@ -62,6 +62,14 @@ async function postApi(acao, dados) {
     if (acao === 'auth.definirNovaSenha') {
       return await _definirNovaSenha(sb, dados);
     }
+    // "Esqueci minha senha" — pública (sem sessão); o servidor só envia o
+    // link para o e-mail cadastrado e responde sempre a mesma mensagem. O link
+    // leva ao "Site URL" configurado no Supabase.
+    if (acao === 'auth.solicitarRecuperacao') {
+      return await _usuariosAdmin(sb, 'recuperarSenha', {
+        login_ou_email: dados.loginOuEmail || dados.login_ou_email || '',
+      });
+    }
 
     // ── VERIFICAR SESSÃO ANTES DE QUALQUER OPERAÇÃO ───────────────────────────
     var sessao = await sb.auth.getSession();
@@ -70,12 +78,21 @@ async function postApi(acao, dados) {
     }
 
     // ── USUÁRIOS ──────────────────────────────────────────────────────────────
+    // Tudo que mexe na conta de acesso passa pela Edge Function usuarios-admin
+    // (etapa 10). Só a listagem e a exclusão continuam direto no banco.
     if (acao === 'usuarios.listar')     return await _usuariosListar(sb, dados);
-    if (acao === 'usuarios.criar')      return await _usuariosCriar(sb, dados);
-    if (acao === 'usuarios.atualizar')  return await _usuariosAtualizar(sb, dados);
-    if (acao === 'usuarios.inativar')   return await _usuariosInativar(sb, dados);
-    if (acao === 'usuarios.deletar')    return await _usuariosDeletar(sb, dados);
-    if (acao === 'usuarios.redefinirSenha') return await _usuariosRedefinirSenha(sb, dados);
+    if (acao === 'usuarios.criar')      return await _usuariosAdmin(sb, 'criar', Object.assign({}, dados, { redirect_to: _urlApp() }));
+    if (acao === 'usuarios.atualizar')  return await _usuariosAdmin(sb, 'atualizar', _camposUsuario(dados));
+    if (acao === 'usuarios.inativar')   return await _usuariosAdmin(sb, 'alterarSituacao', { id: dados.id || dados.usuarioId, ativo: false });
+    if (acao === 'usuarios.ativar')     return await _usuariosAdmin(sb, 'alterarSituacao', { id: dados.id || dados.usuarioId, ativo: true });
+    if (acao === 'usuarios.reenviarAcesso' || acao === 'usuarios.redefinirSenha')
+                                        return await _usuariosAdmin(sb, 'reenviarAcesso', { id: dados.id || dados.usuarioId, redirect_to: _urlApp() });
+    if (acao === 'usuarios.senhaProvisoria')   return await _usuariosAdmin(sb, 'senhaProvisoria', { id: dados.id || dados.usuarioId });
+    if (acao === 'usuarios.statusAcesso')      return await _usuariosAdmin(sb, 'statusAcesso', {});
+    if (acao === 'usuarios.convidarPendentes') return await _usuariosAdmin(sb, 'convidarPendentes', { redirect_to: _urlApp() });
+    // Excluir usuário deixaria a conta de acesso solta (e o histórico sem
+    // dono); o caminho certo é inativar.
+    if (acao === 'usuarios.deletar')    return _err('Usuários não são excluídos: use "Inativar".', 400);
 
     // ── ALUNOS ────────────────────────────────────────────────────────────────
     if (acao === 'alunos.listar')    return await _alunosListar(sb, dados);
@@ -219,7 +236,10 @@ async function _login(sb, dados) {
       return _err('E-mail ou senha incorretos.', 401);
     }
     if (msg.includes('Email not confirmed')) {
-      return _err('Conta ainda não confirmada. Verifique seu e-mail.', 401);
+      return _err('Seu acesso ainda não foi ativado. Abra o convite enviado ao seu e-mail ou use "Esqueci minha senha".', 401);
+    }
+    if (msg.toLowerCase().includes('banned')) {
+      return _err('Usuário inativo. Contate a coordenação.', 403);
     }
     return _err(msg, 401);
   }
@@ -241,11 +261,16 @@ async function _login(sb, dados) {
   }
 
   Auth.salvar(perfil.data);
-  return _ok({
+  // Entrou com senha provisória (gerada pelo admin): precisa criar a própria
+  // antes de usar o sistema. A tela de login mostra o passo "Defina sua senha".
+  var deveTrocar = !!(res.data.user.user_metadata && res.data.user.user_metadata.deve_trocar_senha);
+  var resposta = _ok({
     usuario:          perfil.data,
-    primeiroacesso:   false, // Supabase Auth gerencia reset de senha via email
+    primeiroAcesso:   deveTrocar,
     duracaoSegundos:  7200,
   }, 'Login realizado com sucesso.');
+  resposta.primeirAcesso = deveTrocar; // nome que o f2-login.html confere
+  return resposta;
 }
 
 async function _logout(sb) {
@@ -259,92 +284,132 @@ async function _verificarSessao(sb) {
   if (!res.data || !res.data.session) {
     return _err('Sessão inválida ou expirada.', 401);
   }
-  var usuario = Auth.getUsuario();
-  if (!usuario) {
-    // Sessão existe mas perfil local foi limpo — recarregar da tabela
-    var perfil = await sb
-      .from('usuarios')
-      .select('id, external_id, login, nome, email, papel, situacao_ativo')
-      .eq('auth_user_id', res.data.session.user.id)
-      .single();
-    if (perfil.error || !perfil.data) return _err('Perfil não encontrado.', 403);
-    Auth.salvar(perfil.data);
-    usuario = perfil.data;
+  // Sempre relê o perfil no banco: se o usuário foi inativado ou mudou de
+  // papel, isso vale já no próximo carregamento da página.
+  var sessUser = res.data.session.user;
+  var perfil = await sb
+    .from('usuarios')
+    .select('id, external_id, login, nome, email, papel, situacao_ativo')
+    .eq('auth_user_id', sessUser.id)
+    .maybeSingle();
+  if (perfil.error) {
+    // Falha de rede/servidor: segue com o perfil guardado, se houver
+    var local = Auth.getUsuario();
+    if (local) return _ok({ usuario: local, duracaoSegundos: 7200 });
+    return _err(perfil.error.message, 500);
   }
-  return _ok({ usuario: usuario, duracaoSegundos: 7200 });
+  if (!perfil.data) {
+    await sb.auth.signOut();
+    Auth.limpar();
+    return _err('Usuário não encontrado no sistema. Contate o administrador.', 403);
+  }
+  if (!perfil.data.situacao_ativo) {
+    await sb.auth.signOut();
+    Auth.limpar();
+    return _err('Usuário inativo. Contate a coordenação.', 403);
+  }
+  if (Auth.getUsuario()) {
+    // Atualiza o perfil guardado sem reiniciar o contador de sessão
+    try { localStorage.setItem('sge_usuario', JSON.stringify(perfil.data)); } catch (e) {}
+  } else {
+    Auth.salvar(perfil.data);
+  }
+  return _ok({
+    usuario:         perfil.data,
+    deveTrocarSenha: !!(sessUser.user_metadata && sessUser.user_metadata.deve_trocar_senha),
+    duracaoSegundos: 7200,
+  });
 }
 
+// Usada no primeiro acesso (convite ou senha provisória) e na recuperação de
+// senha. Em todos os casos já existe uma sessão: a do login com a senha
+// provisória, ou a aberta pelo link do e-mail (index.html).
 async function _definirNovaSenha(sb, dados) {
   if (!dados.novaSenha) return _err('Nova senha é obrigatória.', 400);
-  var res = await sb.auth.updateUser({ password: dados.novaSenha });
-  if (res.error) return _err(res.error.message, 400);
-  return _ok(null, 'Senha atualizada com sucesso.');
+  var sessao = await sb.auth.getSession();
+  if (!sessao.data || !sessao.data.session) {
+    return _err('O link expirou ou já foi usado. Volte ao login e use "Esqueci minha senha" para receber outro.', 401);
+  }
+  var res = await sb.auth.updateUser({ password: dados.novaSenha, data: { deve_trocar_senha: false } });
+  if (res.error) {
+    var msg = res.error.message || '';
+    if (msg.includes('different from the old')) return _err('A nova senha precisa ser diferente da anterior.', 400);
+    if (msg.toLowerCase().includes('weak') || msg.includes('at least')) return _err('Senha fraca: siga as regras indicadas.', 400);
+    return _err(msg, 400);
+  }
+  var perfil = await sb
+    .from('usuarios')
+    .select('id, external_id, login, nome, email, papel, situacao_ativo')
+    .eq('auth_user_id', sessao.data.session.user.id)
+    .maybeSingle();
+  if (perfil.error || !perfil.data) {
+    await sb.auth.signOut();
+    return _err('Senha definida, mas o seu cadastro não foi encontrado no sistema. Contate a coordenação.', 403);
+  }
+  if (!perfil.data.situacao_ativo) {
+    await sb.auth.signOut();
+    return _err('Usuário inativo. Contate a coordenação.', 403);
+  }
+  Auth.salvar(perfil.data);
+  return _ok({ usuario: perfil.data, duracaoSegundos: 7200 }, 'Senha definida com sucesso.');
 }
 
 // =============================================================================
 // USUÁRIOS
 // =============================================================================
 
-async function _usuariosListar(sb) {
+async function _usuariosListar(sb, dados) {
   var res = await sb
     .from('usuarios')
     .select('id, external_id, login, nome, email, papel, situacao_ativo, criado_em')
     .order('nome');
   if (res.error) return _err(res.error.message);
-  return _ok(res.data);
-}
-
-async function _usuariosCriar(sb, dados) {
-  if (!dados.email || !dados.nome || !dados.papel) {
-    return _err('Nome, e-mail e papel são obrigatórios.', 400);
+  var lista = res.data || [];
+  // A tela de Usuários pede também a situação da conta de acesso (convite
+  // pendente, último acesso...). Se a Edge Function falhar, lista sem isso.
+  if (dados && dados.comAcesso) {
+    var st = await _usuariosAdmin(sb, 'statusAcesso', {});
+    if (st.sucesso && st.dados) {
+      lista.forEach(function(u) { u.acesso = st.dados[u.id] || null; });
+    }
   }
-  // Criar conta no Supabase Auth via convite (envia e-mail ao usuário)
-  var invite = await sb.auth.admin.inviteUserByEmail(dados.email);
-  if (invite.error) return _err(invite.error.message);
-
-  var res = await sb.from('usuarios').insert({
-    auth_user_id:   invite.data.user.id,
-    login:          dados.login || dados.email,
-    nome:           dados.nome,
-    email:          dados.email,
-    papel:          dados.papel,
-    situacao_ativo: true,
-  }).select().single();
-  if (res.error) return _err(res.error.message);
-  return _ok(res.data, 'Usuário criado. Convite enviado para ' + dados.email);
+  return _ok(lista);
 }
 
-async function _usuariosAtualizar(sb, dados) {
-  if (!dados.id) return _err('ID do usuário é obrigatório.', 400);
-  var campos = {};
-  if (dados.nome)  campos.nome  = dados.nome;
-  if (dados.papel) campos.papel = dados.papel;
-  if (dados.email) campos.email = dados.email;
-  if (dados.login) campos.login = dados.login;
-  var res = await sb.from('usuarios').update(campos).eq('id', dados.id);
-  if (res.error) return _err(res.error.message);
-  return _ok(null, 'Usuário atualizado.');
+// Endereço desta página — para onde os links dos e-mails (convite e nova
+// senha) devem levar. Precisa estar em Authentication → URL Configuration →
+// Redirect URLs no painel do Supabase.
+function _urlApp() {
+  return window.location.origin + window.location.pathname;
 }
 
-async function _usuariosInativar(sb, dados) {
-  if (!dados.id) return _err('ID do usuário é obrigatório.', 400);
-  var res = await sb.from('usuarios').update({ situacao_ativo: false }).eq('id', dados.id);
-  if (res.error) return _err(res.error.message);
-  return _ok(null, 'Usuário inativado.');
+function _camposUsuario(dados) {
+  var c = { id: dados.id || dados.usuarioId };
+  ['nome', 'login', 'email', 'papel'].forEach(function(k) {
+    if (dados[k] !== undefined && dados[k] !== null) c[k] = dados[k];
+  });
+  return c;
 }
 
-async function _usuariosDeletar(sb, dados) {
-  if (!dados.id) return _err('ID do usuário é obrigatório.', 400);
-  var res = await sb.from('usuarios').delete().eq('id', dados.id);
-  if (res.error) return _err(res.error.message);
-  return _ok(null, 'Usuário removido.');
-}
-
-async function _usuariosRedefinirSenha(sb, dados) {
-  if (!dados.email) return _err('E-mail é obrigatório.', 400);
-  var res = await sb.auth.resetPasswordForEmail(dados.email);
-  if (res.error) return _err(res.error.message);
-  return _ok(null, 'E-mail de redefinição enviado para ' + dados.email);
+// Chama a Edge Function usuarios-admin. Ela responde sempre
+// { sucesso, dados, mensagem } com a mensagem já em português.
+async function _usuariosAdmin(sb, acao, corpo) {
+  try {
+    var res = await sb.functions.invoke('usuarios-admin', {
+      body: Object.assign({ acao: acao }, corpo || {}),
+    });
+    if (res.error) {
+      console.error('usuarios-admin [' + acao + ']:', res.error);
+      return _err('Não foi possível falar com o servidor de usuários (Edge Function "usuarios-admin"). ' +
+        'Confira se ela foi publicada. Detalhe: ' + (res.error.message || ''), 502);
+    }
+    var d = res.data || {};
+    if (typeof d === 'string') { try { d = JSON.parse(d); } catch (e) { d = {}; } }
+    if (!d.sucesso) return _err(d.mensagem || 'Operação não concluída.', 400);
+    return _ok(d.dados, d.mensagem);
+  } catch (e) {
+    return _err(e.message || 'Erro ao chamar o servidor de usuários.', 500);
+  }
 }
 
 // -----------------------------------------------------------------------------
