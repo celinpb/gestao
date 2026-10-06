@@ -311,7 +311,7 @@ async function _login(sb, dados) {
   var resposta = _ok({
     usuario:          perfil.data,
     primeiroAcesso:   deveTrocar,
-    duracaoSegundos:  7200,
+    duracaoSegundos:  Auth.SESSAO_SEGUNDOS,
   }, 'Login realizado com sucesso.');
   resposta.primeirAcesso = deveTrocar; // nome que o f2-login.html confere
   return resposta;
@@ -339,7 +339,7 @@ async function _verificarSessao(sb) {
   if (perfil.error) {
     // Falha de rede/servidor: segue com o perfil guardado, se houver
     var local = Auth.getUsuario();
-    if (local) return _ok({ usuario: local, duracaoSegundos: 7200 });
+    if (local) return _ok({ usuario: local, duracaoSegundos: Auth.SESSAO_SEGUNDOS });
     return _err(perfil.error.message, 500);
   }
   if (!perfil.data) {
@@ -361,7 +361,7 @@ async function _verificarSessao(sb) {
   return _ok({
     usuario:         perfil.data,
     deveTrocarSenha: !!(sessUser.user_metadata && sessUser.user_metadata.deve_trocar_senha),
-    duracaoSegundos: 7200,
+    duracaoSegundos: Auth.SESSAO_SEGUNDOS,
   });
 }
 
@@ -395,7 +395,7 @@ async function _definirNovaSenha(sb, dados) {
     return _err('Usuário inativo. Contate a coordenação.', 403);
   }
   Auth.salvar(perfil.data);
-  return _ok({ usuario: perfil.data, duracaoSegundos: 7200 }, 'Senha definida com sucesso.');
+  return _ok({ usuario: perfil.data, duracaoSegundos: Auth.SESSAO_SEGUNDOS }, 'Senha definida com sucesso.');
 }
 
 // =============================================================================
