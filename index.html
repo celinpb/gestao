@@ -192,7 +192,52 @@ function executarScripts(container) {
 // =========================================================
 // INICIALIZAÇÃO
 // =========================================================
+// Links dos e-mails (convite e "esqueci minha senha") voltam para esta página
+// com a sessão no endereço: #access_token=...&refresh_token=...&type=invite
+// (ou type=recovery). Aqui a sessão é aberta, o endereço é limpo e a tela de
+// login mostra o passo "Defina sua senha". Link vencido/usado volta com
+// #error=...&error_code=otp_expired — vira um aviso na tela de login.
+async function tratarLinkDoEmail(sb) {
+  var hash = window.location.hash ? window.location.hash.substring(1) : '';
+  var busca = window.location.search ? window.location.search.substring(1) : '';
+  var p = new URLSearchParams(hash);
+  var q = new URLSearchParams(busca);
+  var limparEndereco = function() {
+    history.replaceState(null, '', window.location.pathname);
+  };
+  var codigoErro = p.get('error_code') || p.get('error') || q.get('error_code') || q.get('error');
+  if (codigoErro) {
+    limparEndereco();
+    window.SGE_AVISO_LOGIN = (codigoErro === 'otp_expired')
+      ? 'Este link expirou ou já foi usado. Use "Esqueci minha senha" para receber um novo.'
+      : 'Não foi possível usar o link do e-mail. Use "Esqueci minha senha" para receber um novo.';
+    return;
+  }
+  if (!p.get('access_token')) return;
+  var tipo = p.get('type') || '';
+  var r = await sb.auth.setSession({
+    access_token:  p.get('access_token'),
+    refresh_token: p.get('refresh_token') || '',
+  });
+  limparEndereco();
+  if (r.error) {
+    window.SGE_AVISO_LOGIN = 'Este link expirou ou já foi usado. Use "Esqueci minha senha" para receber um novo.';
+    return;
+  }
+  if (tipo === 'recovery' || tipo === 'invite' || tipo === 'signup' || tipo === 'magiclink') {
+    window.SGE_MODO_SENHA = (tipo === 'recovery') ? 'recuperacao' : 'convite';
+    // Guardado também na aba: se a página for recarregada antes de a pessoa
+    // criar a senha, ela continua no passo "Defina sua senha".
+    try { sessionStorage.setItem('sge_modo_senha', window.SGE_MODO_SENHA); } catch (e) {}
+  }
+}
+
 async function init() {
+  // O cliente precisa existir ANTES de conferir a sessão — senão quem já
+  // estava logado caía no login ao recarregar a página.
+  var sb = _initSupabase();
+  try { await tratarLinkDoEmail(sb); } catch (e) { console.error('link do e-mail:', e); }
+
   // Verifica sessão ativa no Supabase Auth
   var temSessao = await Auth.temSessao();
   if (!temSessao) {
@@ -204,10 +249,21 @@ async function init() {
   postApi('auth.verificarSessao', {})
     .then(function(res) {
       if (res.sucesso && res.dados && res.dados.usuario) {
+        // Veio de um link de e-mail, ou entrou com senha provisória e ainda
+        // não criou a própria: mostrar o passo "Defina sua senha".
+        if (!window.SGE_MODO_SENHA) {
+          try { window.SGE_MODO_SENHA = sessionStorage.getItem('sge_modo_senha') || null; } catch (e) {}
+        }
+        if (res.dados.deveTrocarSenha && !window.SGE_MODO_SENHA) window.SGE_MODO_SENHA = 'primeiro';
+        if (window.SGE_MODO_SENHA) {
+          carregarLogin();
+          return;
+        }
         App.usuario = res.dados.usuario;
         carregarShell();
       } else {
         Auth.limpar();
+        if (res.mensagem && !window.SGE_AVISO_LOGIN) window.SGE_AVISO_LOGIN = res.mensagem;
         carregarLogin();
       }
     })
@@ -244,6 +300,9 @@ function carregarLogin() {
 // Chamada pelo módulo de login após autenticação bem-sucedida
 function onLoginSucesso(token, usuario) {
   // token ignorado — sessão gerenciada pelo Supabase Auth SDK
+  window.SGE_MODO_SENHA = null;
+  window.SGE_AVISO_LOGIN = null;
+  try { sessionStorage.removeItem('sge_modo_senha'); } catch (e) {}
   if (usuario) Auth.salvar(usuario);
   App.usuario = usuario;
   document.getElementById('login-overlay').style.display = 'none';
