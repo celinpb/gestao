@@ -146,6 +146,18 @@
   .modal-alerta.sucesso{background:rgba(42,157,143,0.08);border:1px solid rgba(42,157,143,0.20);color:#1A6E65;}
   .modal-alerta .material-icons-round{font-size:16px;flex-shrink:0;}
 
+  /* Cadastro existente com o mesmo CPF (06/10) */
+  .cpf-existente{grid-column:1/-1;background:#FAEEDA;border:1px solid rgba(233,196,106,0.6);border-radius:8px;padding:10px 14px;font-size:13px;color:#5C4200;}
+  .cpf-existente-titulo{display:flex;align-items:center;gap:6px;font-weight:600;margin-bottom:6px;}
+  .cpf-existente-titulo .material-icons-round{font-size:17px;}
+  .cpf-existente-item{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid rgba(233,196,106,0.45);border-radius:6px;padding:8px 10px;margin-top:6px;}
+  .cpf-existente-nome{font-weight:600;color:#1A1A2E;}
+  .cpf-existente-meta{font-size:12px;color:#5C5C7A;}
+  .cpf-existente-dica{font-size:12px;margin-top:8px;line-height:1.5;}
+  .btn-cpf-abrir{height:30px;padding:0 12px;border-radius:6px;border:none;background:#1A1A2E;color:#fff;font-family:inherit;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
+  .btn-cpf-abrir:hover{background:#2D2D4A;}
+  .btn-cpf-abrir .material-icons-round{font-size:15px;}
+
   /* =========================================================
      OCORRÊNCIAS — painel lateral
   ========================================================= */
@@ -318,6 +330,7 @@
             <input type="text" class="form-input" id="f-cpf" placeholder="000.000.000-00" maxlength="14">
             <span class="form-erro-msg" id="err-cpf">CPF inválido.</span>
           </div>
+          <div class="cpf-existente" id="cpf-existente" style="display:none;"></div>
           <div class="form-field">
             <label>Data de nascimento <span class="req">*</span></label>
             <input type="date" class="form-input" id="f-nascimento">
@@ -1133,7 +1146,85 @@
     document.querySelectorAll('#modal-aluno .form-input').forEach(function(i){ i.classList.remove('erro'); });
     document.querySelectorAll('#modal-aluno .form-erro-msg').forEach(function(e){ e.classList.remove('show'); });
     if(el('modal-alerta')) el('modal-alerta').classList.remove('show');
+    state.cpfOriginal = '';
+    _cpfVerificado = { cpf: null, achados: [] };
+    if(el('cpf-existente')) { el('cpf-existente').style.display='none'; el('cpf-existente').innerHTML=''; }
   }
+
+  // =========================================================
+  // CADASTRO EXISTENTE PELO CPF (06/10)
+  // Ao digitar o CPF de um aluno novo, procura se já existe cadastro com o
+  // mesmo CPF (ex.: aluno que estudou, saiu e voltou). Se existir, sugere
+  // abrir o cadastro existente — ele mantém o código — em vez de criar outro.
+  // A busca é feita no banco (função alunos_buscar_por_cpf), que devolve só
+  // os dados públicos do aluno, nunca o CPF.
+  // =========================================================
+  var _cpfVerificado = { cpf: null, achados: [] };
+
+  function soDigitos(v) { return String(v || '').replace(/\D/g, ''); }
+
+  // Precisa checar? Aluno novo: sempre que houver CPF completo. Edição: só se
+  // o CPF foi alterado (registros antigos que já compartilham CPF continuam
+  // podendo ser editados).
+  function cpfPrecisaChecagem(d) {
+    if (d.length !== 11) return false;
+    if (state.modoModal === 'editar') return d !== soDigitos(state.cpfOriginal);
+    return true;
+  }
+
+  function verificarCpf() {
+    var d = soDigitos(val('f-cpf'));
+    if (!cpfPrecisaChecagem(d)) {
+      _cpfVerificado = { cpf: d, achados: [] };
+      mostrarCpfExistente([]);
+      return Promise.resolve([]);
+    }
+    if (_cpfVerificado.cpf === d) return Promise.resolve(_cpfVerificado.achados);
+    return postApi('alunos.buscarPorCpf', { cpf: d }).then(function(res) {
+      var lista = (res.sucesso && res.dados) ? res.dados : [];
+      if (state.modoModal === 'editar' && state.alunoSelecionado) {
+        lista = lista.filter(function(a) { return a.id !== state.alunoSelecionado.id; });
+      }
+      if (soDigitos(val('f-cpf')) !== d) return verificarCpf(); // CPF mudou enquanto buscava
+      _cpfVerificado = { cpf: d, achados: lista };
+      mostrarCpfExistente(lista);
+      return lista;
+    }).catch(function() { return []; });
+  }
+
+  function mostrarCpfExistente(lista) {
+    var box = el('cpf-existente'); if (!box) return;
+    if (!lista.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    var editando = state.modoModal === 'editar';
+    var html = '<div class="cpf-existente-titulo"><span class="material-icons-round">person_search</span>' +
+      (editando ? 'Este CPF já está no cadastro de outro aluno' : 'Já existe cadastro com este CPF') + '</div>';
+    lista.forEach(function(a) {
+      var n = normalizar(a);
+      html += '<div class="cpf-existente-item"><div>' +
+        '<div class="cpf-existente-nome">' + escHtml(n.NomeExibicao || '—') + '</div>' +
+        '<div class="cpf-existente-meta">Código ' + escHtml(n.AlunoID || '—') +
+        (n.Nascimento ? ' · nasc. ' + escHtml(fmtDataBR(n.Nascimento)) : '') +
+        ' · <strong>' + (n.SituacaoAluno ? 'Ativo' : 'Inativo') + '</strong></div></div>' +
+        '<button type="button" class="btn-cpf-abrir" data-id="' + escHtml(a.id) + '">' +
+        '<span class="material-icons-round">open_in_new</span>Abrir cadastro existente</button></div>';
+    });
+    html += '<div class="cpf-existente-dica">' + (editando
+      ? 'Confira o número: dois alunos não podem ter o mesmo CPF. Se for a mesma pessoa, use o cadastro existente.'
+      : 'Se for um aluno que está voltando, continue pelo cadastro existente (ele mantém o código; se estiver inativo, use "Ativar" na ficha). Se o CPF foi digitado errado, corrija-o.') +
+      '</div>';
+    box.innerHTML = html;
+    box.style.display = 'block';
+    box.querySelectorAll('.btn-cpf-abrir').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var a = lista.find(function(x) { return x.id === btn.dataset.id; });
+        if (!a) return;
+        fecharModal();
+        selecionarAluno(normalizar(a));
+      });
+    });
+  }
+
+  function fmtDataBR(d) { var p = String(d).substring(0, 10).split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : String(d); }
 
   function abrirModalNovo() {
     state.modoModal = 'novo';
@@ -1163,7 +1254,7 @@
     set('f-raca', a.Raca); set('f-estado-civil', a.EstadoCivil); set('f-genero', a.Genero);
     set('f-estrangeiro', a.Estrangeiro ? 'true' : 'false');
     if(el('campo-passaporte')) el('campo-passaporte').style.display = a.Estrangeiro ? 'block':'none';
-    set('f-telefone', fmtTel(a.Telefone)); set('f-email', a.email);
+    set('f-telefone', a.Telefone ? fmtTel(a.Telefone) : ''); // sem telefone: campo vazio (antes ficava "—" e a validação barrava o salvar) set('f-email', a.email);
     setC('f-pcd', a.PcDBoolean); set('f-pcd-tipo', a.PcDTipo); set('f-pcd-laudo', a.PcDLaudoURL);
     if(el('campo-pcd-tipo')) el('campo-pcd-tipo').style.display = a.PcDBoolean ? 'block':'none';
     if(el('campo-pcd-laudo')) el('campo-pcd-laudo').style.display = a.PcDBoolean ? 'block':'none';
@@ -1177,6 +1268,7 @@
     set('f-resp2-nome', a.Responsavel2Nome); set('f-resp2-parentesco', a.Responsavel2Parentesco);
     set('f-resp2-tel', a.Responsavel2Telefone);
     set('f-cpf', a.CPFouCIN); set('f-cep', a.CEP); set('f-endereco', a.Endereco);
+    if (state.modoModal === 'editar') { state.cpfOriginal = a.CPFouCIN || ''; _cpfVerificado = { cpf: null, achados: [] }; mostrarCpfExistente([]); }
     set('f-numero', a.Numero); set('f-complemento', a.Complemento);
     set('f-bairro', a.Bairro); set('f-municipio', a.Municipio); set('f-uf', a.UF);
     montarSelectPublico(a.PublicoAluno); set('f-comprovante', a.PublicoComprovanteURL);
@@ -1237,6 +1329,21 @@
   function salvarModal() {
     if(!validarModal()) return;
     var btn=el('btn-salvar-modal'); btn.disabled=true; btn.classList.add('loading');
+    // Última checagem do CPF antes de gravar (caso o campo não tenha perdido o foco).
+    verificarCpf().then(function(achados) {
+      if (achados.length) {
+        btn.disabled=false; btn.classList.remove('loading');
+        mostrarAba('pessoal');
+        mostrarAlertaModal(state.modoModal === 'editar'
+          ? 'Este CPF já pertence a outro aluno. Confira o número antes de salvar.'
+          : 'Já existe cadastro com este CPF. Abra o cadastro existente ou corrija o CPF.', 'erro');
+        return;
+      }
+      gravarModal(btn);
+    });
+  }
+
+  function gravarModal(btn) {
     var dados = coletarDados();
     if (state.modoModal === 'editar') {
       dados.id = state.alunoSelecionado ? state.alunoSelecionado.id : '';
@@ -1626,6 +1733,13 @@
     el('f-menor')             && el('f-menor').addEventListener('change',function(){ el('campos-responsaveis').style.display=this.checked?'block':'none'; });
     function mascaraCPF(input){ input.addEventListener('input',function(){ var v=this.value.replace(/\D/g,'').substring(0,11); if(v.length>9)v=v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4'); else if(v.length>6)v=v.replace(/(\d{3})(\d{3})(\d{0,3})/,'$1.$2.$3'); else if(v.length>3)v=v.replace(/(\d{3})(\d{0,3})/,'$1.$2'); this.value=v; }); }
     el('f-cpf')      && mascaraCPF(el('f-cpf'));
+    if (el('f-cpf')) {
+      el('f-cpf').addEventListener('blur', verificarCpf);
+      el('f-cpf').addEventListener('input', function() {
+        var d = soDigitos(this.value);
+        if (d.length === 11) verificarCpf(); else mostrarCpfExistente([]);
+      });
+    }
     el('f-resp1-cpf')&& mascaraCPF(el('f-resp1-cpf'));
     el('painel-aba-ficha')       && el('painel-aba-ficha').addEventListener('click',function(){ mostrarAbaPainel('ficha'); });
     el('painel-aba-ocorrencias') && el('painel-aba-ocorrencias').addEventListener('click',function(){ mostrarAbaPainel('ocorrencias'); });
