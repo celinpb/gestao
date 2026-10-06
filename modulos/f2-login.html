@@ -1,7 +1,14 @@
 <!--
-  F2_Login.html — versão 3
-  Correção: fetch com redirect:'follow' e melhor diagnóstico de erros
-  para contornar o comportamento de redirecionamento do Apps Script Web App.
+  f2-login.html — versão 4 (etapa 10: acesso por e-mail)
+  Telas:
+    1. Login
+    2. Defina sua senha — usada em três situações:
+         'convite'     — veio do link do convite (primeiro acesso)
+         'recuperacao' — veio do link de "Esqueci minha senha"
+         'primeiro'    — entrou com senha provisória gerada pelo admin
+       (o index.html avisa qual em window.SGE_MODO_SENHA)
+    3. Esqueci minha senha — pede login ou e-mail; o link vai só para o
+       e-mail cadastrado.
 -->
 
 <style>
@@ -185,6 +192,17 @@
 
   @keyframes spin-f2 { to { transform: rotate(360deg); } }
 
+  .link-sec {
+    display: block; width: 100%; margin-top: 14px;
+    background: none; border: none; cursor: pointer;
+    font-family: var(--font-sans); font-size: 13px; color: var(--c-text-2);
+    text-align: center; text-decoration: underline; text-underline-offset: 3px;
+    padding: 4px;
+  }
+  .link-sec:hover { color: var(--c-accent); }
+
+  .texto-ajuda { font-size: 13.5px; color: var(--c-text-2); margin-bottom: 18px; line-height: 1.6; }
+
   .alert {
     border-radius: var(--radius-md); padding: 11px 14px;
     font-size: 13px; margin-bottom: 16px; display: none;
@@ -212,14 +230,6 @@
   }
 
   .etapa-badge .material-icons-round { font-size: 13px; }
-
-  /* Diagnóstico (visível apenas durante depuração) */
-  #f2-debug {
-    font-size: 11px; font-family: monospace;
-    background: #f0f0f0; border: 1px solid #ccc;
-    border-radius: 6px; padding: 8px; margin-bottom: 12px;
-    color: #333; display: none; word-break: break-all;
-  }
 </style>
 
 <div id="login-root">
@@ -238,9 +248,6 @@
     </div>
 
     <div class="card-body">
-
-      <!-- Diagnóstico (remover após resolver) -->
-      <div id="f2-debug"></div>
 
       <div class="alert" id="f2-alert" role="alert">
         <span class="material-icons-round">error_outline</span>
@@ -276,16 +283,18 @@
           <div class="spinner-btn"></div>
           <span class="btn-label">Entrar</span>
         </button>
+
+        <button class="link-sec" id="f2-link-esqueci" type="button">Esqueci minha senha</button>
       </div>
 
-      <!-- TELA 2: PRIMEIRO ACESSO -->
+      <!-- TELA 2: DEFINA SUA SENHA -->
       <div id="f2-tela-primeiro-acesso" style="display:none;">
         <div class="etapa-badge">
           <span class="material-icons-round">lock_reset</span>
-          Primeiro acesso
+          <span id="f2-badge-texto">Primeiro acesso</span>
         </div>
 
-        <p style="font-size:13.5px;color:var(--c-text-2);margin-bottom:18px;line-height:1.6;">
+        <p class="texto-ajuda" id="f2-texto-definir">
           Esta é sua primeira entrada no sistema. Por segurança, defina uma nova senha pessoal agora.
         </p>
 
@@ -328,6 +337,33 @@
           <div class="spinner-btn"></div>
           <span class="btn-label">Definir senha e entrar</span>
         </button>
+
+        <button class="link-sec" id="f2-link-cancelar-definir" type="button">Cancelar e voltar ao login</button>
+      </div>
+
+      <!-- TELA 3: ESQUECI MINHA SENHA -->
+      <div id="f2-tela-esqueci" style="display:none;">
+        <p class="texto-ajuda">
+          Informe seu login ou o e-mail cadastrado. Se houver um usuário ativo com esses dados,
+          enviaremos um link para o <strong>e-mail cadastrado no sistema</strong> para você criar uma nova senha.
+        </p>
+
+        <div class="field">
+          <label for="f2-campo-esqueci">Login ou e-mail</label>
+          <div class="field-input-wrap">
+            <input type="text" id="f2-campo-esqueci"
+                   placeholder="seu.login ou email@escola.br"
+                   autocomplete="username" autocapitalize="none">
+          </div>
+          <div class="field-error" id="f2-err-esqueci">Informe seu login ou e-mail.</div>
+        </div>
+
+        <button class="btn-primary" id="f2-btn-enviar-link" type="button">
+          <div class="spinner-btn"></div>
+          <span class="btn-label">Enviar link</span>
+        </button>
+
+        <button class="link-sec" id="f2-link-voltar" type="button">Voltar ao login</button>
       </div>
 
     </div>
@@ -338,22 +374,24 @@
 (function () {
   'use strict';
 
-  var state = { loginOuEmail: null, senhaAtual: null };
+  var TEXTOS_DEFINIR = {
+    primeiro: {
+      badge: 'Primeiro acesso',
+      texto: 'Você entrou com uma senha provisória. Por segurança, defina agora uma senha pessoal.',
+      titulo: 'Defina sua senha', sub: 'Crie uma senha segura e pessoal'
+    },
+    convite: {
+      badge: 'Primeiro acesso',
+      texto: 'Bem-vindo(a) ao sistema! Para concluir seu cadastro, crie a sua senha de acesso.',
+      titulo: 'Crie sua senha', sub: 'Último passo para acessar o sistema'
+    },
+    recuperacao: {
+      badge: 'Nova senha',
+      texto: 'Crie uma nova senha para a sua conta. A senha anterior deixará de valer.',
+      titulo: 'Nova senha', sub: 'Crie uma senha segura e pessoal'
+    }
+  };
 
-  // -------------------------------------------------------
-  // DEBUG: exibe informações de diagnóstico na tela
-  // Remove ou comente após resolver o problema
-  // -------------------------------------------------------
-  function debug(msg) {
-    var el = document.getElementById('f2-debug');
-    if (!el) return;
-    el.style.display = 'block';
-    el.innerHTML += '<div>' + new Date().toLocaleTimeString() + ' — ' + msg + '</div>';
-  }
-
-  // -------------------------------------------------------
-  // UTILITÁRIOS
-  // -------------------------------------------------------
   function el(id) { return document.getElementById(id); }
 
   function setBotao(id, carregando) {
@@ -422,24 +460,58 @@
     return Object.keys(regras).every(function(k) { return regras[k]; });
   }
 
-  // -------------------------------------------------------
-  // CHAMADA À API — usa postApi() do api.js (fetch com text/plain)
-  // Funciona tanto no GitHub Pages quanto em qualquer servidor estático.
-  // O token é null para rotas públicas (login, definirNovaSenha).
-  // -------------------------------------------------------
   function chamarApi(acao, dados, callback) {
-    debug('Chamando: ' + acao);
-
-    // postApi() está definido em api.js, carregado pelo index.html
     postApi(acao, dados)
-      .then(function(resultado) {
-        debug('Resposta: ' + JSON.stringify(resultado).substring(0, 80));
-        callback(null, resultado);
-      })
-      .catch(function(erro) {
-        debug('ERRO: ' + (erro.message || JSON.stringify(erro)));
-        callback(erro, null);
-      });
+      .then(function(resultado) { callback(null, resultado); })
+      .catch(function(erro) { callback(erro, null); });
+  }
+
+  // -------------------------------------------------------
+  // NAVEGAÇÃO ENTRE TELAS
+  // -------------------------------------------------------
+  function mostrarTela(qual) {
+    el('f2-tela-login').style.display           = qual === 'login'   ? 'block' : 'none';
+    el('f2-tela-primeiro-acesso').style.display = qual === 'definir' ? 'block' : 'none';
+    el('f2-tela-esqueci').style.display         = qual === 'esqueci' ? 'block' : 'none';
+  }
+
+  function cabecalho(titulo, sub) {
+    if (el('f2-card-title'))    el('f2-card-title').textContent    = titulo;
+    if (el('f2-card-subtitle')) el('f2-card-subtitle').textContent = sub;
+  }
+
+  function irParaLogin() {
+    limpar();
+    mostrarTela('login');
+    cabecalho('Acesso ao sistema', 'Informe suas credenciais para continuar');
+    if (el('f2-campo-login')) el('f2-campo-login').focus();
+  }
+
+  function irParaDefinirSenha(modo) {
+    var t = TEXTOS_DEFINIR[modo] || TEXTOS_DEFINIR.primeiro;
+    limpar();
+    mostrarTela('definir');
+    cabecalho(t.titulo, t.sub);
+    el('f2-badge-texto').textContent   = t.badge;
+    el('f2-texto-definir').textContent = t.texto;
+    if (el('f2-nova-senha')) el('f2-nova-senha').focus();
+  }
+
+  function irParaEsqueci() {
+    limpar();
+    mostrarTela('esqueci');
+    cabecalho('Esqueci minha senha', 'Receba um link no seu e-mail');
+    var login = el('f2-campo-login') ? el('f2-campo-login').value.trim() : '';
+    if (login && el('f2-campo-esqueci')) el('f2-campo-esqueci').value = login;
+    if (el('f2-campo-esqueci')) el('f2-campo-esqueci').focus();
+  }
+
+  // Sair da tela "Defina sua senha" sem definir: encerra a sessão aberta
+  // pelo link/senha provisória, para não ficar ninguém logado pela metade.
+  function cancelarDefinir() {
+    window.SGE_MODO_SENHA = null;
+    try { sessionStorage.removeItem('sge_modo_senha'); } catch (e) {}
+    postApi('auth.logout', {}).finally(function() { irParaLogin(); });
   }
 
   // -------------------------------------------------------
@@ -466,24 +538,20 @@
     setBotao('f2-btn-entrar', true);
 
     chamarApi('auth.login', { loginOuEmail: login, senha: senha }, function(erro, res) {
+      setBotao('f2-btn-entrar', false);
       if (erro || !res) {
         alerta('Erro ao comunicar com o servidor. Tente novamente.');
-        setBotao('f2-btn-entrar', false);
         return;
       }
       if (!res.sucesso) {
         alerta(res.mensagem || 'Credenciais incorretas. Tente novamente.');
-        setBotao('f2-btn-entrar', false);
         return;
       }
-      if (res.primeirAcesso) {
-        state.loginOuEmail = login;
-        state.senhaAtual   = senha;
-        irParaPrimeiroAcesso();
-        setBotao('f2-btn-entrar', false);
+      if (res.primeirAcesso || (res.dados && res.dados.primeiroAcesso)) {
+        if (el('f2-campo-senha')) el('f2-campo-senha').value = '';
+        irParaDefinirSenha('primeiro');
         return;
       }
-      setBotao('f2-btn-entrar', false);
       if (typeof window.onLoginSucesso === 'function') {
         window.onLoginSucesso(null, res.dados ? res.dados.usuario : res.usuario);
       }
@@ -491,17 +559,8 @@
   }
 
   // -------------------------------------------------------
-  // TELA 2 — PRIMEIRO ACESSO
+  // TELA 2 — DEFINA SUA SENHA
   // -------------------------------------------------------
-  function irParaPrimeiroAcesso() {
-    el('f2-tela-login').style.display           = 'none';
-    el('f2-tela-primeiro-acesso').style.display = 'block';
-    if (el('f2-card-title'))    el('f2-card-title').textContent    = 'Defina sua senha';
-    if (el('f2-card-subtitle')) el('f2-card-subtitle').textContent = 'Crie uma senha segura e pessoal';
-    semAlerta();
-    if (el('f2-nova-senha')) el('f2-nova-senha').focus();
-  }
-
   function definirNovaSenha() {
     limpar();
     var nova     = el('f2-nova-senha')      ? el('f2-nova-senha').value      : '';
@@ -526,12 +585,7 @@
 
     setBotao('f2-btn-definir', true);
 
-    chamarApi('auth.definirNovaSenha', {
-      loginOuEmail:     state.loginOuEmail,
-      senhaAtual:       state.senhaAtual,
-      novaSenha:        nova,
-      confirmacaoSenha: confirma,
-    }, function(erro, res) {
+    chamarApi('auth.definirNovaSenha', { novaSenha: nova }, function(erro, res) {
       if (erro || !res) {
         alerta('Erro ao comunicar com o servidor. Tente novamente.');
         setBotao('f2-btn-definir', false);
@@ -543,8 +597,9 @@
         return;
       }
       alerta('Senha definida com sucesso! Entrando…', 'success');
-      setBotao('f2-btn-definir', false);
       setTimeout(function() {
+        setBotao('f2-btn-definir', false);
+        window.SGE_MODO_SENHA = null;
         if (typeof window.onLoginSucesso === 'function') {
           window.onLoginSucesso(null, res.dados ? res.dados.usuario : res.usuario);
         }
@@ -553,42 +608,53 @@
   }
 
   // -------------------------------------------------------
+  // TELA 3 — ESQUECI MINHA SENHA
+  // -------------------------------------------------------
+  function enviarLink() {
+    limpar();
+    var chave = el('f2-campo-esqueci') ? el('f2-campo-esqueci').value.trim() : '';
+    if (!chave) {
+      erroField('f2-err-esqueci', 'Informe seu login ou e-mail.');
+      if (el('f2-campo-esqueci')) el('f2-campo-esqueci').classList.add('error');
+      return;
+    }
+    setBotao('f2-btn-enviar-link', true);
+    chamarApi('auth.solicitarRecuperacao', { loginOuEmail: chave }, function(erro, res) {
+      setBotao('f2-btn-enviar-link', false);
+      if (erro || !res) {
+        alerta('Erro ao comunicar com o servidor. Tente novamente.');
+        return;
+      }
+      if (!res.sucesso) {
+        alerta(res.mensagem || 'Não foi possível enviar o link. Tente novamente.');
+        return;
+      }
+      alerta(res.mensagem || 'Se houver um usuário ativo com esses dados, enviamos um link para o e-mail cadastrado.', 'success');
+    });
+  }
+
+  // -------------------------------------------------------
   // REGISTRO DE EVENTOS
   // -------------------------------------------------------
+  function aoEnter(id, fn) {
+    var c = el(id);
+    if (c) c.addEventListener('keydown', function(e) { if (e.key === 'Enter') fn(); });
+  }
+
   function init() {
-    debug('F2 init() executado no GitHub Pages.');
+    if (el('f2-btn-entrar'))     el('f2-btn-entrar').addEventListener('click', tentarLogin);
+    if (el('f2-btn-definir'))    el('f2-btn-definir').addEventListener('click', definirNovaSenha);
+    if (el('f2-btn-enviar-link')) el('f2-btn-enviar-link').addEventListener('click', enviarLink);
+    if (el('f2-link-esqueci'))   el('f2-link-esqueci').addEventListener('click', irParaEsqueci);
+    if (el('f2-link-voltar'))    el('f2-link-voltar').addEventListener('click', irParaLogin);
+    if (el('f2-link-cancelar-definir')) el('f2-link-cancelar-definir').addEventListener('click', cancelarDefinir);
 
-    var btnEntrar  = el('f2-btn-entrar');
-    var btnDefinir = el('f2-btn-definir');
-    var campoLogin = el('f2-campo-login');
-    var campoSenha = el('f2-campo-senha');
-    var campoNova  = el('f2-nova-senha');
-    var campoConf  = el('f2-confirmar-senha');
-
-    if (btnEntrar)  btnEntrar.addEventListener('click', tentarLogin);
-    if (btnDefinir) btnDefinir.addEventListener('click', definirNovaSenha);
-
-    if (campoLogin) {
-      campoLogin.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && campoSenha) campoSenha.focus();
-      });
-    }
-    if (campoSenha) {
-      campoSenha.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') tentarLogin();
-      });
-    }
-    if (campoNova) {
-      campoNova.addEventListener('input', checarRegras);
-      campoNova.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && campoConf) campoConf.focus();
-      });
-    }
-    if (campoConf) {
-      campoConf.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') definirNovaSenha();
-      });
-    }
+    aoEnter('f2-campo-login', function() { if (el('f2-campo-senha')) el('f2-campo-senha').focus(); });
+    aoEnter('f2-campo-senha', tentarLogin);
+    aoEnter('f2-nova-senha', function() { if (el('f2-confirmar-senha')) el('f2-confirmar-senha').focus(); });
+    aoEnter('f2-confirmar-senha', definirNovaSenha);
+    aoEnter('f2-campo-esqueci', enviarLink);
+    if (el('f2-nova-senha')) el('f2-nova-senha').addEventListener('input', checarRegras);
 
     [
       ['f2-toggle-senha',     'f2-campo-senha'],
@@ -599,7 +665,16 @@
       if (btn) btn.addEventListener('click', function() { toggleSenha(par[1], this); });
     });
 
-    if (campoLogin) campoLogin.focus();
+    // Avisos e modo vindos do index.html (link do e-mail, sessão encerrada…)
+    if (window.SGE_MODO_SENHA) {
+      irParaDefinirSenha(window.SGE_MODO_SENHA);
+    } else {
+      irParaLogin();
+    }
+    if (window.SGE_AVISO_LOGIN) {
+      alerta(window.SGE_AVISO_LOGIN);
+      window.SGE_AVISO_LOGIN = null;
+    }
   }
 
   if (document.readyState === 'loading') {
