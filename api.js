@@ -41,6 +41,49 @@ function _err(mensagem, codigo) {
 }
 
 // =============================================================================
+// _buscarTodas() — leitura completa, em partes (revisão de 06/10)
+// -----------------------------------------------------------------------------
+// O Supabase entrega no máximo "Max Rows" linhas por consulta (neste projeto:
+// 1000) e CORTA O RESTO SEM AVISAR. Toda listagem que pode passar disso
+// (matrículas de um semestre, frequências, notas, turmas/calendário de vários
+// semestres…) usa este helper: pede a 1ª parte já com a contagem exata e
+// continua pedindo até juntar tudo. Como se guia pela contagem, funciona com
+// qualquer valor de Max Rows.
+//
+// `construir(opcoes)` deve devolver a consulta (sb.from(...).select(colunas,
+// opcoes) + filtros) SEMPRE com uma ordenação que termine numa coluna (ou
+// combinação) única — sem isso, as partes podem repetir ou pular linhas.
+// Devolve { data, error } como o próprio Supabase.
+// =============================================================================
+var LOTE_LEITURA = 1000;
+
+async function _buscarTodas(construir) {
+  var primeira = await construir({ count: 'exact' }).range(0, LOTE_LEITURA - 1);
+  if (primeira.error) return { data: null, error: primeira.error };
+  var dados = (primeira.data || []).slice();
+  var total = (typeof primeira.count === 'number') ? primeira.count : null;
+  var ultimoLote = dados.length;
+  for (var volta = 0; volta < 500; volta++) {
+    var falta = (total !== null) ? dados.length < total : ultimoLote === LOTE_LEITURA;
+    if (!falta || ultimoLote === 0) break;
+    var res = await construir().range(dados.length, dados.length + LOTE_LEITURA - 1);
+    if (res.error) return { data: null, error: res.error };
+    var lote = res.data || [];
+    ultimoLote = lote.length;
+    for (var i = 0; i < lote.length; i++) dados.push(lote[i]);
+  }
+  return { data: dados, error: null };
+}
+
+// Divide uma lista em pedaços (para filtros .in() com muitos ids, que
+// estourariam o tamanho máximo do endereço da requisição).
+function _pedacos(lista, tamanho) {
+  var saida = [];
+  for (var i = 0; i < lista.length; i += tamanho) saida.push(lista.slice(i, i + tamanho));
+  return saida;
+}
+
+// =============================================================================
 // postApi() — wrapper principal (mantém assinatura idêntica ao sistema anterior)
 // Todos os módulos HTML chamam postApi(acao, dados) e recebem { sucesso, dados, mensagem }
 // =============================================================================
@@ -359,10 +402,11 @@ async function _definirNovaSenha(sb, dados) {
 // =============================================================================
 
 async function _usuariosListar(sb, dados) {
-  var res = await sb
-    .from('usuarios')
-    .select('id, external_id, login, nome, email, papel, situacao_ativo, criado_em')
-    .order('nome');
+  var res = await _buscarTodas(function(opcoes) {
+    return sb.from('usuarios')
+      .select('id, external_id, login, nome, email, papel, situacao_ativo, criado_em', opcoes)
+      .order('nome').order('id');
+  });
   if (res.error) return _err(res.error.message);
   var lista = res.data || [];
   // A tela de Usuários pede também a situação da conta de acesso (convite
@@ -449,7 +493,7 @@ async function _alunosListar(sb, dados) {
 
   var query = sb.from('alunos')
     .select('id, external_id, nome_completo, nome_social, nascimento, nascimento_uf, nascimento_municipio, genero, raca, estado_civil, estrangeiro, telefone, email, municipio, uf, bairro, pcd, pcd_tipo, situacao_ativo, inscricao_data_hora', { count: 'exact' })
-    .order('nome_completo');
+    .order('nome_completo').order('id'); // 'id' desempata nomes iguais (senão a paginação repete/pula alunos)
   if (dados.somenteAtivos) query = query.eq('situacao_ativo', true);
   if (dados.busca) query = query.or('nome_completo.ilike.%' + dados.busca + '%,nome_social.ilike.%' + dados.busca + '%');
   query = query.range(de, ate);
@@ -663,13 +707,15 @@ async function _alunosSensiveisBuscar(sb, dados) {
 // =============================================================================
 
 async function _cursosListar(sb, dados) {
-  var query = sb.from('cursos')
-    .select('id, external_id, nome, sigla, idade_minima_meses, idade_maxima_meses, ativo, idioma_id, idiomas(id, nome), curso_avaliacoes(avaliacao_id, ordem)')
-    .order('sigla');
-  if (dados && dados.idioma) {
-    query = query.eq('idiomas.nome', dados.idioma);
-  }
-  var res = await query;
+  var res = await _buscarTodas(function(opcoes) {
+    var query = sb.from('cursos')
+      .select('id, external_id, nome, sigla, idade_minima_meses, idade_maxima_meses, ativo, idioma_id, idiomas(id, nome), curso_avaliacoes(avaliacao_id, ordem)', opcoes)
+      .order('sigla').order('id');
+    if (dados && dados.idioma) {
+      query = query.eq('idiomas.nome', dados.idioma);
+    }
+    return query;
+  });
   if (res.error) return _err(res.error.message);
   return _ok(res.data);
 }
@@ -763,9 +809,13 @@ async function _semestresAtualizar(sb, dados) {
 // -----------------------------------------------------------------------------
 
 async function _calendarioListar(sb, dados) {
-  var query = sb.from('calendario').select('*').order('data_aula');
-  if (dados && dados.semestre_id) query = query.eq('semestre_id', dados.semestre_id);
-  var res = await query;
+  // Sem filtro de semestre (ex.: f8-relatorios.html) traz o calendário de
+  // TODOS os semestres — ~140 dias cada, passa de 1000 em poucos semestres.
+  var res = await _buscarTodas(function(opcoes) {
+    var query = sb.from('calendario').select('*', opcoes).order('data_aula').order('semestre_id');
+    if (dados && dados.semestre_id) query = query.eq('semestre_id', dados.semestre_id);
+    return query;
+  });
   if (res.error) return _err(res.error.message);
   return _ok(res.data);
 }
@@ -787,13 +837,16 @@ async function _calendarioSalvar(sb, dados) {
 // =============================================================================
 
 async function _turmasListar(sb, dados) {
-  var query = sb.from('turmas')
-    .select('*, semestres(rotulo), cursos(nome, sigla, external_id)')
-    .order('external_id');
-  if (dados && dados.semestre_id) query = query.eq('semestre_id', dados.semestre_id);
-  if (dados && dados.professor_id) query = query.eq('professor_id', dados.professor_id);
-  if (dados && dados.situacao)     query = query.eq('situacao', dados.situacao);
-  var res = await query;
+  // ~270 turmas por semestre: sem filtro de semestre, passa de 1000 em poucos semestres.
+  var res = await _buscarTodas(function(opcoes) {
+    var query = sb.from('turmas')
+      .select('*, semestres(rotulo), cursos(nome, sigla, external_id)', opcoes)
+      .order('external_id').order('id');
+    if (dados && dados.semestre_id) query = query.eq('semestre_id', dados.semestre_id);
+    if (dados && dados.professor_id) query = query.eq('professor_id', dados.professor_id);
+    if (dados && dados.situacao)     query = query.eq('situacao', dados.situacao);
+    return query;
+  });
   if (res.error) return _err(res.error.message);
   var linhas = res.data || [];
   // O join direto com `usuarios` não é mais possível para professor/secretaria
@@ -824,13 +877,23 @@ async function _matriculasAtivasPorTurma(sb, turmaIds) {
   var unicos = (turmaIds || []).filter(function(v) { return !!v; })
     .filter(function(v, i, arr) { return arr.indexOf(v) === i; });
   if (!unicos.length) return {};
-  var res = await sb.from('matriculas').select('turma_id').eq('situacao', 'ATIVA').in('turma_id', unicos);
-  if (res.error) {
-    console.error('_matriculasAtivasPorTurma erro:', res.error);
-    return {};
-  }
+  // Antes: uma consulta só, que voltava cortada em 1000 linhas (o semestre tem
+  // ~3.700 matrículas) — as vagas ocupadas das turmas apareciam erradas.
+  // Agora: turmas em pedaços de 100 (o endereço da requisição tem tamanho
+  // máximo) e cada pedaço lido por completo.
   var mapa = {};
-  (res.data || []).forEach(function(m) { mapa[m.turma_id] = (mapa[m.turma_id] || 0) + 1; });
+  var grupos = _pedacos(unicos, 100);
+  for (var g = 0; g < grupos.length; g++) {
+    var res = await _buscarTodas(function(opcoes) {
+      return sb.from('matriculas').select('id, turma_id', opcoes)
+        .eq('situacao', 'ATIVA').in('turma_id', grupos[g]).order('id');
+    });
+    if (res.error) {
+      console.error('_matriculasAtivasPorTurma erro:', res.error);
+      return {};
+    }
+    (res.data || []).forEach(function(m) { mapa[m.turma_id] = (mapa[m.turma_id] || 0) + 1; });
+  }
   return mapa;
 }
 
@@ -855,14 +918,18 @@ async function _turmasAtualizar(sb, dados) {
 // =============================================================================
 
 async function _matriculasListar(sb, dados) {
-  var query = sb.from('matriculas')
-    .select('*, alunos(external_id, nome_completo, nome_social, pcd), turmas!matriculas_turma_id_fkey(id, external_id, estagio, curso_id)')
-    .order('data_matricula', { ascending: false, nullsFirst: false });
-  if (dados && dados.turma_id)    query = query.eq('turma_id', dados.turma_id);
-  if (dados && dados.aluno_id)    query = query.eq('aluno_id', dados.aluno_id);
-  if (dados && dados.semestre_id) query = query.eq('semestre_id', dados.semestre_id);
-  if (dados && dados.situacao)    query = query.eq('situacao', dados.situacao);
-  var res = await query;
+  // Por semestre (relatório condensado, painel etc.) são ~3.700 linhas —
+  // antes voltavam só as 1000 primeiras.
+  var res = await _buscarTodas(function(opcoes) {
+    var query = sb.from('matriculas')
+      .select('*, alunos(external_id, nome_completo, nome_social, pcd), turmas!matriculas_turma_id_fkey(id, external_id, estagio, curso_id)', opcoes)
+      .order('data_matricula', { ascending: false, nullsFirst: false }).order('id');
+    if (dados && dados.turma_id)    query = query.eq('turma_id', dados.turma_id);
+    if (dados && dados.aluno_id)    query = query.eq('aluno_id', dados.aluno_id);
+    if (dados && dados.semestre_id) query = query.eq('semestre_id', dados.semestre_id);
+    if (dados && dados.situacao)    query = query.eq('situacao', dados.situacao);
+    return query;
+  });
   if (res.error) return _err(res.error.message);
   return _ok(res.data);
 }
@@ -1049,48 +1116,20 @@ async function _frequenciasListar(sb, dados) {
   // verdade a LEITURA é que nunca voltava com dado nenhum. Os nomes já vêm
   // por outro caminho (matriculas.listar) em todas as telas que usam isto.
   //
-  // Paginação interna (2026-09-25): sem `.range()`, o PostgREST/Supabase
-  // aplica um teto padrão de linhas por consulta (tipicamente 1000) e
-  // trunca silenciosamente — sem erro — qualquer resultado maior, o que é
-  // um risco real aqui: `frequencias.listar({})` sem filtro (usado pelo
-  // relatório condensado em f8-relatorios.html) pode facilmente passar de
-  // 1000 linhas. Em vez de expor `pagina`/`tamanhoPagina` na API pública
-  // (como `_alunosListar` faz) — o que quebraria todo mundo que já chama
-  // esta ação esperando `dados` como array simples (f6-diario.html e
-  // vários pontos de f8-relatorios.html) — a paginação acontece aqui
-  // dentro, de forma transparente: busca em lotes via `.range()` até não
-  // haver mais linhas, e devolve o array completo acumulado. O contrato
-  // externo (`{sucesso, dados: [...]}`) não muda para ninguém.
-  //
-  // TAMANHO_LOTE precisa ser MENOR OU IGUAL ao teto real configurado no
-  // projeto Supabase (Settings → API → "Max Rows"), senão o próprio lote
-  // pode vir truncado sem a gente perceber, reproduzindo o mesmo bug de
-  // outra forma. 500 é uma estimativa conservadora (o padrão de fábrica do
-  // Supabase é 1000) — ainda não confirmamos o valor real deste projeto
-  // especificamente, então isso fica sinalizado como pendência.
-  var TAMANHO_LOTE = 500;
-
-  function construirQuery() {
-    var q = sb.from('frequencias').select('*');
+  // Leitura completa em partes (ver _buscarTodas): `frequencias.listar({})`
+  // sem filtro (relatórios condensado e controle de registros) passa de
+  // 17 mil linhas. Ordenação por (matricula_id, data_aula), que é única —
+  // a versão anterior paginava SEM ordenação, o que podia repetir ou pular
+  // linhas entre as partes.
+  var res = await _buscarTodas(function(opcoes) {
+    var q = sb.from('frequencias').select('*', opcoes).order('matricula_id').order('data_aula');
     if (dados && dados.turma_id)    q = q.eq('turma_id', dados.turma_id);
     if (dados && dados.matricula_id) q = q.eq('matricula_id', dados.matricula_id);
     if (dados && dados.data_aula)   q = q.eq('data_aula', dados.data_aula);
     return q;
-  }
-
-  var acumulado = [];
-  var pagina = 0;
-  while (true) {
-    var de = pagina * TAMANHO_LOTE;
-    var ate = de + TAMANHO_LOTE - 1;
-    var res = await construirQuery().range(de, ate);
-    if (res.error) return _err(res.error.message);
-    var lote = res.data || [];
-    acumulado = acumulado.concat(lote);
-    if (lote.length < TAMANHO_LOTE) break;
-    pagina++;
-  }
-  return _ok(acumulado);
+  });
+  if (res.error) return _err(res.error.message);
+  return _ok(res.data);
 }
 
 async function _frequenciasSalvar(sb, dados) {
@@ -1110,9 +1149,11 @@ async function _frequenciasSalvar(sb, dados) {
 // =============================================================================
 
 async function _conteudoListar(sb, dados) {
-  var query = sb.from('conteudo').select('*').order('data_aula', { ascending: false });
-  if (dados && dados.turma_id) query = query.eq('turma_id', dados.turma_id);
-  var res = await query;
+  var res = await _buscarTodas(function(opcoes) {
+    var query = sb.from('conteudo').select('*', opcoes).order('data_aula', { ascending: false }).order('turma_id');
+    if (dados && dados.turma_id) query = query.eq('turma_id', dados.turma_id);
+    return query;
+  });
   if (res.error) return _err(res.error.message);
   return _ok(res.data);
 }
@@ -1138,10 +1179,14 @@ async function _conteudoSalvar(sb, dados) {
 // =============================================================================
 
 async function _notasListar(sb, dados) {
-  var query = sb.from('notas').select('*, avaliacoes(componente_nota, tipo)');
-  if (dados && dados.matricula_id) query = query.eq('matricula_id', dados.matricula_id);
-  if (dados && dados.semestre_id)  query = query.eq('semestre_id', dados.semestre_id);
-  var res = await query;
+  // Por semestre (relatório condensado): ~3.700 matrículas × várias notas.
+  var res = await _buscarTodas(function(opcoes) {
+    var query = sb.from('notas').select('*, avaliacoes(componente_nota, tipo)', opcoes)
+      .order('matricula_id').order('componente_nota').order('subcomponente_nota');
+    if (dados && dados.matricula_id) query = query.eq('matricula_id', dados.matricula_id);
+    if (dados && dados.semestre_id)  query = query.eq('semestre_id', dados.semestre_id);
+    return query;
+  });
   if (res.error) return _err(res.error.message);
   return _ok(res.data);
 }
@@ -1163,14 +1208,16 @@ async function _notasSalvar(sb, dados) {
 // =============================================================================
 
 async function _ocorrenciasListar(sb, dados) {
-  var query = sb.from('ocorrencias')
-    .select('*, alunos(nome_completo, nome_social), ocorrencia_destinatarios(usuario_id), ocorrencia_respostas(id, texto, criado_em, autor_id)')
-    .order('criado_em', { ascending: false });
-  if (dados && dados.aluno_id)     query = query.eq('aluno_id', dados.aluno_id);
-  if (dados && dados.status)       query = query.eq('status', dados.status);
-  if (dados && dados.tipo)         query = query.eq('tipo', dados.tipo);
-  if (dados && dados.semestre_id)  query = query.eq('semestre_ref_id', dados.semestre_id);
-  var res = await query;
+  var res = await _buscarTodas(function(opcoes) {
+    var query = sb.from('ocorrencias')
+      .select('*, alunos(nome_completo, nome_social), ocorrencia_destinatarios(usuario_id), ocorrencia_respostas(id, texto, criado_em, autor_id)', opcoes)
+      .order('criado_em', { ascending: false }).order('id');
+    if (dados && dados.aluno_id)     query = query.eq('aluno_id', dados.aluno_id);
+    if (dados && dados.status)       query = query.eq('status', dados.status);
+    if (dados && dados.tipo)         query = query.eq('tipo', dados.tipo);
+    if (dados && dados.semestre_id)  query = query.eq('semestre_ref_id', dados.semestre_id);
+    return query;
+  });
   if (res.error) return _err(res.error.message);
   var linhas = res.data || [];
   // Nomes resolvidos à parte via usuarios_publico (join direto com `usuarios`
@@ -1248,6 +1295,9 @@ async function _ocorrenciasCriar(sb, dados) {
 }
 
 async function _ocorrenciasResponder(sb, dados) {
+  // Aceita os dois nomes de campo: o painel (dashboard.html) manda
+  // `ocorrenciaId`, a ficha do aluno (f4-alunos.html) manda `ocorrencia_id`.
+  dados.ocorrencia_id = dados.ocorrencia_id || dados.ocorrenciaId;
   if (!dados.ocorrencia_id || !dados.texto) return _err('ID e texto são obrigatórios.', 400);
   var usuario = Auth.getUsuario();
   var res = await sb.from('ocorrencia_respostas').insert({
@@ -1365,7 +1415,7 @@ async function _auditoriaListar(sb, dados) {
 
   var query = sb.from('auditoria')
     .select('id, criado_em, usuario_id, usuario_nome, papel, acao, modulo, tipo_operacao, entidade_id, descricao, dados_antigos, dados_novos, semestre_id', { count: 'exact' })
-    .order('criado_em', { ascending: false });
+    .order('criado_em', { ascending: false }).order('id', { ascending: false }); // 'id' desempata (paginação estável)
   if (dados.de)            query = query.gte('criado_em', dados.de + 'T00:00:00-03:00');
   if (dados.ate)           query = query.lte('criado_em', dados.ate + 'T23:59:59.999-03:00');
   if (dados.usuario_id)    query = query.eq('usuario_id', dados.usuario_id);
@@ -1391,10 +1441,12 @@ async function _auditoriaListar(sb, dados) {
 // =============================================================================
 
 async function _comentariosListar(sb, dados) {
-  var query = sb.from('comentarios').select('*').order('etapa');
-  if (dados && dados.matricula_id) query = query.eq('matricula_id', dados.matricula_id);
-  if (dados && dados.turma_id)     query = query.eq('turma_id', dados.turma_id);
-  var res = await query;
+  var res = await _buscarTodas(function(opcoes) {
+    var query = sb.from('comentarios').select('*', opcoes).order('etapa').order('matricula_id');
+    if (dados && dados.matricula_id) query = query.eq('matricula_id', dados.matricula_id);
+    if (dados && dados.turma_id)     query = query.eq('turma_id', dados.turma_id);
+    return query;
+  });
   if (res.error) return _err(res.error.message);
   return _ok(res.data);
 }
@@ -1421,26 +1473,31 @@ async function _comentariosSalvar(sb, dados) {
 // =============================================================================
 
 async function _relatoriosFrequencia(sb, dados) {
-  var query = sb.from('frequencia_resumo').select('*');
-  if (dados && dados.turma_id)    query = query.eq('turma_id', dados.turma_id);
-  if (dados && dados.semestre_id) query = query.eq('semestre_id', dados.semestre_id);
-  var res = await query;
+  var res = await _buscarTodas(function(opcoes) {
+    var query = sb.from('frequencia_resumo').select('*', opcoes).order('matricula_id');
+    if (dados && dados.turma_id)    query = query.eq('turma_id', dados.turma_id);
+    if (dados && dados.semestre_id) query = query.eq('semestre_id', dados.semestre_id);
+    return query;
+  });
   if (res.error) return _err(res.error.message);
   return _ok(res.data);
 }
 
 // Funções auxiliares de ocorrências adicionais
 async function _ocorrenciasListarRespostas(sb, dados) {
-  if (!dados.ocorrenciaId) return _err('ocorrenciaId é obrigatório.', 400);
+  // Mesmo caso: `ocorrenciaId` (painel) ou `ocorrencia_id` (ficha do aluno).
+  var ocorrenciaId = dados.ocorrenciaId || dados.ocorrencia_id;
+  if (!ocorrenciaId) return _err('ocorrenciaId é obrigatório.', 400);
   var res = await sb.from('ocorrencia_respostas')
     .select('*')
-    .eq('ocorrencia_id', dados.ocorrenciaId)
+    .eq('ocorrencia_id', ocorrenciaId)
     .order('criado_em');
   if (res.error) return _err(res.error.message);
   var linhas = res.data || [];
   var mapaNomes = await _nomesPublicos(sb, linhas.map(function(r) { return r.autor_id; }));
   linhas.forEach(function(r) {
     r.autor = r.autor_id ? { nome: (mapaNomes[r.autor_id] || {}).nome || '' } : null;
+    r.usuarios = r.autor; // nome que f4-alunos.html lê
   });
   return _ok(linhas);
 }
