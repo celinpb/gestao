@@ -222,6 +222,8 @@ async function tratarLinkDoEmail(sb) {
     refresh_token: p.get('refresh_token') || '',
   });
   limparEndereco();
+  // Link válido: a sessão aberta por ele começa com o prazo cheio de 30 min.
+  if (!r.error) Auth.definirDuracao(Auth.SESSAO_SEGUNDOS);
   if (r.error) {
     window.SGE_AVISO_LOGIN = 'Este link expirou ou já foi usado. Use "Esqueci minha senha" para receber um novo.';
     return;
@@ -243,6 +245,21 @@ async function init() {
   // Verifica sessão ativa no Supabase Auth
   var temSessao = await Auth.temSessao();
   if (!temSessao) {
+    carregarLogin();
+    return;
+  }
+
+  // Sessão de 30 min sem uso (como no sistema antigo): se a página foi
+  // reaberta depois do prazo — aba fechada, computador desligado — a sessão
+  // guardada no navegador é encerrada em vez de entrar direto. Precisa vir
+  // ANTES de qualquer postApi(), que renovaria o prazo.
+  var restante = Auth.getSegundosRestantes();
+  if (restante === null || restante <= 0) {
+    try { await sb.auth.signOut(); } catch (e) {}
+    Auth.limpar();
+    try { sessionStorage.removeItem('sge_modo_senha'); } catch (e) {}
+    window.SGE_MODO_SENHA = null;
+    if (restante === 0) window.SGE_AVISO_LOGIN = 'Sua sessão expirou por inatividade (30 minutos). Faça login novamente.';
     carregarLogin();
     return;
   }
@@ -491,12 +508,11 @@ document.getElementById('btn-logout').addEventListener('click', function() {
 // =========================================================
 // CONTADOR DE SESSÃO (contagem regressiva + logout automático)
 // =========================================================
-// Lê Auth.getSegundosRestantes() a cada segundo. Esse valor é calculado a
-// partir da duração informada pelo próprio back-end (M1.SESSAO.DURACAO_MINUTOS)
-// e é renovado automaticamente em toda chamada de API bem-sucedida (ver
-// api.js), espelhando o sliding window que o servidor já aplica no
-// CacheService. Assim, o número mostrado aqui nunca diverge do que o
-// back-end realmente está usando para expirar a sessão.
+// Lê Auth.getSegundosRestantes() a cada segundo. O prazo é de 30 minutos sem
+// uso (Auth.SESSAO_SEGUNDOS em auth.js, igual ao sistema antigo) e volta a 30
+// a cada chamada bem-sucedida ao banco (_ok em api.js chama Auth.renovar()).
+// Ao chegar a zero, encerra a sessão. O prazo fica no localStorage, então vale
+// para todas as abas abertas e também ao reabrir a página (ver init()).
 var _sessaoIntervalo = null;
 
 function iniciarContadorSessao() {
