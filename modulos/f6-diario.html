@@ -579,6 +579,7 @@
       postApi('frequencias.listar',{turma_id:turmaUuid}), // todas as datas para contar faltas
     ]).then(function(res){
       S.matriculas=(res[0].sucesso&&res[0].dados)?res[0].dados.map(normMatricula):[];
+      S.matriculas.sort(function(a,b){return (a.NomeExibicao||'').localeCompare(b.NomeExibicao||'','pt-BR',{sensitivity:'base'});}); // ordem alfabética
 
       // Frequências desta data específica (chave = matricula_id / m.id, uuid)
       if(res[1].sucesso&&res[1].dados&&res[1].dados.length>0){
