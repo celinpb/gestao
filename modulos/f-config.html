@@ -1,13 +1,36 @@
 <!--
   F_Config.html
-  Configurações gerais da escola: dados institucionais, logo e gestão de semestres.
+  Configurações gerais da escola, organizadas em abas: Escola (dados e logo),
+  Semestres, Calendário, Público-alvo, Portal do Aluno e Regras de acesso.
   Visível apenas para admin.
   (07/10) Card "Portal do Aluno" (E1): situação da última atualização da
-  cópia que o portal consulta e botão "Atualizar agora".
+  cópia que o portal consulta e botão "Atualizar agora"; envio dos códigos
+  por e-mail (fase 5): andamento, ligar/pausar, lote agora, teste, reenviar
+  e lista de alunos sem e-mail.
+  (07/10) Página reorganizada em abas (a última aba aberta é lembrada durante
+  a sessão do navegador) e nova aba "Calendário": o admin edita os dias do
+  semestre atual (letivo / não letivo + observação), um a um ou em intervalo,
+  cria dias extras e remove dias das pontas do calendário. Exige
+  claude/etapa13-calendario-admin.sql (regras de acesso + aviso de
+  frequência já lançada).
 -->
 <style>
   .cfg-secoes{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
   @media(max-width:800px){.cfg-secoes{grid-template-columns:1fr;}}
+
+  /* Abas */
+  .cfg-abas{display:flex;gap:2px;border-bottom:1px solid var(--c-border,#E8E7E2);margin-bottom:20px;overflow-x:auto;scrollbar-width:thin;}
+  .cfg-aba{flex-shrink:0;display:inline-flex;align-items:center;gap:7px;height:42px;padding:0 14px;border:none;border-bottom:2.5px solid transparent;background:none;cursor:pointer;font-family:var(--font-sans,sans-serif);font-size:13.5px;font-weight:500;color:var(--c-text-2,#5C5C7A);white-space:nowrap;transition:color 150ms ease,border-color 150ms ease;margin-bottom:-1px;}
+  .cfg-aba .material-icons-round{font-size:18px;}
+  .cfg-aba:hover{color:var(--c-text-1,#1A1A2E);}
+  .cfg-aba.ativa{color:#E63946;border-bottom-color:#E63946;font-weight:600;}
+  .cfg-aba-selo{display:none;align-items:center;height:18px;padding:0 7px;border-radius:99px;font-size:11px;font-weight:600;background:rgba(212,168,67,0.16);color:#8A6412;}
+  .cfg-aba-selo.show{display:inline-flex;}
+  .cfg-aba-selo.alerta{background:rgba(230,57,70,0.12);color:#A32D2D;}
+  .cfg-painel{display:none;}
+  .cfg-painel.ativo{display:block;animation:cfg-painel-in 180ms ease;}
+  @keyframes cfg-painel-in{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+  .cfg-painel > .cfg-card + .cfg-card{margin-top:20px;}
 
   .cfg-card{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:10px;overflow:hidden;}
   .cfg-card-header{padding:14px 18px;border-bottom:1px solid var(--c-border,#E8E7E2);display:flex;align-items:center;gap:8px;}
@@ -34,6 +57,7 @@
   .btn-cfg-primario:disabled{opacity:0.55;cursor:not-allowed;}
   .btn-cfg-sec{background:#fff;color:var(--c-text-1,#1A1A2E);border:1.5px solid var(--c-border,#E8E7E2);}
   .btn-cfg-sec:hover{background:#F5F4F0;}
+  .btn-cfg-sec:disabled{opacity:0.55;cursor:not-allowed;}
   @keyframes spin-cfg{to{transform:rotate(360deg);}}
 
   /* Logo */
@@ -153,6 +177,61 @@
   .pt-linha.erro{color:#B01020;}
   .pt-linha.erro .material-icons-round{color:#E63946;}
   .pt-acoes{display:flex;gap:8px;flex-wrap:wrap;}
+  .pt-barra{height:8px;border-radius:99px;background:#F0EEE8;overflow:hidden;margin:2px 0 14px;}
+  .pt-barra-fill{height:100%;width:0;background:#2A9D8F;border-radius:99px;transition:width 300ms ease;}
+  .pt-reenviar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;}
+  .pt-reenviar .cfg-input{max-width:200px;font-variant-numeric:tabular-nums;letter-spacing:0.04em;}
+  .btn-cfg-pausa{background:#1A1A2E;color:#fff;}
+  .btn-cfg-pausa:hover{background:#2D2D4A;}
+
+  /* Calendário letivo */
+  .cal-topo{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+  .cal-semestre{font-size:13px;color:var(--c-text-2,#5C5C7A);}
+  .cal-semestre strong{color:var(--c-text-1,#1A1A2E);}
+  .cal-metricas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px;}
+  @media(max-width:560px){.cal-metricas{grid-template-columns:1fr 1fr;}}
+  .cal-metrica{background:#FAFAF8;border:1px solid var(--c-border,#E8E7E2);border-radius:8px;padding:10px 14px;}
+  .cal-metrica span{display:block;font-size:11px;font-weight:500;letter-spacing:0.3px;text-transform:uppercase;color:var(--c-text-3,#9898B0);}
+  .cal-metrica strong{font-size:22px;font-weight:600;color:var(--c-text-1,#1A1A2E);font-variant-numeric:tabular-nums;}
+  .cal-metrica.pendente strong{color:#B8860B;}
+  .cal-nav{display:flex;align-items:center;gap:6px;}
+  .cal-nav-btn{width:32px;height:32px;border-radius:7px;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--c-text-2,#5C5C7A);}
+  .cal-nav-btn:hover{background:#F5F4F0;}
+  .cal-nav-btn:disabled{opacity:0.35;cursor:default;background:#fff;}
+  .cal-nav-btn .material-icons-round{font-size:18px;}
+  .cal-mes{font-size:15px;font-weight:600;color:var(--c-text-1,#1A1A2E);min-width:150px;text-align:center;}
+  .cal-grade{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;}
+  .cal-sem{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--c-text-3,#9898B0);text-align:center;padding:4px 0;}
+  .cal-dia{position:relative;min-height:58px;border:1px solid var(--c-border,#E8E7E2);border-radius:7px;padding:5px 6px;background:#fff;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--c-text-1,#1A1A2E);text-align:left;font-family:var(--font-sans,sans-serif);transition:border-color 120ms ease,box-shadow 120ms ease;}
+  .cal-dia:hover{border-color:#C9C7BF;}
+  .cal-dia small{display:block;font-size:10.5px;font-weight:500;line-height:1.25;margin-top:3px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+  .cal-dia.obs{background:rgba(69,123,157,0.08);color:#185FA5;}
+  .cal-dia.nao{background:rgba(230,57,70,0.08);color:#A32D2D;}
+  .cal-dia.fora{background:#FAFAF8;color:#C4C3CF;border-style:dashed;font-weight:500;}
+  .cal-dia.fora:hover{color:var(--c-text-2,#5C5C7A);border-color:#C9C7BF;}
+  .cal-dia.hoje{box-shadow:inset 0 0 0 1.5px #1A1A2E;}
+  .cal-dia.sel{border-color:#E63946;box-shadow:0 0 0 2px rgba(230,57,70,0.35);}
+  .cal-dia.alterado::after{content:"";position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:#D4A843;}
+  .cal-dia.extra::before{content:"+";position:absolute;bottom:3px;right:6px;font-size:11px;font-weight:700;color:#2A9D8F;}
+  .cal-vazio{min-height:58px;}
+  .cal-legenda{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--c-text-2,#5C5C7A);}
+  .cal-legenda span{display:inline-flex;align-items:center;gap:5px;}
+  .cal-legenda i{display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid var(--c-border,#E8E7E2);}
+  .cal-editor{background:#F8F7F3;border:1px solid var(--c-border,#E8E7E2);border-radius:8px;padding:14px;margin-top:16px;display:none;}
+  .cal-editor.show{display:block;}
+  .cal-editor-titulo{font-size:13.5px;font-weight:600;color:var(--c-text-1,#1A1A2E);margin-bottom:12px;}
+  .cal-editor-grid{display:grid;grid-template-columns:180px 1fr;gap:12px;margin-bottom:10px;}
+  @media(max-width:560px){.cal-editor-grid{grid-template-columns:1fr;}}
+  .cal-radios{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px;}
+  .cal-radios label,.cal-check{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;color:var(--c-text-1,#1A1A2E);}
+  .cal-radios input,.cal-check input{accent-color:#E63946;width:15px;height:15px;}
+  .cal-aviso{background:rgba(212,168,67,0.12);border:1px solid rgba(212,168,67,0.35);border-radius:8px;padding:9px 12px;font-size:12.5px;color:#7A5A10;display:none;gap:8px;align-items:flex-start;margin-bottom:12px;line-height:1.45;}
+  .cal-aviso.show{display:flex;}
+  .cal-aviso .material-icons-round{font-size:16px;flex-shrink:0;margin-top:1px;}
+  .cal-editor-acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .cal-editor-acoes .cal-remover{margin-left:auto;color:#B01020;}
+  .cal-rodape{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center;margin-top:16px;padding-top:16px;border-top:1px solid var(--c-border,#E8E7E2);}
+  .cal-rodape .cal-rodape-esq{margin-right:auto;}
 </style>
 
 <div>
@@ -171,96 +250,113 @@
   </div>
 
   <div id="cfg-conteudo" style="display:none;">
-    <div class="cfg-secoes">
 
-      <!-- DADOS DA ESCOLA -->
-      <div class="cfg-card">
-        <div class="cfg-card-header">
-          <span class="material-icons-round">business</span>
-          <span class="cfg-card-titulo">Dados da escola</span>
-        </div>
-        <div class="cfg-card-corpo">
-          <div class="cfg-alerta" id="cfg-alerta-dados">
-            <span class="material-icons-round">check_circle</span>
-            <span id="cfg-alerta-dados-msg"></span>
-          </div>
-          <div class="cfg-field">
-            <label>Nome oficial</label>
-            <input type="text" class="cfg-input" id="cfg-nome" placeholder="Nome completo da escola">
-          </div>
-          <div class="cfg-field">
-            <label>Sigla</label>
-            <input type="text" class="cfg-input" id="cfg-sigla" placeholder="Ex: CELINPB" maxlength="20">
-          </div>
-          <div class="cfg-field">
-            <label>Endereço</label>
-            <input type="text" class="cfg-input" id="cfg-endereco" placeholder="Rua, número, bairro, cidade - UF">
-          </div>
-          <div class="cfg-field">
-            <label>Telefone</label>
-            <input type="tel" class="cfg-input" id="cfg-telefone" placeholder="(83) 3333-4444">
-          </div>
-          <div class="cfg-field">
-            <label>E-mail institucional</label>
-            <input type="email" class="cfg-input" id="cfg-email" placeholder="contato@celinpb.pb.gov.br">
-          </div>
-          <div class="cfg-field">
-            <label>Site</label>
-            <input type="url" class="cfg-input" id="cfg-site" placeholder="https://celinpb.pb.gov.br">
-          </div>
-          <button class="btn-cfg btn-cfg-primario" id="btn-salvar-dados">
-            <div class="spinner-btn"></div>
-            <span class="material-icons-round btn-txt" style="font-size:16px;">save</span>
-            <span class="btn-txt">Salvar dados</span>
-          </button>
-        </div>
-      </div>
+    <!-- BARRA DE ABAS -->
+    <div class="cfg-abas" role="tablist" id="cfg-abas">
+      <button class="cfg-aba ativa" role="tab" data-aba="escola"><span class="material-icons-round">business</span>Escola</button>
+      <button class="cfg-aba" role="tab" data-aba="semestres"><span class="material-icons-round">calendar_today</span>Semestres</button>
+      <button class="cfg-aba" role="tab" data-aba="calendario"><span class="material-icons-round">event</span>Calendário<span class="cfg-aba-selo alerta" id="aba-selo-calendario"></span></button>
+      <button class="cfg-aba" role="tab" data-aba="publico"><span class="material-icons-round">groups</span>Público-alvo</button>
+      <button class="cfg-aba" role="tab" data-aba="portal"><span class="material-icons-round">school</span>Portal do Aluno<span class="cfg-aba-selo" id="aba-selo-portal"></span></button>
+      <button class="cfg-aba" role="tab" data-aba="regras"><span class="material-icons-round">shield</span>Regras de acesso</button>
+    </div>
 
-      <!-- LOGO -->
-      <div class="cfg-card">
-        <div class="cfg-card-header">
-          <span class="material-icons-round">image</span>
-          <span class="cfg-card-titulo">Logo da escola</span>
-        </div>
-        <div class="cfg-card-corpo">
-          <div class="cfg-alerta" id="cfg-alerta-logo">
-            <span class="material-icons-round">check_circle</span>
-            <span id="cfg-alerta-logo-msg"></span>
+    <!-- ABA: ESCOLA -->
+    <div class="cfg-painel ativo" data-painel="escola" role="tabpanel">
+      <div class="cfg-secoes">
+
+        <!-- DADOS DA ESCOLA -->
+        <div class="cfg-card">
+          <div class="cfg-card-header">
+            <span class="material-icons-round">business</span>
+            <span class="cfg-card-titulo">Dados da escola</span>
           </div>
-          <div class="logo-preview-wrap">
-            <div class="logo-preview" id="logo-preview">
-              <span class="material-icons-round">image</span>
+          <div class="cfg-card-corpo">
+            <div class="cfg-alerta" id="cfg-alerta-dados">
+              <span class="material-icons-round">check_circle</span>
+              <span id="cfg-alerta-dados-msg"></span>
             </div>
-            <div class="logo-upload-info">
-              <p>Faça upload de uma imagem PNG ou JPG (recomendado: fundo transparente).</p>
-              <small>Tamanho máximo: 200KB. A imagem será convertida para Base64.</small>
+            <div class="cfg-field">
+              <label>Nome oficial</label>
+              <input type="text" class="cfg-input" id="cfg-nome" placeholder="Nome completo da escola">
             </div>
-          </div>
-          <input type="file" id="cfg-logo-file" accept="image/png,image/jpeg,image/svg+xml">
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
-            <label class="btn-logo-upload" for="cfg-logo-file">
-              <span class="material-icons-round">upload</span>Escolher imagem
-            </label>
-            <button class="btn-cfg-sec btn-cfg" id="btn-remover-logo" style="height:34px;padding:0 12px;font-size:12.5px;">
-              <span class="material-icons-round" style="font-size:16px;">delete</span>Remover
+            <div class="cfg-field">
+              <label>Sigla</label>
+              <input type="text" class="cfg-input" id="cfg-sigla" placeholder="Ex: CELINPB" maxlength="20">
+            </div>
+            <div class="cfg-field">
+              <label>Endereço</label>
+              <input type="text" class="cfg-input" id="cfg-endereco" placeholder="Rua, número, bairro, cidade - UF">
+            </div>
+            <div class="cfg-field">
+              <label>Telefone</label>
+              <input type="tel" class="cfg-input" id="cfg-telefone" placeholder="(83) 3333-4444">
+            </div>
+            <div class="cfg-field">
+              <label>E-mail institucional</label>
+              <input type="email" class="cfg-input" id="cfg-email" placeholder="contato@celinpb.pb.gov.br">
+            </div>
+            <div class="cfg-field">
+              <label>Site</label>
+              <input type="url" class="cfg-input" id="cfg-site" placeholder="https://celinpb.pb.gov.br">
+            </div>
+            <button class="btn-cfg btn-cfg-primario" id="btn-salvar-dados">
+              <div class="spinner-btn"></div>
+              <span class="material-icons-round btn-txt" style="font-size:16px;">save</span>
+              <span class="btn-txt">Salvar dados</span>
             </button>
           </div>
-          <div class="cfg-field">
-            <label>Ou cole uma URL pública de imagem</label>
-            <input type="url" class="cfg-input" id="cfg-logo-url" placeholder="https://…">
-            <span class="cfg-hint">Alternativa ao upload. Será convertida para Base64 ao salvar.</span>
-          </div>
-          <button class="btn-cfg btn-cfg-primario" id="btn-salvar-logo" disabled title="Recurso ainda não disponível nesta migração">
-            <div class="spinner-btn"></div>
-            <span class="material-icons-round btn-txt" style="font-size:16px;">save</span>
-            <span class="btn-txt">Salvar logo</span>
-          </button>
-          <div class="cfg-hint" style="margin-top:8px;">Upload de logo ainda não foi migrado para o Supabase nesta etapa (pendência conhecida).</div>
         </div>
-      </div>
 
-      <!-- SEMESTRES -->
-      <div class="cfg-card cfg-span2">
+        <!-- LOGO -->
+        <div class="cfg-card">
+          <div class="cfg-card-header">
+            <span class="material-icons-round">image</span>
+            <span class="cfg-card-titulo">Logo da escola</span>
+          </div>
+          <div class="cfg-card-corpo">
+            <div class="cfg-alerta" id="cfg-alerta-logo">
+              <span class="material-icons-round">check_circle</span>
+              <span id="cfg-alerta-logo-msg"></span>
+            </div>
+            <div class="logo-preview-wrap">
+              <div class="logo-preview" id="logo-preview">
+                <span class="material-icons-round">image</span>
+              </div>
+              <div class="logo-upload-info">
+                <p>Faça upload de uma imagem PNG ou JPG (recomendado: fundo transparente).</p>
+                <small>Tamanho máximo: 200KB. A imagem será convertida para Base64.</small>
+              </div>
+            </div>
+            <input type="file" id="cfg-logo-file" accept="image/png,image/jpeg,image/svg+xml">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+              <label class="btn-logo-upload" for="cfg-logo-file">
+                <span class="material-icons-round">upload</span>Escolher imagem
+              </label>
+              <button class="btn-cfg-sec btn-cfg" id="btn-remover-logo" style="height:34px;padding:0 12px;font-size:12.5px;">
+                <span class="material-icons-round" style="font-size:16px;">delete</span>Remover
+              </button>
+            </div>
+            <div class="cfg-field">
+              <label>Ou cole uma URL pública de imagem</label>
+              <input type="url" class="cfg-input" id="cfg-logo-url" placeholder="https://…">
+              <span class="cfg-hint">Alternativa ao upload. Será convertida para Base64 ao salvar.</span>
+            </div>
+            <button class="btn-cfg btn-cfg-primario" id="btn-salvar-logo" disabled title="Recurso ainda não disponível nesta migração">
+              <div class="spinner-btn"></div>
+              <span class="material-icons-round btn-txt" style="font-size:16px;">save</span>
+              <span class="btn-txt">Salvar logo</span>
+            </button>
+            <div class="cfg-hint" style="margin-top:8px;">Upload de logo ainda não foi migrado para o Supabase nesta etapa (pendência conhecida).</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ABA: SEMESTRES -->
+    <div class="cfg-painel" data-painel="semestres" role="tabpanel">
+      <div class="cfg-card">
         <div class="cfg-card-header">
           <span class="material-icons-round">calendar_today</span>
           <span class="cfg-card-titulo">Gestão de semestres</span>
@@ -317,9 +413,104 @@
           </button>
         </div>
       </div>
+    </div>
 
-      <!-- TIPOS DE PÚBLICO-ALVO -->
-      <div class="cfg-card cfg-span2">
+    <!-- ABA: CALENDÁRIO LETIVO -->
+    <div class="cfg-painel" data-painel="calendario" role="tabpanel">
+      <div class="cfg-card">
+        <div class="cfg-card-header">
+          <span class="material-icons-round">event</span>
+          <span class="cfg-card-titulo">Calendário letivo do semestre atual</span>
+        </div>
+        <div class="cfg-card-corpo">
+          <div class="cfg-alerta" id="cfg-alerta-cal">
+            <span class="material-icons-round">check_circle</span>
+            <span id="cfg-alerta-cal-msg"></span>
+          </div>
+
+          <div id="cal-carregando" class="cfg-spinner"><div class="cfg-spinner-anim"></div><span>Carregando calendário…</span></div>
+
+          <div id="cal-conteudo" style="display:none;">
+            <div class="cal-topo">
+              <div class="cal-semestre" id="cal-semestre"></div>
+              <div class="cal-nav">
+                <button class="cal-nav-btn" id="cal-ant" title="Mês anterior"><span class="material-icons-round">chevron_left</span></button>
+                <span class="cal-mes" id="cal-mes"></span>
+                <button class="cal-nav-btn" id="cal-prox" title="Próximo mês"><span class="material-icons-round">chevron_right</span></button>
+              </div>
+            </div>
+
+            <div class="cal-metricas">
+              <div class="cal-metrica"><span>Dias letivos</span><strong id="cal-n-letivos">0</strong></div>
+              <div class="cal-metrica"><span>Não letivos</span><strong id="cal-n-nao">0</strong></div>
+              <div class="cal-metrica pendente"><span>Alterações não salvas</span><strong id="cal-n-pend">0</strong></div>
+            </div>
+
+            <div class="cal-grade" id="cal-grade"></div>
+
+            <div class="cal-legenda">
+              <span><i style="background:#fff;"></i>Letivo</span>
+              <span><i style="background:rgba(69,123,157,0.12);"></i>Letivo com observação</span>
+              <span><i style="background:rgba(230,57,70,0.10);"></i>Não letivo</span>
+              <span><i style="background:#FAFAF8;border-style:dashed;"></i>Fora do calendário</span>
+              <span><i style="background:#D4A843;border-color:#D4A843;border-radius:50%;"></i>Alterado, falta salvar</span>
+            </div>
+            <div class="cfg-hint" style="margin-top:8px;">Clique num dia para editar. Clique em outro dia em seguida para selecionar o intervalo entre os dois. Clique num dia tracejado para incluí-lo no calendário como dia extra.</div>
+
+            <!-- Editor do dia / intervalo / dia extra -->
+            <div class="cal-editor" id="cal-editor">
+              <div class="cal-editor-titulo" id="cal-editor-titulo">Editar dia</div>
+              <div class="cfg-field" id="cal-campo-data" style="display:none;max-width:220px;">
+                <label for="cal-data-nova">Data do dia extra</label>
+                <input type="date" class="cfg-input" id="cal-data-nova">
+              </div>
+              <div class="cal-radios">
+                <label><input type="radio" name="cal-tipo" value="LETIVO"> Letivo</label>
+                <label><input type="radio" name="cal-tipo" value="NAO_LETIVO"> Não letivo</label>
+              </div>
+              <div class="cfg-field" style="margin-bottom:10px;">
+                <label for="cal-descricao">Observação (opcional)</label>
+                <input type="text" class="cfg-input" id="cal-descricao" maxlength="200" list="cal-sugestoes" placeholder="Ex.: Ponto facultativo, Aulas ONLINE, Reposição">
+                <datalist id="cal-sugestoes">
+                  <option value="Aulas ONLINE"></option>
+                  <option value="Ponto facultativo"></option>
+                  <option value="Feriado"></option>
+                  <option value="Recesso"></option>
+                  <option value="Reposição"></option>
+                </datalist>
+              </div>
+              <label class="cal-check" id="cal-limpar-wrap" style="display:none;margin-bottom:12px;">
+                <input type="checkbox" id="cal-limpar-desc"> Apagar a observação de todos os dias selecionados
+              </label>
+              <div class="cal-aviso" id="cal-aviso">
+                <span class="material-icons-round">warning</span>
+                <span id="cal-aviso-msg"></span>
+              </div>
+              <div class="cal-editor-acoes">
+                <button class="btn-cfg btn-cfg-sec" id="cal-btn-aplicar"><span class="material-icons-round">check</span>Aplicar</button>
+                <button class="btn-cfg btn-cfg-sec" id="cal-btn-cancelar">Cancelar</button>
+                <button class="btn-cfg btn-cfg-sec cal-remover" id="cal-btn-remover" style="display:none;"><span class="material-icons-round">event_busy</span>Tirar do calendário</button>
+              </div>
+            </div>
+
+            <div class="cal-rodape">
+              <button class="btn-cfg btn-cfg-sec cal-rodape-esq" id="cal-btn-extra"><span class="material-icons-round">add</span>Adicionar dia extra</button>
+              <button class="btn-cfg btn-cfg-sec" id="cal-btn-descartar"><span class="material-icons-round">undo</span>Descartar alterações</button>
+              <button class="btn-cfg btn-cfg-primario" id="cal-btn-salvar">
+                <div class="spinner-btn"></div>
+                <span class="material-icons-round btn-txt" style="font-size:16px;">save</span>
+                <span class="btn-txt">Salvar alterações</span>
+              </button>
+            </div>
+            <div class="cfg-hint" style="margin-top:10px;">As mudanças valem assim que são salvas: o Diário de Classe deixa de oferecer os dias não letivos e os relatórios passam a contar só os dias letivos. Frequências já lançadas nunca são apagadas por esta tela. Um dia com frequência lançada não pode ser tirado do calendário, só marcado como não letivo.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ABA: TIPOS DE PÚBLICO-ALVO -->
+    <div class="cfg-painel" data-painel="publico" role="tabpanel">
+      <div class="cfg-card">
         <div class="cfg-card-header">
           <span class="material-icons-round">groups</span>
           <span class="cfg-card-titulo">Tipos de público-alvo</span>
@@ -331,12 +522,14 @@
           </button>
         </div>
       </div>
+    </div>
 
-      <!-- PORTAL DO ALUNO (E1) -->
-      <div class="cfg-card cfg-span2">
+    <!-- ABA: PORTAL DO ALUNO (E1) -->
+    <div class="cfg-painel" data-painel="portal" role="tabpanel">
+      <div class="cfg-card">
         <div class="cfg-card-header">
-          <span class="material-icons-round">school</span>
-          <span class="cfg-card-titulo">Portal do Aluno</span>
+          <span class="material-icons-round">sync</span>
+          <span class="cfg-card-titulo">Cópia consultada pelo portal</span>
         </div>
         <div class="cfg-card-corpo">
           <div class="cfg-alerta" id="cfg-alerta-portal">
@@ -358,8 +551,49 @@
         </div>
       </div>
 
-      <!-- REGRAS DE ACESSO (RLS) — SOMENTE LEITURA -->
-      <div class="cfg-card cfg-span2">
+      <!-- Envio dos códigos por e-mail (fase 5) -->
+      <div class="cfg-card">
+        <div class="cfg-card-header">
+          <span class="material-icons-round">mail</span>
+          <span class="cfg-card-titulo">Envio dos códigos por e-mail</span>
+        </div>
+        <div class="cfg-card-corpo">
+          <div class="cfg-alerta" id="cfg-alerta-envio">
+            <span class="material-icons-round">check_circle</span>
+            <span id="cfg-alerta-envio-msg"></span>
+          </div>
+          <div class="pt-status" id="pe-status">Carregando…</div>
+          <div class="pt-barra" id="pe-barra" aria-hidden="true"><div class="pt-barra-fill" id="pe-barra-fill"></div></div>
+          <div class="pt-acoes">
+            <button class="btn-cfg btn-cfg-primario" id="pe-btn-auto">
+              <div class="spinner-btn"></div>
+              <span class="material-icons-round btn-txt" style="font-size:16px;" id="pe-btn-auto-ic">play_arrow</span>
+              <span class="btn-txt" id="pe-btn-auto-txt">Ligar envio automático</span>
+            </button>
+            <button class="btn-cfg btn-cfg-sec" id="pe-btn-lote">
+              <span class="material-icons-round">send</span>Enviar um lote agora
+            </button>
+            <button class="btn-cfg btn-cfg-sec" id="pe-btn-teste">
+              <span class="material-icons-round">outgoing_mail</span>Enviar e-mail de teste para mim
+            </button>
+            <button class="btn-cfg btn-cfg-sec" id="pe-btn-sem">
+              <span class="material-icons-round">download</span>Baixar lista sem e-mail
+            </button>
+          </div>
+          <div class="pt-reenviar">
+            <input type="text" class="cfg-input" id="pe-codigo" inputmode="numeric" maxlength="11" placeholder="Código do aluno">
+            <button class="btn-cfg btn-cfg-sec" id="pe-btn-reenviar">
+              <span class="material-icons-round">replay</span>Reenviar código
+            </button>
+          </div>
+          <div class="cfg-hint" style="margin-top:10px;">Cada aluno ativo do portal recebe um único e-mail com o código, no próprio e-mail ou, se for menor de idade sem e-mail, no e-mail do responsável. Com o envio automático ligado, o sistema envia até 25 e-mails a cada 15 minutos, das 8h às 20h45, respeitando o limite de 400 por dia (a conta Gmail do sistema divide a cota com os e-mails do SGE). Alunos novos entram na fila sozinhos. Quem não tem e-mail aparece na lista para a secretaria informar o código.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ABA: REGRAS DE ACESSO (RLS) — SOMENTE LEITURA -->
+    <div class="cfg-painel" data-painel="regras" role="tabpanel">
+      <div class="cfg-card">
         <div class="cfg-card-header">
           <span class="material-icons-round">shield</span>
           <span class="cfg-card-titulo">Regras de acesso por papel</span>
@@ -387,6 +621,7 @@
                 <tr><td class="regras-modulo">Avaliações</td><td>Total</td><td>Cria/edita</td><td>Só lê</td><td>Só lê</td><td class="regras-obs">Exclusão sempre restrita ao admin.</td></tr>
                 <tr><td class="regras-modulo">Alunos</td><td>Total</td><td>Total</td><td>Só lê alunos das próprias turmas</td><td>Cria/edita/lê todos</td><td class="regras-obs">Exclusão sempre restrita ao admin.</td></tr>
                 <tr><td class="regras-modulo">Semestres</td><td>Total</td><td>Cria/edita</td><td>Sem acesso</td><td>Só lê</td><td class="regras-obs">Exclusão sempre restrita ao admin.</td></tr>
+                <tr><td class="regras-modulo">Calendário letivo</td><td>Cria/edita/tira dias</td><td>Só lê</td><td>Só lê</td><td>Só lê</td><td class="regras-obs">Edição pela aba Calendário. Um dia com frequência lançada não pode ser tirado do calendário, só marcado como não letivo.</td></tr>
                 <tr><td class="regras-modulo">Turmas</td><td>Total</td><td>Cria/edita/exclui</td><td>Só as próprias — edita apenas link do encontro, WhatsApp e Classroom</td><td>Só lê todas</td><td class="regras-obs">Professor não pode alterar outros campos da turma nem trocar de turma.</td></tr>
                 <tr><td class="regras-modulo">Matrículas</td><td>Total</td><td>Total</td><td>Só lê as das próprias turmas</td><td>Cria/edita/lê todas</td><td class="regras-obs">Exclusão sempre restrita ao admin.</td></tr>
                 <tr><td class="regras-modulo">Frequência</td><td>Total</td><td>Total</td><td>Lança só nas próprias turmas</td><td>Só lê</td><td class="regras-obs">Exclusão sempre restrita ao admin.</td></tr>
@@ -402,11 +637,11 @@
               </tbody>
             </table>
           </div>
-          <div class="regras-rodape">Última revisão destas regras: 07/10/2026 (inclusão do Portal do Aluno). Um usuário não autenticado não tem acesso a nenhum dado do sistema.</div>
+          <div class="regras-rodape">Última revisão destas regras: 07/10/2026 (inclusão do Portal do Aluno e da edição do calendário letivo). Um usuário não autenticado não tem acesso a nenhum dado do sistema.</div>
         </div>
       </div>
+    </div>
 
-    </div><!-- /cfg-secoes -->
   </div><!-- /cfg-conteudo -->
 
   <!-- MODAL: GESTÃO DE TIPOS DE PÚBLICO-ALVO -->
@@ -496,12 +731,13 @@
     return{id:s.id,SemestreID:s.external_id||s.id,Semestre:s.rotulo||'',SemestreAtual:s.semestre_atual||false,EdicaoAtiva:s.edicao_ativa!==false,VisualizacaoAtiva:s.visualizacao_ativa!==false};
   }
 
-  function mostrarAlertaCampo(id,msg,tipo){
+  function mostrarAlertaCampo(id,msg,tipo,ms){
     var a=el(id); if(!a)return;
     tipo=tipo||'erro';
     a.className='cfg-alerta show '+tipo;
     var span=a.querySelector('span:last-child'); if(span)span.textContent=msg;
-    setTimeout(function(){a.classList.remove('show');},4000);
+    clearTimeout(a._t);
+    a._t=setTimeout(function(){a.classList.remove('show');},ms||4000);
   }
 
   // A tela inteira ficava presa em "Carregando configurações…" porque nada
@@ -518,11 +754,51 @@
       return;
     }
     if(el('cfg-conteudo'))el('cfg-conteudo').style.display='block';
+    iniciarAbas();
     carregarConfig();
     carregarSemestres();
+    carregarCalendario();
     carregarTiposPublico();
     carregarPortal();
+    carregarEnvio();
     registrarEventos();
+  }
+
+  // =========================================================================
+  // ABAS — só troca o que aparece; tudo é carregado uma vez em init(), e o
+  // acompanhamento do portal continua rodando mesmo com outra aba aberta.
+  // A última aba aberta fica guardada no sessionStorage (vale até fechar a
+  // aba do navegador) para a página voltar nela ao reabrir Configurações.
+  // =========================================================================
+  var CHAVE_ABA='sge.config.aba';
+
+  function mostrarAba(nome){
+    var achou=false;
+    document.querySelectorAll('#cfg-abas .cfg-aba').forEach(function(b){
+      var on=b.dataset.aba===nome; if(on)achou=true;
+      b.classList.toggle('ativa',on);
+      b.setAttribute('aria-selected',on?'true':'false');
+    });
+    if(!achou)return mostrarAba('escola');
+    document.querySelectorAll('#cfg-conteudo .cfg-painel').forEach(function(p){
+      p.classList.toggle('ativo',p.dataset.painel===nome);
+    });
+    try{ sessionStorage.setItem(CHAVE_ABA,nome); }catch(e){}
+  }
+
+  function iniciarAbas(){
+    document.querySelectorAll('#cfg-abas .cfg-aba').forEach(function(b){
+      b.addEventListener('click',function(){ mostrarAba(b.dataset.aba); });
+    });
+    var salva=null;
+    try{ salva=sessionStorage.getItem(CHAVE_ABA); }catch(e){}
+    mostrarAba(salva||'escola');
+  }
+
+  function definirSelo(id,texto,classeExtra){
+    var s=el(id); if(!s)return;
+    s.textContent=texto||'';
+    s.className='cfg-aba-selo'+(classeExtra?' '+classeExtra:'')+(texto?' show':'');
   }
 
   function carregarConfig(){
@@ -599,10 +875,16 @@
   }
 
   function atualizarSemestre(id,dados){
+    if(dados.semestre_atual && calPendentes()>0){
+      if(!confirm('Há alterações não salvas no calendário do semestre atual.\n\nSe você trocar o semestre atual agora, elas serão descartadas. Continuar?'))return;
+    }
     postApi('semestres.atualizar',Object.assign({id:id},dados)).then(function(res){
       mostrarAlertaCampo('cfg-alerta-sem',res.sucesso?'Semestre atualizado.':(res.mensagem||'Erro.'),res.sucesso?'sucesso':'erro');
       if(typeof toast==='function') toast(res.sucesso?'Semestre atualizado.':res.mensagem,res.sucesso?'success':'error');
-      if(res.sucesso) carregarSemestres();
+      if(res.sucesso){
+        carregarSemestres();
+        if(dados.semestre_atual) carregarCalendario();
+      }
     });
   }
 
@@ -633,6 +915,9 @@
       visualizacao_ativa: el('ns-vis')?el('ns-vis').checked:true,
     };
     if(externalId) dados.external_id=externalId;
+    if(dados.semestre_atual && calPendentes()>0){
+      if(!confirm('Há alterações não salvas no calendário do semestre atual.\n\nSe o novo semestre virar o atual, elas serão descartadas. Continuar?'))return;
+    }
     var btn=el('btn-registrar-sem'); if(btn){btn.disabled=true;btn.classList.add('loading');}
     postApi('semestres.registrar',dados).then(function(res){
       if(btn){btn.disabled=false;btn.classList.remove('loading');}
@@ -641,6 +926,329 @@
       if(typeof toast==='function')toast('Semestre registrado.','success');
       fecharFormNovoSemestre();
       carregarSemestres();
+      if(dados.semestre_atual) carregarCalendario();
+    });
+  }
+
+  // =========================================================================
+  // CALENDÁRIO LETIVO (tabela `calendario` — claude/etapa6-calendario-letivo.sql
+  // e claude/etapa13-calendario-admin.sql). Edita o semestre marcado como
+  // atual. As mudanças ficam pendentes na tela e vão juntas em "Salvar
+  // alterações": dias criados/alterados por calendario.salvar (upsert por
+  // semestre + data, já existente em api.js); dias tirados do calendário
+  // direto pelo cliente do Supabase (api.js não tem ação de exclusão para
+  // calendário, e o banco recusa tirar dia com frequência lançada).
+  // Só admin grava (RLS); esta tela inteira já é restrita a admin em init().
+  // =========================================================================
+  var cal={semestre:null,dias:{},orig:{},carregado:false,ano:0,mes:0,selA:null,selB:null,modo:null};
+  var MESES_CAL=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var SEM_CAL=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+  function isoDe(ano,mes,dia){ return ano+'-'+String(mes+1).padStart(2,'0')+'-'+String(dia).padStart(2,'0'); }
+  function hojeISOcal(){
+    try{ return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Fortaleza',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()); }
+    catch(e){ var d=new Date(); return isoDe(d.getFullYear(),d.getMonth(),d.getDate()); }
+  }
+  function fmtCal(iso){ return iso.slice(8,10)+'/'+iso.slice(5,7)+'/'+iso.slice(0,4); }
+  function fmtCalCurto(iso){ return iso.slice(8,10)+'/'+iso.slice(5,7); }
+  function diaSemanaCal(iso){ return new Date(iso+'T12:00:00').getDay(); }
+  function chaveDia(d){ return d?(d.tipo+'|'+(d.descricao||'')):''; }
+
+  function calPendentes(){
+    var n=0, k;
+    for(k in cal.dias){ if(chaveDia(cal.dias[k])!==(cal.orig[k]||'')) n++; }
+    for(k in cal.orig){ if(!cal.dias[k]) n++; }
+    return n;
+  }
+  function datasOrdenadas(){ return Object.keys(cal.dias).sort(); }
+
+  function carregarCalendario(){
+    if(el('cal-carregando'))el('cal-carregando').style.display='flex';
+    if(el('cal-conteudo'))el('cal-conteudo').style.display='none';
+    return postApi('semestres.listar',{}).then(function(res){
+      var atual=(res.sucesso&&res.dados)?res.dados.filter(function(s){return s.semestre_atual;})[0]:null;
+      if(!atual){
+        if(el('cal-carregando'))el('cal-carregando').innerHTML='<span>Nenhum semestre está marcado como atual. Marque um na aba Semestres.</span>';
+        return null;
+      }
+      cal.semestre=atual;
+      return postApi('calendario.listar',{semestre_id:atual.id}).then(function(r){
+        if(!r.sucesso){
+          if(el('cal-carregando'))el('cal-carregando').innerHTML='<span style="color:#B01020;">Não foi possível carregar o calendário: '+esc(r.mensagem||'erro desconhecido')+'</span>';
+          return null;
+        }
+        cal.dias={}; cal.orig={};
+        (r.dados||[]).forEach(function(d){
+          var iso=String(d.data_aula||'').substring(0,10); if(!iso)return;
+          cal.dias[iso]={tipo:d.tipo==='NAO_LETIVO'?'NAO_LETIVO':'LETIVO',descricao:d.descricao||''};
+          cal.orig[iso]=chaveDia(cal.dias[iso]);
+        });
+        cal.carregado=true;
+        cal.selA=cal.selB=null; fecharEditorCal();
+        // Abre no mês de hoje, se ele estiver dentro do calendário; senão, no 1º mês.
+        var hoje=hojeISOcal(), datas=datasOrdenadas();
+        var ref=(datas.length&&hoje>=datas[0]&&hoje<=datas[datas.length-1])?hoje:(datas[0]||hoje);
+        cal.ano=parseInt(ref.slice(0,4),10); cal.mes=parseInt(ref.slice(5,7),10)-1;
+        if(el('cal-carregando'))el('cal-carregando').style.display='none';
+        if(el('cal-conteudo'))el('cal-conteudo').style.display='block';
+        renderCalendario();
+        return true;
+      });
+    });
+  }
+
+  // Meses navegáveis: do mês do 1º dia ao mês do último dia (dias extras
+  // ampliam esse intervalo automaticamente).
+  function limitesMeses(){
+    var datas=datasOrdenadas();
+    if(!datas.length){ var h=hojeISOcal(); datas=[h]; }
+    var p=datas[0], u=datas[datas.length-1];
+    return { min:parseInt(p.slice(0,4),10)*12+parseInt(p.slice(5,7),10)-1,
+             max:parseInt(u.slice(0,4),10)*12+parseInt(u.slice(5,7),10)-1 };
+  }
+
+  function selecaoCal(){
+    if(!cal.selA)return [];
+    var a=cal.selA, b=cal.selB||cal.selA;
+    if(b<a){ var t=a; a=b; b=t; }
+    return datasOrdenadas().filter(function(k){ return k>=a&&k<=b; });
+  }
+
+  function renderCalendario(){
+    if(!cal.carregado)return;
+    var datas=datasOrdenadas();
+    var nL=0,nN=0;
+    datas.forEach(function(k){ if(cal.dias[k].tipo==='LETIVO')nL++; else nN++; });
+    if(el('cal-n-letivos'))el('cal-n-letivos').textContent=nL;
+    if(el('cal-n-nao'))el('cal-n-nao').textContent=nN;
+    var pend=calPendentes();
+    if(el('cal-n-pend'))el('cal-n-pend').textContent=pend;
+    definirSelo('aba-selo-calendario',pend?(pend+' não salva'+(pend>1?'s':'')):'','alerta');
+    if(el('cal-semestre')){
+      el('cal-semestre').innerHTML='Semestre <strong>'+esc(cal.semestre.rotulo||cal.semestre.external_id||'')+'</strong>'+
+        (datas.length?' · de '+fmtCal(datas[0])+' a '+fmtCal(datas[datas.length-1]):' · calendário vazio');
+    }
+
+    var lim=limitesMeses(), atual=cal.ano*12+cal.mes;
+    if(atual<lim.min){cal.ano=Math.floor(lim.min/12);cal.mes=lim.min%12;atual=lim.min;}
+    if(atual>lim.max){cal.ano=Math.floor(lim.max/12);cal.mes=lim.max%12;atual=lim.max;}
+    if(el('cal-ant'))el('cal-ant').disabled=atual<=lim.min;
+    if(el('cal-prox'))el('cal-prox').disabled=atual>=lim.max;
+    if(el('cal-mes'))el('cal-mes').textContent=MESES_CAL[cal.mes]+' '+cal.ano;
+
+    var grade=el('cal-grade'); if(!grade)return;
+    grade.innerHTML='';
+    SEM_CAL.forEach(function(s){ var h=document.createElement('div'); h.className='cal-sem'; h.textContent=s; grade.appendChild(h); });
+    var primeiro=new Date(cal.ano,cal.mes,1,12).getDay();
+    for(var i=0;i<primeiro;i++){ var v=document.createElement('div'); v.className='cal-vazio'; grade.appendChild(v); }
+    var total=new Date(cal.ano,cal.mes+1,0,12).getDate();
+    var sel=selecaoCal(), hoje=hojeISOcal();
+    for(var dia=1;dia<=total;dia++){
+      var iso=isoDe(cal.ano,cal.mes,dia), d=cal.dias[iso];
+      var b=document.createElement('button');
+      b.type='button'; b.dataset.iso=iso;
+      var cls='cal-dia';
+      if(!d) cls+=' fora';
+      else {
+        if(d.tipo==='NAO_LETIVO') cls+=' nao'; else if(d.descricao) cls+=' obs';
+        if(chaveDia(d)!==(cal.orig[iso]||'')) cls+=' alterado';
+        if(!cal.orig[iso]) cls+=' extra';
+        if(sel.indexOf(iso)!==-1) cls+=' sel';
+      }
+      if(iso===hoje) cls+=' hoje';
+      b.className=cls;
+      b.title=d?(fmtCal(iso)+' · '+(d.tipo==='LETIVO'?'Letivo':'Não letivo')+(d.descricao?' · '+d.descricao:'')):(fmtCal(iso)+' · fora do calendário (clique para incluir como dia extra)');
+      b.innerHTML=dia+(d&&d.descricao?'<small>'+esc(d.descricao)+'</small>':'');
+      b.addEventListener('click',cliqueDiaCal);
+      grade.appendChild(b);
+    }
+  }
+
+  function cliqueDiaCal(){
+    var iso=this.dataset.iso;
+    if(!cal.dias[iso]){ abrirEditorExtra(iso); return; }
+    if(cal.modo==='editar' && cal.selA && !cal.selB && iso!==cal.selA) cal.selB=iso;
+    else { cal.selA=iso; cal.selB=null; }
+    abrirEditorEdicao();
+  }
+
+  function marcarTipoCal(tipo){
+    document.querySelectorAll('input[name="cal-tipo"]').forEach(function(r){ r.checked=(r.value===tipo); });
+  }
+  function tipoEscolhidoCal(){
+    var r=document.querySelector('input[name="cal-tipo"]:checked'); return r?r.value:null;
+  }
+
+  function abrirEditorEdicao(){
+    var s=selecaoCal(); if(!s.length)return;
+    cal.modo='editar';
+    var varios=s.length>1, prim=cal.dias[s[0]];
+    if(el('cal-editor-titulo'))el('cal-editor-titulo').textContent=varios
+      ?('Editar '+s.length+' dias do calendário ('+fmtCalCurto(s[0])+' a '+fmtCalCurto(s[s.length-1])+')')
+      :('Editar '+SEM_CAL[diaSemanaCal(s[0])].toLowerCase()+', '+fmtCal(s[0]));
+    if(el('cal-campo-data'))el('cal-campo-data').style.display='none';
+    // Num intervalo, só pré-marca o tipo se todos os dias forem iguais.
+    var mesmoTipo=s.every(function(k){ return cal.dias[k].tipo===prim.tipo; });
+    marcarTipoCal(mesmoTipo?prim.tipo:null);
+    if(el('cal-descricao')){
+      el('cal-descricao').value=varios?'':prim.descricao;
+      el('cal-descricao').placeholder=varios?'Em branco: cada dia mantém a observação que já tem':'Ex.: Ponto facultativo, Aulas ONLINE, Reposição';
+    }
+    if(el('cal-limpar-wrap'))el('cal-limpar-wrap').style.display=varios?'flex':'none';
+    if(el('cal-limpar-desc'))el('cal-limpar-desc').checked=false;
+    // "Tirar do calendário" só para um dia que está numa das pontas do
+    // calendário (para não abrir buracos no meio do semestre).
+    var datas=datasOrdenadas();
+    var ponta=!varios&&(s[0]===datas[0]||s[0]===datas[datas.length-1]);
+    if(el('cal-btn-remover'))el('cal-btn-remover').style.display=ponta?'':'none';
+    if(el('cal-editor'))el('cal-editor').classList.add('show');
+    if(el('cal-btn-aplicar'))el('cal-btn-aplicar').innerHTML='<span class="material-icons-round">check</span>Aplicar';
+    atualizarAvisoCal();
+    renderCalendario();
+  }
+
+  function abrirEditorExtra(iso){
+    cal.modo='extra'; cal.selA=cal.selB=null;
+    if(el('cal-editor-titulo'))el('cal-editor-titulo').textContent='Adicionar dia extra ao calendário';
+    if(el('cal-campo-data'))el('cal-campo-data').style.display='block';
+    if(el('cal-data-nova'))el('cal-data-nova').value=iso||'';
+    marcarTipoCal('LETIVO');
+    if(el('cal-descricao')){ el('cal-descricao').value=''; el('cal-descricao').placeholder='Ex.: Reposição'; }
+    if(el('cal-limpar-wrap'))el('cal-limpar-wrap').style.display='none';
+    if(el('cal-btn-remover'))el('cal-btn-remover').style.display='none';
+    if(el('cal-btn-aplicar'))el('cal-btn-aplicar').innerHTML='<span class="material-icons-round">add</span>Incluir dia';
+    if(el('cal-editor'))el('cal-editor').classList.add('show');
+    atualizarAvisoCal();
+    renderCalendario();
+    if(!iso&&el('cal-data-nova'))el('cal-data-nova').focus();
+  }
+
+  function fecharEditorCal(){
+    cal.modo=null; cal.selA=cal.selB=null;
+    if(el('cal-editor'))el('cal-editor').classList.remove('show');
+    if(el('cal-aviso'))el('cal-aviso').classList.remove('show');
+  }
+
+  function avisoCal(msg){
+    var a=el('cal-aviso'); if(!a)return;
+    if(msg){ if(el('cal-aviso-msg'))el('cal-aviso-msg').textContent=msg; a.classList.add('show'); }
+    else a.classList.remove('show');
+  }
+
+  function atualizarAvisoCal(){
+    var hoje=hojeISOcal();
+    if(cal.modo==='extra'){
+      var iso=val('cal-data-nova');
+      if(iso&&cal.dias[iso]) return avisoCal('Este dia já faz parte do calendário. Feche e clique nele para editar.');
+      if(iso&&tipoEscolhidoCal()==='LETIVO'&&iso<hoje) return avisoCal('Data no passado: o dia passa a aparecer no Diário de Classe para lançamento de frequência.');
+      return avisoCal('');
+    }
+    if(tipoEscolhidoCal()==='NAO_LETIVO'){
+      var passados=selecaoCal().filter(function(k){ return k<=hoje && cal.dias[k].tipo==='LETIVO'; });
+      if(passados.length) return avisoCal((passados.length>1?passados.length+' dos dias selecionados já passaram':'Este dia já passou')+
+        ' e pode haver frequência lançada. Ao salvar, o sistema confere e mostra quantas turmas têm registros antes de confirmar. Nenhum registro é apagado.');
+    }
+    avisoCal('');
+  }
+
+  function aplicarEditorCal(){
+    var tipo=tipoEscolhidoCal();
+    var desc=val('cal-descricao');
+    if(cal.modo==='extra'){
+      var iso=val('cal-data-nova');
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(iso)){ mostrarAlertaCampo('cfg-alerta-cal','Escolha a data do dia extra.','erro'); return; }
+      if(cal.dias[iso]){ mostrarAlertaCampo('cfg-alerta-cal','O dia '+fmtCal(iso)+' já faz parte do calendário.','erro'); return; }
+      if(!tipo){ mostrarAlertaCampo('cfg-alerta-cal','Escolha se o dia é letivo ou não letivo.','erro'); return; }
+      cal.dias[iso]={tipo:tipo,descricao:desc};
+      cal.ano=parseInt(iso.slice(0,4),10); cal.mes=parseInt(iso.slice(5,7),10)-1;
+      fecharEditorCal(); renderCalendario();
+      mostrarAlertaCampo('cfg-alerta-cal','Dia '+fmtCal(iso)+' incluído. Clique em "Salvar alterações" para gravar.','sucesso');
+      return;
+    }
+    var s=selecaoCal(); if(!s.length)return;
+    if(!tipo){ mostrarAlertaCampo('cfg-alerta-cal','Escolha se os dias selecionados são letivos ou não letivos.','erro'); return; }
+    var limpar=el('cal-limpar-desc')&&el('cal-limpar-desc').checked;
+    s.forEach(function(k){
+      var nova=(s.length>1)?(limpar?'':(desc||cal.dias[k].descricao)):desc;
+      cal.dias[k]={tipo:tipo,descricao:nova};
+    });
+    fecharEditorCal(); renderCalendario();
+  }
+
+  function removerDiaCal(){
+    var s=selecaoCal(); if(s.length!==1)return;
+    var iso=s[0];
+    if(!confirm('Tirar o dia '+fmtCal(iso)+' do calendário do semestre?\n\nUse isto só para encurtar o semestre ou desfazer um dia extra. Para um dia sem aula no meio do semestre, marque-o como "Não letivo".'))return;
+    delete cal.dias[iso];
+    fecharEditorCal(); renderCalendario();
+  }
+
+  function descartarCal(){
+    if(!calPendentes()){ fecharEditorCal(); renderCalendario(); return; }
+    if(!confirm('Descartar todas as alterações do calendário que ainda não foram salvas?'))return;
+    cal.dias={};
+    Object.keys(cal.orig).forEach(function(k){
+      var p=cal.orig[k].split('|'); cal.dias[k]={tipo:p[0],descricao:p.slice(1).join('|')};
+    });
+    fecharEditorCal(); renderCalendario();
+  }
+
+  function salvarCal(){
+    var registros=[], removidos=[], viraramNao=[], k;
+    for(k in cal.dias){
+      if(chaveDia(cal.dias[k])===(cal.orig[k]||''))continue;
+      registros.push({semestre_id:cal.semestre.id,data_aula:k,tipo:cal.dias[k].tipo,descricao:cal.dias[k].descricao||null});
+      var antigoLetivo=cal.orig[k]&&cal.orig[k].split('|')[0]==='LETIVO';
+      if(antigoLetivo&&cal.dias[k].tipo==='NAO_LETIVO') viraramNao.push(k);
+    }
+    for(k in cal.orig){ if(!cal.dias[k]) removidos.push(k); }
+    if(!registros.length&&!removidos.length){ mostrarAlertaCampo('cfg-alerta-cal','Nenhuma alteração para salvar.','sucesso'); return; }
+
+    var sb=sbCliente();
+    var btn=el('cal-btn-salvar'); if(btn){btn.disabled=true;btn.classList.add('loading');}
+    function fim(){ if(btn){btn.disabled=false;btn.classList.remove('loading');} }
+
+    // 1) Confere frequência nos dias que vão virar não letivos.
+    var conferir=viraramNao.length&&sb
+      ? sb.rpc('calendario_frequencias_nas_datas',{p_semestre_id:cal.semestre.id,p_datas:viraramNao}).then(function(r){
+          if(r.error) throw new Error('Não foi possível conferir a frequência lançada: '+r.error.message+'. Se o script claude/etapa13-calendario-admin.sql ainda não foi rodado, rode-o antes.');
+          return r.data||[];
+        })
+      : Promise.resolve([]);
+
+    conferir.then(function(comFreq){
+      var resumo=registros.length+' dia(s) criado(s) ou alterado(s)'+(removidos.length?' e '+removidos.length+' tirado(s) do calendário':'')+'.';
+      var msg='Salvar as alterações do calendário?\n\n'+resumo;
+      if(comFreq.length){
+        msg+='\n\nAtenção: estes dias que vão virar NÃO LETIVOS já têm frequência lançada:\n'+
+          comFreq.map(function(f){ return '• '+fmtCal(String(f.data_aula).substring(0,10))+': '+f.turmas+' turma(s), '+f.registros+' registro(s)'; }).join('\n')+
+          '\n\nOs registros não são apagados, mas o dia deixa de aparecer no Diário de Classe e nos relatórios de dias letivos.';
+      }
+      if(!confirm(msg)){ fim(); return null; }
+
+      // 2) Tira do calendário (o banco recusa dia com frequência lançada).
+      var passo=removidos.length&&sb
+        ? sb.from('calendario').delete().eq('semestre_id',cal.semestre.id).in('data_aula',removidos).then(function(r){
+            if(r.error) throw new Error(r.error.message);
+          })
+        : Promise.resolve();
+      // 3) Grava criados/alterados (upsert por semestre + data, em api.js).
+      return passo.then(function(){
+        if(!registros.length) return {sucesso:true};
+        return postApi('calendario.salvar',{registros:registros});
+      }).then(function(res){
+        fim();
+        if(!res.sucesso) throw new Error(res.mensagem||'Erro ao salvar.');
+        mostrarAlertaCampo('cfg-alerta-cal','Calendário salvo: '+resumo,'sucesso',6000);
+        if(typeof toast==='function')toast('Calendário salvo.','success');
+        carregarCalendario();
+      });
+    }).catch(function(e){
+      fim();
+      mostrarAlertaCampo('cfg-alerta-cal',(e&&e.message)||'Erro ao salvar o calendário.','erro',8000);
+      // Recarrega para mostrar o que de fato ficou gravado, caso uma parte
+      // (ex.: remoção) tenha dado certo e outra não.
+      if(removidos.length) carregarCalendario();
     });
   }
 
@@ -900,11 +1508,148 @@
     });
   }
 
+  // ── Envio dos códigos por e-mail (fase 5 — claude/e1-fase5-envio-codigos.sql)
+  var pe={automatico:false};
+  function fmtNumPt(n){ return (Number(n)||0).toLocaleString('pt-BR'); }
+
+  function carregarEnvio(){
+    var sb=sbCliente(), box=el('pe-status');
+    if(!sb||!box)return Promise.resolve(null);
+    return sb.rpc('portal_envio_resumo').then(function(res){
+      if(res.error){
+        box.innerHTML=linhaPt('erro','error','Não foi possível ler o envio dos códigos: '+esc(res.error.message)+
+          '. Se ainda não foi instalado, rode <strong>claude/e1-fase5-envio-codigos.sql</strong>.');
+        ['pe-btn-auto','pe-btn-lote','pe-btn-teste','pe-btn-sem','pe-btn-reenviar'].forEach(function(id){ if(el(id))el(id).disabled=true; });
+        definirSelo('aba-selo-portal','');
+        return null;
+      }
+      var r=res.data||{};
+      pe.automatico=!!r.automatico;
+      var total=(r.enviados||0)+(r.pendentes||0)+(r.sem_email||0)+(r.falhas||0);
+      var html='';
+      html+=linhaPt('ok','mark_email_read','<strong>'+fmtNumPt(r.enviados)+'</strong> de '+fmtNumPt(total)+' alunos ativos já receberam o código'+
+        (r.para_responsavel?' ('+fmtNumPt(r.para_responsavel)+' pelo e-mail do responsável)':'')+'.');
+      html+=linhaPt(r.pendentes?'pendente':'ok', r.pendentes?'schedule_send':'done_all',
+        r.pendentes?('<strong>'+fmtNumPt(r.pendentes)+'</strong> na fila para envio.'):'Nenhum código na fila.');
+      if(r.sem_email) html+=linhaPt('pendente','person_off','<strong>'+fmtNumPt(r.sem_email)+'</strong> sem e-mail cadastrado: a secretaria informa o código (baixe a lista).');
+      if(r.falhas) html+=linhaPt('erro','error','<strong>'+fmtNumPt(r.falhas)+'</strong> com falha depois de 3 tentativas (e-mail provavelmente errado): corrija a ficha e use "Reenviar código".');
+      html+=linhaPt('', 'today','Últimas 24 h: <strong>'+fmtNumPt(r.enviados_24h)+'</strong> de '+fmtNumPt(r.limite_diario)+' e-mails permitidos.');
+      if(r.automatico){
+        var dias=r.pendentes?Math.ceil(r.pendentes/(r.limite_diario||400)):0;
+        html+=linhaPt('ok','autorenew','Envio automático <strong>ligado</strong>'+(r.alterado_por?' por '+esc(r.alterado_por):'')+
+          (dias?'. Previsão para esvaziar a fila: cerca de '+dias+' dia'+(dias>1?'s':'')+'.':'.'));
+      } else {
+        html+=linhaPt('', 'pause_circle','Envio automático <strong>desligado</strong>.');
+      }
+      if(r.ultima_rodada) html+=linhaPt('', 'history','Última rodada: '+fmtMomentoPt(r.ultima_rodada)+' — '+esc(r.ultima_rodada_resultado||''));
+      if(r.ultimo_erro && r.ultimo_erro_em && (Date.now()-new Date(r.ultimo_erro_em).getTime())<24*3600*1000){
+        html+=linhaPt('erro','warning','Aviso de '+fmtMomentoPt(r.ultimo_erro_em)+': '+esc(r.ultimo_erro));
+      }
+      box.innerHTML=html;
+      var fill=el('pe-barra-fill'); if(fill) fill.style.width=(total?Math.round((r.enviados||0)*100/total):0)+'%';
+      var btn=el('pe-btn-auto');
+      if(btn){
+        btn.className='btn-cfg '+(r.automatico?'btn-cfg-pausa':'btn-cfg-primario');
+        if(el('pe-btn-auto-txt'))el('pe-btn-auto-txt').textContent=r.automatico?'Pausar envio automático':'Ligar envio automático';
+        if(el('pe-btn-auto-ic'))el('pe-btn-auto-ic').textContent=r.automatico?'pause':'play_arrow';
+      }
+      // Selo na aba: falhas têm prioridade sobre a fila.
+      if(r.falhas) definirSelo('aba-selo-portal',fmtNumPt(r.falhas)+' com falha','alerta');
+      else definirSelo('aba-selo-portal',r.pendentes?(fmtNumPt(r.pendentes)+' na fila'):'');
+      renovarSessao();
+      return r;
+    });
+  }
+
+  function alternarEnvioAutomatico(){
+    var ligar=!pe.automatico;
+    var msg=ligar
+      ? 'Ligar o envio automático dos códigos?\n\nO sistema envia até 25 e-mails a cada 15 minutos, das 8h às 20h45, no máximo 400 por dia, até todos os alunos receberem. Alunos novos também passam a receber sozinhos.\n\nDica: antes, use "Enviar e-mail de teste para mim".'
+      : 'Pausar o envio automático?\n\nNinguém perde o lugar na fila: ao ligar de novo, o envio continua de onde parou.';
+    if(!confirm(msg))return;
+    var sb=sbCliente(); if(!sb)return;
+    var btn=el('pe-btn-auto'); if(btn){btn.disabled=true;btn.classList.add('loading');}
+    sb.rpc('portal_envio_configurar',{p_automatico:ligar}).then(function(res){
+      if(btn){btn.disabled=false;btn.classList.remove('loading');}
+      if(res.error){mostrarAlertaCampo('cfg-alerta-envio','Não foi possível alterar: '+res.error.message,'erro');return;}
+      mostrarAlertaCampo('cfg-alerta-envio',ligar?'Envio automático ligado. A primeira rodada sai em até 15 minutos (das 8h às 20h45).':'Envio automático pausado.','sucesso');
+      if(typeof toast==='function')toast(ligar?'Envio automático ligado.':'Envio automático pausado.','success');
+      carregarEnvio();
+    });
+  }
+
+  // Chama a Edge Function portal-envio-codigos (envio de verdade, pela conta Gmail)
+  function chamarEnvio(acao, btnId, textoOk){
+    var sb=sbCliente(); if(!sb)return;
+    var btn=el(btnId); if(btn){btn.disabled=true;}
+    mostrarAlertaCampo('cfg-alerta-envio',acao==='teste'?'Enviando o e-mail de teste…':'Enviando um lote… (pode levar até 1 minuto)','sucesso');
+    sb.functions.invoke('portal-envio-codigos',{body:{acao:acao}}).then(function(res){
+      if(btn){btn.disabled=false;}
+      var d=res.data||{};
+      if(typeof d==='string'){ try{d=JSON.parse(d);}catch(e){d={};} }
+      if(res.error||!d.sucesso){
+        mostrarAlertaCampo('cfg-alerta-envio',(d.mensagem)||('Não foi possível falar com a função portal-envio-codigos. Confira se ela foi publicada. '+(res.error&&res.error.message?res.error.message:'')),'erro');
+        return;
+      }
+      mostrarAlertaCampo('cfg-alerta-envio',d.mensagem||textoOk,'sucesso');
+      if(typeof toast==='function')toast(d.mensagem||textoOk,'success');
+      carregarEnvio();
+    }).catch(function(e){
+      if(btn){btn.disabled=false;}
+      mostrarAlertaCampo('cfg-alerta-envio','Erro de comunicação: '+(e.message||'tente novamente.'),'erro');
+    });
+  }
+
+  function reenviarCodigo(){
+    var cod=val('pe-codigo').replace(/\D/g,'');
+    if(cod.length!==9){mostrarAlertaCampo('cfg-alerta-envio','Digite o código do aluno (9 números).','erro');return;}
+    var sb=sbCliente(); if(!sb)return;
+    sb.rpc('portal_envio_reenviar',{p_codigo:cod}).then(function(res){
+      if(res.error){mostrarAlertaCampo('cfg-alerta-envio',res.error.message,'erro');return;}
+      var d=res.data||{};
+      mostrarAlertaCampo('cfg-alerta-envio',d.mensagem||'Pronto.',d.sucesso?'sucesso':'erro');
+      if(d.sucesso&&el('pe-codigo'))el('pe-codigo').value='';
+      carregarEnvio();
+    });
+  }
+
+  function baixarSemEmail(){
+    var sb=sbCliente(); if(!sb)return;
+    var btn=el('pe-btn-sem'); if(btn)btn.disabled=true;
+    sb.rpc('portal_envio_sem_email').then(function(res){
+      if(btn)btn.disabled=false;
+      if(res.error){mostrarAlertaCampo('cfg-alerta-envio',res.error.message,'erro');return;}
+      var linhas=res.data||[];
+      if(!linhas.length){mostrarAlertaCampo('cfg-alerta-envio','Nenhum aluno sem e-mail.','sucesso');return;}
+      var q=function(v){ v=(v===null||v===undefined)?'':String(v); return '"'+v.replace(/"/g,'""')+'"'; };
+      var csv=['Código;Nome;Turmas;Menor de idade'].concat(linhas.map(function(l){
+        return [q(l.codigo),q(l.nome),q(l.turmas),q(l.menor?'Sim':'Não')].join(';');
+      })).join('\r\n');
+      var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+      var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+      a.download='alunos-sem-email-portal.csv'; document.body.appendChild(a); a.click();
+      setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1000);
+      mostrarAlertaCampo('cfg-alerta-envio',linhas.length+' aluno(s) na lista. Ela contém nomes: guarde com cuidado e apague depois de usar.','sucesso');
+    });
+  }
+
   function registrarEventos(){
     el('btn-salvar-dados')&&el('btn-salvar-dados').addEventListener('click',salvarConfig);
     el('btn-novo-sem')&&el('btn-novo-sem').addEventListener('click',abrirFormNovoSemestre);
     el('btn-cancelar-novo-sem')&&el('btn-cancelar-novo-sem').addEventListener('click',fecharFormNovoSemestre);
     el('btn-registrar-sem')&&el('btn-registrar-sem').addEventListener('click',registrarNovoSemestre);
+    // Calendário letivo
+    el('cal-ant')&&el('cal-ant').addEventListener('click',function(){ cal.mes--; if(cal.mes<0){cal.mes=11;cal.ano--;} renderCalendario(); });
+    el('cal-prox')&&el('cal-prox').addEventListener('click',function(){ cal.mes++; if(cal.mes>11){cal.mes=0;cal.ano++;} renderCalendario(); });
+    el('cal-btn-aplicar')&&el('cal-btn-aplicar').addEventListener('click',aplicarEditorCal);
+    el('cal-btn-cancelar')&&el('cal-btn-cancelar').addEventListener('click',function(){ fecharEditorCal(); renderCalendario(); });
+    el('cal-btn-remover')&&el('cal-btn-remover').addEventListener('click',removerDiaCal);
+    el('cal-btn-extra')&&el('cal-btn-extra').addEventListener('click',function(){ abrirEditorExtra(''); });
+    el('cal-btn-descartar')&&el('cal-btn-descartar').addEventListener('click',descartarCal);
+    el('cal-btn-salvar')&&el('cal-btn-salvar').addEventListener('click',salvarCal);
+    el('cal-data-nova')&&el('cal-data-nova').addEventListener('change',atualizarAvisoCal);
+    el('cal-descricao')&&el('cal-descricao').addEventListener('keydown',function(e){ if(e.key==='Enter')aplicarEditorCal(); });
+    document.querySelectorAll('input[name="cal-tipo"]').forEach(function(r){ r.addEventListener('change',atualizarAvisoCal); });
     // Tipos de público-alvo
     el('btn-abrir-pa')&&el('btn-abrir-pa').addEventListener('click',abrirModalTipos);
     el('pa-btn-fechar')&&el('pa-btn-fechar').addEventListener('click',fecharModalTipos);
@@ -916,7 +1661,16 @@
     el('pa-nome')&&el('pa-nome').addEventListener('keydown',function(e){if(e.key==='Enter')salvarTipo();});
     // Portal do Aluno
     el('pt-btn-atualizar')&&el('pt-btn-atualizar').addEventListener('click',atualizarPortal);
-    el('pt-btn-recarregar')&&el('pt-btn-recarregar').addEventListener('click',function(){carregarPortal();});
+    el('pt-btn-recarregar')&&el('pt-btn-recarregar').addEventListener('click',function(){carregarPortal();carregarEnvio();});
+    // Envio dos códigos
+    el('pe-btn-auto')&&el('pe-btn-auto').addEventListener('click',alternarEnvioAutomatico);
+    el('pe-btn-lote')&&el('pe-btn-lote').addEventListener('click',function(){
+      if(confirm('Enviar agora um lote de até 25 códigos? Conta para o limite de 400 por dia.')) chamarEnvio('rodada','pe-btn-lote','Lote enviado.');
+    });
+    el('pe-btn-teste')&&el('pe-btn-teste').addEventListener('click',function(){ chamarEnvio('teste','pe-btn-teste','E-mail de teste enviado.'); });
+    el('pe-btn-sem')&&el('pe-btn-sem').addEventListener('click',baixarSemEmail);
+    el('pe-btn-reenviar')&&el('pe-btn-reenviar').addEventListener('click',reenviarCodigo);
+    el('pe-codigo')&&el('pe-codigo').addEventListener('keydown',function(e){if(e.key==='Enter')reenviarCodigo();});
   }
 
   if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}else{init();}
