@@ -880,6 +880,7 @@
     if(el('inf-matriculados'))el('inf-matriculados').textContent='…';
     postApi('matriculas.listar',{turma_id:S.turmaSel.id,situacao:'ATIVA'}).then(function(res){
       S.matriculas=(res.sucesso&&res.dados)?res.dados.map(normM):[];
+      S.matriculas.sort(function(a,b){return (a.NomeExibicao||'').localeCompare(b.NomeExibicao||'','pt-BR',{sensitivity:'base'});}); // ordem alfabética
       renderizarMatriculas();
       if(el('inf-matriculados'))el('inf-matriculados').textContent=S.matriculas.length;
     });
