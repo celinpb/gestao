@@ -284,6 +284,7 @@
     ]).then(function(results){
       if(!results[0].sucesso){mostrarEstado('erro');return;}
       S.matriculas=(results[0].dados||[]).map(normM);
+      S.matriculas.sort(function(a,b){return (a.NomeExibicao||'').localeCompare(b.NomeExibicao||'','pt-BR',{sensitivity:'base'});}); // ordem alfabética
       var cursos=(results[1].sucesso&&results[1].dados)?results[1].dados:[];
       var todasAv=(results[2].sucesso&&results[2].dados)?results[2].dados.map(normAv):[];
       var cursoRaw=cursos.find(function(c){return c.id===t.curso_id;});
