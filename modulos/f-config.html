@@ -2,6 +2,8 @@
   F_Config.html
   Configurações gerais da escola: dados institucionais, logo e gestão de semestres.
   Visível apenas para admin.
+  (07/10) Card "Portal do Aluno" (E1): situação da última atualização da
+  cópia que o portal consulta e botão "Atualizar agora".
 -->
 <style>
   .cfg-secoes{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
@@ -140,6 +142,17 @@
   .pa-checks label{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;color:var(--c-text-1,#1A1A2E);}
   .pa-checks input{accent-color:#E63946;width:15px;height:15px;}
   .pa-modal-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 20px;border-top:1px solid var(--c-border,#E8E7E2);background:#FAFAF8;}
+
+  /* Portal do Aluno (E1) */
+  .pt-status{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;font-size:13px;color:var(--c-text-2,#5C5C7A);line-height:1.5;}
+  .pt-status strong{color:var(--c-text-1,#1A1A2E);}
+  .pt-linha{display:flex;align-items:flex-start;gap:8px;}
+  .pt-linha .material-icons-round{font-size:17px;flex-shrink:0;margin-top:1px;color:var(--c-text-3,#9898B0);}
+  .pt-linha.ok .material-icons-round{color:#2A9D8F;}
+  .pt-linha.pendente .material-icons-round{color:#D4A843;}
+  .pt-linha.erro{color:#B01020;}
+  .pt-linha.erro .material-icons-round{color:#E63946;}
+  .pt-acoes{display:flex;gap:8px;flex-wrap:wrap;}
 </style>
 
 <div>
@@ -319,6 +332,32 @@
         </div>
       </div>
 
+      <!-- PORTAL DO ALUNO (E1) -->
+      <div class="cfg-card cfg-span2">
+        <div class="cfg-card-header">
+          <span class="material-icons-round">school</span>
+          <span class="cfg-card-titulo">Portal do Aluno</span>
+        </div>
+        <div class="cfg-card-corpo">
+          <div class="cfg-alerta" id="cfg-alerta-portal">
+            <span class="material-icons-round">check_circle</span>
+            <span id="cfg-alerta-portal-msg"></span>
+          </div>
+          <div class="pt-status" id="pt-status">Carregando…</div>
+          <div class="pt-acoes">
+            <button class="btn-cfg btn-cfg-primario" id="pt-btn-atualizar">
+              <div class="spinner-btn"></div>
+              <span class="material-icons-round btn-txt" style="font-size:16px;">sync</span>
+              <span class="btn-txt">Atualizar agora</span>
+            </button>
+            <button class="btn-cfg btn-cfg-sec" id="pt-btn-recarregar">
+              <span class="material-icons-round">refresh</span>Ver situação
+            </button>
+          </div>
+          <div class="cfg-hint" style="margin-top:10px;">O portal mostra uma cópia das informações (turmas, frequência, notas e comentários), refeita automaticamente às 00h, 06h, 12h e 18h. Use "Atualizar agora" depois de um lançamento importante ou para corrigir um dado que um aluno apontou — a nova cópia fica pronta em até 2 minutos.</div>
+        </div>
+      </div>
+
       <!-- REGRAS DE ACESSO (RLS) — SOMENTE LEITURA -->
       <div class="cfg-card cfg-span2">
         <div class="cfg-card-header">
@@ -359,10 +398,11 @@
                 <tr><td class="regras-modulo">Auditoria</td><td>Só lê (menu Auditoria)</td><td>Sem acesso</td><td>Sem acesso</td><td>Sem acesso</td><td class="regras-obs">Gravada automaticamente pelo banco a cada alteração. Ninguém grava, edita nem exclui registros, nem o admin.</td></tr>
                 <tr><td class="regras-modulo">Tipos de público-alvo</td><td>Cria/edita/inativa</td><td>Só lê</td><td>Só lê</td><td>Só lê</td><td class="regras-obs">Ninguém exclui, nem o admin: um tipo que sai de uso é inativado.</td></tr>
                 <tr><td class="regras-modulo">Dados sensíveis do aluno (CPF, endereço, responsáveis)</td><td>Total</td><td>Total</td><td>Só leitura parcial (menor de idade e contato do responsável)</td><td>Total</td><td class="regras-obs">Acesso exclusivo pela Edge Function alunos-sensiveis; a tabela não tem policy nenhuma, é bloqueio total por padrão.</td></tr>
+                <tr><td class="regras-modulo">Portal do Aluno</td><td>Vê a situação e pede atualização</td><td>Sem acesso</td><td>Sem acesso</td><td>Sem acesso</td><td class="regras-obs">Cada aluno vê só os próprios dados, com código e data de nascimento, numa página separada, com limite de tentativas. Ninguém do SGE lê a cópia usada pelo portal.</td></tr>
               </tbody>
             </table>
           </div>
-          <div class="regras-rodape">Última revisão destas regras: 21/09/2026 (etapa 4 do plano de migração). Um usuário não autenticado não tem acesso a nenhum dado do sistema.</div>
+          <div class="regras-rodape">Última revisão destas regras: 07/10/2026 (inclusão do Portal do Aluno). Um usuário não autenticado não tem acesso a nenhum dado do sistema.</div>
         </div>
       </div>
 
@@ -481,6 +521,7 @@
     carregarConfig();
     carregarSemestres();
     carregarTiposPublico();
+    carregarPortal();
     registrarEventos();
   }
 
@@ -758,6 +799,107 @@
     });
   }
 
+  // =========================================================================
+  // PORTAL DO ALUNO (E1) — claude/e1-consulta-alunos.sql
+  // Lê consulta_controle (só admin, pelo RLS) e pede uma atualização com
+  // consulta_solicitar_atualizacao() (a função barra quem não é admin). A
+  // atualização em si roda no banco pelo pg_cron, em até 1 minuto — não
+  // daqui, porque a API corta em 8 s as consultas feitas pelo navegador.
+  // Chamadas feitas direto ao cliente do Supabase (sem passar por postApi),
+  // para que esta funcionalidade não exija mudar api.js.
+  // =========================================================================
+  var pt={timer:null,ate:0};
+  var TZ_PT='America/Fortaleza';
+
+  function sbCliente(){
+    if(typeof _initSupabase==='function')return _initSupabase();
+    return window._supabase||null;
+  }
+  function renovarSessao(){ try{ if(window.Auth&&typeof Auth.renovar==='function')Auth.renovar(); }catch(e){} }
+  function fmtMomentoPt(ts){
+    if(!ts)return '—';
+    var d=new Date(ts); if(isNaN(d))return '—';
+    var dia=new Intl.DateTimeFormat('pt-BR',{timeZone:TZ_PT,day:'2-digit',month:'2-digit',year:'numeric'}).format(d);
+    var hora=new Intl.DateTimeFormat('pt-BR',{timeZone:TZ_PT,hour:'2-digit',minute:'2-digit'}).format(d);
+    return dia+' às '+hora;
+  }
+  function linhaPt(classe,icone,html){
+    return '<div class="pt-linha '+classe+'"><span class="material-icons-round">'+icone+'</span><span>'+html+'</span></div>';
+  }
+
+  function carregarPortal(){
+    var sb=sbCliente(), box=el('pt-status');
+    if(!sb||!box)return Promise.resolve(null);
+    return sb.from('consulta_controle').select('*').eq('id',1).maybeSingle().then(function(res){
+      if(res.error){
+        box.innerHTML=linhaPt('erro','error','Não foi possível ler a situação do portal: '+esc(res.error.message)+
+          '. Se o portal ainda não foi instalado no banco, rode <strong>claude/e1-consulta-alunos.sql</strong>.');
+        if(el('pt-btn-atualizar'))el('pt-btn-atualizar').disabled=true;
+        return null;
+      }
+      var c=res.data;
+      if(!c){ box.innerHTML=linhaPt('erro','lock','Sem permissão para ver a situação do portal.'); return null; }
+      renovarSessao();
+      var html='';
+      if(c.ultima_geracao){
+        html+=linhaPt('ok','check_circle','Última atualização: <strong>'+fmtMomentoPt(c.ultima_geracao)+'</strong> ('+
+          (c.origem==='manual'?'pedida pelo admin':'automática')+'). '+
+          '<strong>'+(c.total_alunos||0).toLocaleString('pt-BR')+'</strong> alunos com acesso'+
+          (c.duracao_ms?', levou '+(c.duracao_ms/1000).toLocaleString('pt-BR',{maximumFractionDigits:1})+' s':'')+'.');
+      } else {
+        html+=linhaPt('pendente','schedule','O portal ainda não foi gerado nenhuma vez.');
+      }
+      if(c.ultimo_erro && (!c.ultima_geracao || new Date(c.ultimo_erro_em)>new Date(c.ultima_geracao))){
+        html+=linhaPt('erro','error','A última tentativa falhou em '+fmtMomentoPt(c.ultimo_erro_em)+': '+esc(c.ultimo_erro)+
+          '. Os alunos continuam vendo a atualização anterior.');
+      }
+      if(c.solicitado_em){
+        html+=linhaPt('pendente','hourglass_top','Atualização pedida por '+esc(c.solicitado_por||'admin')+' em '+fmtMomentoPt(c.solicitado_em)+
+          '. Fica pronta em até 2 minutos.');
+      }
+      box.innerHTML=html;
+      var btn=el('pt-btn-atualizar');
+      if(btn){btn.disabled=!!c.solicitado_em; btn.classList.remove('loading');}
+      if(c.solicitado_em) acompanharPortal(); else pararAcompanhar();
+      return c;
+    });
+  }
+
+  // Enquanto houver pedido pendente, relê a situação a cada 15 s (até 4 min).
+  function acompanharPortal(){
+    if(pt.timer)return;
+    pt.ate=Date.now()+4*60*1000;
+    pt.timer=setInterval(function(){
+      if(!el('pt-status')||Date.now()>pt.ate){pararAcompanhar();return;}
+      carregarPortal().then(function(c){
+        if(c&&!c.solicitado_em){
+          pararAcompanhar();
+          var falhou=c.ultimo_erro&&c.ultimo_erro_em&&new Date(c.ultimo_erro_em)>new Date(c.ultima_geracao||0);
+          mostrarAlertaCampo('cfg-alerta-portal',falhou?'A atualização falhou — veja a mensagem abaixo.':'Portal atualizado.',falhou?'erro':'sucesso');
+          if(typeof toast==='function')toast(falhou?'A atualização do portal falhou.':'Portal do Aluno atualizado.',falhou?'error':'success');
+        }
+      });
+    },15000);
+  }
+  function pararAcompanhar(){ if(pt.timer){clearInterval(pt.timer);pt.timer=null;} }
+
+  function atualizarPortal(){
+    if(!confirm('Atualizar agora as informações do Portal do Aluno?\n\nA nova cópia fica pronta em até 2 minutos. Enquanto isso, os alunos continuam vendo a anterior.'))return;
+    var sb=sbCliente(); if(!sb)return;
+    var btn=el('pt-btn-atualizar'); if(btn){btn.disabled=true;btn.classList.add('loading');}
+    sb.rpc('consulta_solicitar_atualizacao').then(function(res){
+      if(btn)btn.classList.remove('loading');
+      if(res.error){
+        if(btn)btn.disabled=false;
+        mostrarAlertaCampo('cfg-alerta-portal','Não foi possível pedir a atualização: '+res.error.message,'erro');
+        return;
+      }
+      mostrarAlertaCampo('cfg-alerta-portal',(res.data&&res.data.mensagem)||'Atualização solicitada.','sucesso');
+      if(typeof toast==='function')toast('Atualização do portal solicitada.','success');
+      carregarPortal();
+    });
+  }
+
   function registrarEventos(){
     el('btn-salvar-dados')&&el('btn-salvar-dados').addEventListener('click',salvarConfig);
     el('btn-novo-sem')&&el('btn-novo-sem').addEventListener('click',abrirFormNovoSemestre);
@@ -772,6 +914,9 @@
     el('pa-btn-cancelar')&&el('pa-btn-cancelar').addEventListener('click',fecharFormTipo);
     el('pa-btn-salvar')&&el('pa-btn-salvar').addEventListener('click',salvarTipo);
     el('pa-nome')&&el('pa-nome').addEventListener('keydown',function(e){if(e.key==='Enter')salvarTipo();});
+    // Portal do Aluno
+    el('pt-btn-atualizar')&&el('pt-btn-atualizar').addEventListener('click',atualizarPortal);
+    el('pt-btn-recarregar')&&el('pt-btn-recarregar').addEventListener('click',function(){carregarPortal();});
   }
 
   if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}else{init();}
