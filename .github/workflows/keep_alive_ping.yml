@@ -1,30 +1,44 @@
 # =============================================================================
 # SGE · CELINPB — GitHub Actions: Keep-Alive + Backup automático
 # Arquivo: .github/workflows/keep_alive_ping.yml
-# Repositório: o mesmo do frontend (GitHub Pages)
+# Repositório: o de PRODUÇÃO do frontend (GitHub Pages) — depois da virada,
+# celinpb/gestao. Se estiver também em celinpb/gestao2, basta deixar em um só.
 #
 # O que este workflow faz:
 #   1. A cada 5 dias, faz um "ping" no banco Supabase para evitar a pausa
 #      automática do plano gratuito (que ocorre após 7 dias sem atividade).
-#   2. Uma vez por semana (domingo às 03h), exporta todas as tabelas críticas
-#      como JSON e salva como artefato no GitHub por 90 dias.
+#   2. Uma vez por semana (domingo às 00h de Brasília) — ou quando disparado
+#      à mão — exporta TODAS as tabelas como JSON, compacta num arquivo .7z
+#      PROTEGIDO POR SENHA e guarda como artefato no GitHub por 90 dias.
+#
+# Versão 2 (06/10), corrige dois problemas da versão anterior:
+#   - A exportação pedia cada tabela de uma vez só, e o Supabase entrega no
+#     máximo 1.000 linhas por pedido: frequências, alunos e matrículas saíam
+#     CORTADAS no backup. Agora cada tabela é lida em partes e o backup FALHA
+#     (fica vermelho) se o número de linhas não bater com o do banco.
+#   - O backup (incluindo CPFs e endereços de alunos_sensiveis) ficava em
+#     texto aberto como artefato. Num repositório público, artefatos podem ser
+#     baixados por qualquer pessoa com conta no GitHub — vazamento de dados
+#     protegidos pela LGPD. Agora só o .7z com senha é guardado.
 #
 # CONFIGURAÇÃO NECESSÁRIA (uma única vez):
-#   No seu repositório GitHub → Settings → Secrets and variables → Actions
-#   Adicione os seguintes secrets:
-#     SUPABASE_URL        → URL do seu projeto (ex: https://xxxx.supabase.co)
-#     SUPABASE_ANON_KEY   → chave anon/public (NÃO a service_role key)
-#     SUPABASE_SERVICE_KEY → service_role key (usada APENAS no backup server-side)
+#   GitHub → repositório → Settings → Secrets and variables → Actions →
+#   New repository secret:
+#     SUPABASE_URL         → https://kolomiisespdgaoukvbj.supabase.co
+#     SUPABASE_ANON_KEY    → chave anon/public
+#     SUPABASE_SERVICE_KEY → service_role key (usada APENAS aqui, no runner)
+#     BACKUP_SENHA         → uma senha forte, guardada também fora do GitHub
+#                            (sem ela não é possível abrir os backups)
 #
-#   ATENÇÃO: SUPABASE_SERVICE_KEY nunca deve aparecer no frontend.
-#   Aqui ela é usada apenas em ambiente de CI controlado (runner GitHub).
+#   Para abrir um backup: Actions → execução → Artifacts → baixar → abrir o
+#   .7z com o 7-Zip (Windows) ou similar, digitando a BACKUP_SENHA.
 # =============================================================================
 
 name: SGE · Keep-Alive e Backup
 
 on:
   schedule:
-    # Ping a cada 5 dias (dom, ter, sex às 04h UTC = 01h Brasília)
+    # Ping a cada 5 dias (04h UTC = 01h Brasília)
     - cron: '0 4 */5 * *'
     # Backup completo todo domingo às 03h UTC = 00h Brasília
     - cron: '0 3 * * 0'
@@ -40,7 +54,6 @@ jobs:
     steps:
       - name: Fazer ping no Supabase
         run: |
-          echo "Enviando ping para ${{ secrets.SUPABASE_URL }} ..."
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             "${{ secrets.SUPABASE_URL }}/rest/v1/semestres?select=id&limit=1" \
             -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
@@ -53,87 +66,108 @@ jobs:
           echo "Ping bem-sucedido. Banco ativo."
 
   # ===========================================================================
-  # JOB 2 · BACKUP — exporta dados críticos como JSON
-  # Roda apenas nos domingos (cron '0 3 * * 0') ou manualmente
+  # JOB 2 · BACKUP — exporta todas as tabelas, completas, em .7z com senha
   # ===========================================================================
   backup:
     name: Backup semanal do banco
     runs-on: ubuntu-latest
-    # Só executa no domingo OU quando disparado manualmente
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.schedule, '0 3 * * 0')
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 3 * * 0'
     steps:
-      - name: Criar pasta de backup
-        run: mkdir -p backup
+      - name: Conferir a senha do backup
+        env:
+          BACKUP_SENHA: ${{ secrets.BACKUP_SENHA }}
+        run: |
+          if [ -z "$BACKUP_SENHA" ]; then
+            echo "ERRO: o secret BACKUP_SENHA não está configurado — backup cancelado para não guardar dados abertos."
+            exit 1
+          fi
 
-      - name: Exportar tabelas críticas
+      - name: Exportar todas as tabelas (completas, em partes de 1.000)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SERVICE_KEY:  ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          # Função auxiliar: exporta uma tabela inteira como JSON
-          export_table() {
-            TABLE=$1
-            echo "Exportando $TABLE ..."
-            curl -s \
-              "$SUPABASE_URL/rest/v1/$TABLE?select=*" \
-              -H "apikey: $SERVICE_KEY" \
-              -H "Authorization: Bearer $SERVICE_KEY" \
-              -H "Prefer: count=exact" \
-              > "backup/${TABLE}.json"
-            COUNT=$(python3 -c "import json,sys; d=json.load(open('backup/${TABLE}.json')); print(len(d) if isinstance(d,list) else 'erro')")
-            echo "  → $COUNT registros exportados"
-          }
+          python3 - <<'PY'
+          import json, os, re, urllib.request, urllib.error
 
-          # Tabelas prioritárias (dados que mais doem perder)
-          export_table usuarios
-          export_table alunos
-          export_table semestres
-          export_table turmas
-          export_table matriculas
-          export_table frequencias
-          export_table notas
-          export_table ocorrencias
-          export_table auditoria
-          export_table cursos
-          export_table avaliacoes
+          URL = os.environ['SUPABASE_URL'].rstrip('/')
+          KEY = os.environ['SERVICE_KEY']
+          LOTE = 1000
+          TABELAS = [
+              'usuarios', 'idiomas', 'avaliacoes', 'cursos', 'curso_avaliacoes', 'curso_proximos',
+              'semestres', 'calendario', 'turmas', 'alunos', 'alunos_sensiveis', 'matriculas',
+              'frequencias', 'conteudo', 'notas', 'comentarios', 'ocorrencias', 'ocorrencia_respostas',
+              'ocorrencia_destinatarios', 'config_escola', 'publico_alvo_tipos', 'auditoria',
+          ]
 
-          # alunos_sensiveis: exportada com service_role (tem acesso total)
-          echo "Exportando alunos_sensiveis (dados LGPD) ..."
-          curl -s \
-            "$SUPABASE_URL/rest/v1/alunos_sensiveis?select=*" \
-            -H "apikey: $SERVICE_KEY" \
-            -H "Authorization: Bearer $SERVICE_KEY" \
-            > "backup/alunos_sensiveis.json"
-          echo "  → $(python3 -c "import json; d=json.load(open('backup/alunos_sensiveis.json')); print(len(d))")" registros
+          def pedir(caminho, contar=False):
+              cab = {'apikey': KEY, 'Authorization': 'Bearer ' + KEY}
+              if contar:
+                  cab['Prefer'] = 'count=exact'
+              req = urllib.request.Request(URL + '/rest/v1/' + caminho, headers=cab)
+              with urllib.request.urlopen(req, timeout=120) as r:
+                  total = None
+                  m = re.search(r'/(\d+)$', r.headers.get('Content-Range', '') or '')
+                  if m:
+                      total = int(m.group(1))
+                  return json.load(r), total
 
-          echo "Backup completo em $(date -u '+%Y-%m-%d %H:%M UTC')"
+          os.makedirs('backup', exist_ok=True)
+          resumo, problemas = [], []
+          for t in TABELAS:
+              ordem = '&order=id.asc'
+              try:
+                  _, total = pedir(f'{t}?select=*&limit=1{ordem}', contar=True)
+              except urllib.error.HTTPError as e:
+                  if e.code == 404:
+                      resumo.append((t, 'tabela não existe'))
+                      continue
+                  ordem = ''  # tabela sem coluna "id": exporta sem ordenação
+                  _, total = pedir(f'{t}?select=*&limit=1', contar=True)
+              linhas = []
+              while total is None or len(linhas) < total:
+                  lote, _ = pedir(f'{t}?select=*&limit={LOTE}&offset={len(linhas)}{ordem}')
+                  if not lote:
+                      break
+                  linhas.extend(lote)
+                  if total is None and len(lote) < LOTE:
+                      break
+              with open(f'backup/{t}.json', 'w', encoding='utf-8') as f:
+                  json.dump(linhas, f, ensure_ascii=False)
+              if total is not None and len(linhas) != total:
+                  problemas.append(f'{t}: exportadas {len(linhas)} de {total}')
+              resumo.append((t, len(linhas)))
+              print(f'{t}: {len(linhas)} linhas' + ('' if total is None else f' (banco: {total})'))
 
-      - name: Criar manifesto do backup
+          with open('resumo.md', 'w', encoding='utf-8') as f:
+              f.write('| Tabela | Linhas |\n|---|---|\n')
+              for t, n in resumo:
+                  f.write(f'| {t} | {n} |\n')
+          if problemas:
+              print('ERRO: backup incompleto:\n' + '\n'.join(problemas))
+              raise SystemExit(1)
+          PY
+
+      - name: Compactar com senha (.7z) e apagar os arquivos abertos
+        env:
+          BACKUP_SENHA: ${{ secrets.BACKUP_SENHA }}
         run: |
-          DATE=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-          echo "{\"backup_em\": \"$DATE\", \"arquivos\": $(ls backup/*.json | python3 -c "import sys,json; print(json.dumps([l.strip() for l in sys.stdin]))")}" \
-            > backup/manifesto.json
-          cat backup/manifesto.json
+          command -v 7z >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq p7zip-full)
+          DATA=$(date -u '+%Y-%m-%d')
+          mkdir -p saida
+          7z a -t7z -mhe=on -p"$BACKUP_SENHA" "saida/sge-backup-$DATA.7z" backup/ > /dev/null
+          rm -rf backup
+          ls -la saida
 
       - name: Salvar backup como artefato GitHub
         uses: actions/upload-artifact@v4
         with:
           name: sge-backup-${{ github.run_id }}-${{ github.run_number }}
-          path: backup/
+          path: saida/
           retention-days: 90
-          # Artefatos ficam disponíveis por 90 dias na aba Actions do GitHub.
-          # Para baixar: GitHub → Actions → último workflow → Artifacts → Download
 
       - name: Resumo do backup
         run: |
-          echo "### Backup SGE · CELINPB" >> $GITHUB_STEP_SUMMARY
+          echo "### Backup SGE · CELINPB — $(date -u '+%d/%m/%Y %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Data: $(date -u '+%d/%m/%Y %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Tabela | Tamanho |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|---------|" >> $GITHUB_STEP_SUMMARY
-          for f in backup/*.json; do
-            NAME=$(basename $f)
-            SIZE=$(du -sh $f | cut -f1)
-            echo "| $NAME | $SIZE |" >> $GITHUB_STEP_SUMMARY
-          done
+          cat resumo.md >> $GITHUB_STEP_SUMMARY
