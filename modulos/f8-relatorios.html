@@ -522,6 +522,10 @@
     });
   }
 
+  // Ordem alfabética pelo nome exibido (nome social, se houver), ignorando
+  // acentos e maiúsculas — mesma regra das telas de Turmas, Diário e Notas.
+  function compararNomes(x,y){ return (x||'').localeCompare(y||'','pt-BR',{sensitivity:'base'}); }
+  function porNome(a,b){ return compararNomes(a.NomeExibicao, b.NomeExibicao); }
   function postApi(a,d){ return window.postApi(a,d); }
   function el(id){ return document.getElementById(id); }
   function val(id){ return el(id) ? el(id).value.trim() : ''; }
@@ -1021,7 +1025,7 @@
   function gerarBoletim(turmaId, alunoFiltro, incluirInativos, incluirOutras){
     var turma=S.turmas.find(function(t){return t.id===turmaId;});
     return postApi('matriculas.listar',{turma_id:turmaId}).then(function(r){
-      var matriculas=(r.sucesso&&r.dados)?r.dados.map(normM):[];
+      var matriculas=(r.sucesso&&r.dados)?r.dados.map(normM).sort(porNome):[];
       if(!incluirOutras) matriculas=matriculas.filter(function(m){return m.SituacaoMatricula==='ATIVA';});
       if(alunoFiltro){
         var f=alunoFiltro.toLowerCase();
@@ -1110,9 +1114,9 @@
   function gerarTurmasComAlunos(turmaId, incluirOutras){
     var turma=S.turmas.find(function(t){return t.id===turmaId;});
     return postApi('matriculas.listar',{turma_id:turmaId}).then(function(r){
-      var matriculas=(r.sucesso&&r.dados)?r.dados.map(normM):[];
+      var matriculas=(r.sucesso&&r.dados)?r.dados.map(normM).sort(porNome):[];
       if(!incluirOutras) matriculas=matriculas.filter(function(m){return m.SituacaoMatricula==='ATIVA';});
-      matriculas.sort(function(a,b){return (a.NomeExibicao||'').localeCompare(b.NomeExibicao||'','pt-BR');});
+      matriculas.sort(porNome);
 
       var html='<div class="r8-folha">'+headerInstitucional('Alunos matriculados');
       html+='<h2 class="r8-titulo-rel">Alunos matriculados</h2>';
@@ -1135,6 +1139,7 @@
   function gerarAlunosGeral(incluirInativos){
     return listarTudo('alunos.listar', {somenteAtivos:!incluirInativos}).then(function(lista){
       if(!lista.length){ mostrarEstadoVazio('Nenhum aluno encontrado.'); return; }
+      lista.sort(function(a,b){ return compararNomes(a.nome_social||a.nome_completo, b.nome_social||b.nome_completo); });
       var html='<div class="r8-folha">'+headerInstitucional('Listagem geral de alunos');
       html+='<h2 class="r8-titulo-rel">Listagem geral de alunos'+(incluirInativos?' (incl. inativos)':'')+'</h2>';
       html+='<table class="r8-table"><thead><tr><th>Nome</th><th class="c">ID</th><th class="c">Município/UF</th><th class="c">Telefone</th><th class="c">Situação</th></tr></thead><tbody>';
@@ -1157,7 +1162,7 @@
       postApi('matriculas.listar',{turma_id:turmaId}),
       postApi('frequencias.listar',{turma_id:turmaId}),
     ]).then(function(r){
-      var matriculas=(r[0].sucesso&&r[0].dados)?r[0].dados.map(normM):[];
+      var matriculas=(r[0].sucesso&&r[0].dados)?r[0].dados.map(normM).sort(porNome):[];
       if(!incluirOutras) matriculas=matriculas.filter(function(m){return m.SituacaoMatricula==='ATIVA';});
       var freqAll=(r[1].sucesso&&r[1].dados)?r[1].dados:[];
       if(!matriculas.length){ mostrarEstadoVazio('Nenhum aluno encontrado nesta turma.'); return; }
@@ -1189,7 +1194,7 @@
   function gerarResultadosTurma(turmaId, incluirOutras){
     var turma=S.turmas.find(function(t){return t.id===turmaId;});
     return postApi('matriculas.listar',{turma_id:turmaId}).then(function(r){
-      var matriculas=(r.sucesso&&r.dados)?r.dados.map(normM):[];
+      var matriculas=(r.sucesso&&r.dados)?r.dados.map(normM).sort(porNome):[];
       if(!incluirOutras) matriculas=matriculas.filter(function(m){return m.SituacaoMatricula==='ATIVA';});
       if(!matriculas.length){ mostrarEstadoVazio('Nenhum aluno encontrado nesta turma.'); return; }
       var avaliacoesTurma=avaliacoesDaTurma(turma);
@@ -1278,11 +1283,11 @@
     var colunas=CAMPOS_ALUNO.filter(function(c){return camposSel.indexOf(c.v)!==-1;});
     var precisaSensiveis=colunas.some(function(c){return c.sensivel;});
     return Promise.all([ postApi('matriculas.listar',{turma_id:turmaId}), carregarAlunosTodos() ]).then(function(r){
-      var matriculas=(r[0].sucesso&&r[0].dados)?r[0].dados.map(normM):[];
+      var matriculas=(r[0].sucesso&&r[0].dados)?r[0].dados.map(normM).sort(porNome):[];
       if(!incluirOutras) matriculas=matriculas.filter(function(m){return m.SituacaoMatricula==='ATIVA';});
       if(!matriculas.length){ mostrarEstadoVazio('Nenhum aluno encontrado nesta turma.'); return; }
       var mapaAlunos=r[1];
-      matriculas.sort(function(a,b){return (a.NomeExibicao||'').localeCompare(b.NomeExibicao||'','pt-BR');});
+      matriculas.sort(porNome);
 
       var prosseguir=function(mapaSens){
         if(mapaSens){
@@ -1450,11 +1455,11 @@
       postApi('matriculas.listar',{turma_id:turmaId}),
       postApi('frequencias.listar',{turma_id:turmaId}),
     ]).then(function(r){
-      var matriculas=(r[0].sucesso&&r[0].dados)?r[0].dados.map(normM):[];
+      var matriculas=(r[0].sucesso&&r[0].dados)?r[0].dados.map(normM).sort(porNome):[];
       if(!incluirOutras) matriculas=matriculas.filter(function(m){return m.SituacaoMatricula==='ATIVA';});
       var freqAll=(r[1].sucesso&&r[1].dados)?r[1].dados:[];
       if(!matriculas.length){ mostrarEstadoVazio('Nenhum aluno encontrado nesta turma.'); return; }
-      matriculas.sort(function(a,b){return (a.NomeExibicao||'').localeCompare(b.NomeExibicao||'','pt-BR');});
+      matriculas.sort(porNome);
 
       var subtitulo=(turma?turma.TurmaID:'')+' · '+(turma?(turma.Estagio||turma.CursoSigla):'')+
         (turma&&turma.ProfessorNome?' · Prof. '+turma.ProfessorNome:'');
@@ -1602,7 +1607,7 @@
 
     return Promise.all(chamadas).then(function(r){
       if(btn){ btn.disabled=false; btn.classList.remove('loading'); }
-      var matriculas=(r[0].sucesso&&r[0].dados)?r[0].dados.map(normM):[];
+      var matriculas=(r[0].sucesso&&r[0].dados)?r[0].dados.map(normM).sort(porNome):[];
       var mapaAlunos=r[1]||{};
       var notasSemestre=(r[2]&&r[2].sucesso&&r[2].dados)?r[2].dados.map(normNota):null;
       var freqTodas=(r[3]&&r[3].sucesso&&r[3].dados)?r[3].dados:null;
