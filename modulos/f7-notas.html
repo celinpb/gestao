@@ -53,6 +53,11 @@
   .n7-nome{font-weight:500;font-size:13px;color:var(--c-text-1,#1A1A2E);}
   .n7-mat-id{font-size:10.5px;font-family:var(--font-mono,monospace);color:var(--c-text-3,#9898B0);}
 
+  /* Aviso de escala de notas */
+  .n7-escala{display:flex;align-items:flex-start;gap:8px;background:rgba(69,123,157,0.08);border:1px solid rgba(69,123,157,0.30);color:#1D4E6E;border-radius:8px;padding:10px 14px;font-size:13px;line-height:1.5;margin-bottom:12px;}
+  .n7-escala .material-icons-round{font-size:18px;color:#457B9D;flex-shrink:0;margin-top:1px;}
+  .n7-nota-input.invalido{border-color:#E63946;background:rgba(230,57,70,0.07);}
+
   /* Campo de nota */
   .n7-nota-input{width:56px;height:32px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:6px;text-align:center;font-family:var(--font-mono,monospace);font-size:13px;color:var(--c-text-1,#1A1A2E);background:#FAFAF8;outline:none;transition:border-color 150ms ease,background 150ms ease;}
   .n7-nota-input:focus{border-color:#E63946;background:#fff;box-shadow:0 0 0 2px rgba(230,57,70,0.10);}
@@ -145,6 +150,7 @@
     </button>
   </div>
 
+  <div class="n7-escala" id="n7-escala" style="display:none;"></div>
   <div class="n7-legenda" id="n7-legenda"></div>
 
   <div class="n7-card">
@@ -197,11 +203,16 @@
 (function(){
   'use strict';
   var S={turmas:[],turmaSel:null,matriculas:[],avaliacoes:[],notas:{},notasSalvas:{},comentarios:{},medias:{},papel:'',usuarioId:'',matComentario:null,etapaAtual:'1'};
+  // Escala oficial de notas (10/2026): 0 a 100, aprovação com média 70 em
+  // CADA componente. Os valores vêm da tabela `avaliacoes` (já cadastrados
+  // assim); estes números só valem se algum campo estiver vazio no banco.
+  var ESCALA_MIN=0, ESCALA_MAX=100, NOTA_APROVACAO=70;
   function postApi(a,d){return window.postApi(a,d);}
   function el(id){return document.getElementById(id);}
   function normT(t){var c=t.cursos||{};return{id:t.id,TurmaID:t.external_id||t.id,Estagio:t.estagio||'',CursoSigla:c.sigla||'',curso_id:t.curso_id,semestre_id:t.semestre_id};}
   function normM(m){var al=m.alunos||{};var ns=al.nome_social||'';return{id:m.id,MatriculaID:m.external_id||m.id,AlunoID:al.external_id||m.aluno_id,NomeExibicao:ns||al.nome_completo||'',PcD:al.pcd||false,aluno_id:m.aluno_id};}
-  function normAv(a){return{id:a.id,AvaliacaoID:a.external_id||a.id,ComponenteNota:a.componente_nota||'',Tipo:a.tipo||'',QntNotas:a.quantidade_notas||1,NotaMinima:a.nota_minima,NotaMaxima:a.nota_maxima,NotaAprovacao:a.nota_aprovacao};}
+  function normAv(a){return{id:a.id,AvaliacaoID:a.external_id||a.id,ComponenteNota:a.componente_nota||'',Tipo:a.tipo||'',QntNotas:a.quantidade_notas||1,NotaMinima:numOu(a.nota_minima,ESCALA_MIN),NotaMaxima:numOu(a.nota_maxima,ESCALA_MAX),NotaAprovacao:numOu(a.nota_aprovacao,NOTA_APROVACAO)};}
+  function numOu(v,padrao){return (v===null||v===undefined||v==='')?padrao:Number(v);}
   function normNota(n){return{id:n.id,MatriculaID:n.matricula_id,ComponenteNota:n.componente_nota||'',SubcomponenteNota:n.subcomponente_nota||'',ValorNota:n.valor_nota};}
   function normCom(c){return{id:c.id,MatriculaID:c.matricula_id,Etapa:c.etapa||'',Comentario:c.comentario||''};}
 
@@ -319,9 +330,37 @@
     cont.innerHTML='';
     S.avaliacoes.forEach(function(av,idx){
       var span=document.createElement('span');span.className='n7-legenda-item';
-      span.innerHTML='<span class="n7-legenda-dot" style="background:'+corComponente(idx)+';"></span>'+(av.ComponenteNota||'—');
+      span.innerHTML='<span class="n7-legenda-dot" style="background:'+corComponente(idx)+';"></span>'+(av.ComponenteNota||'—')+' · aprovação: '+fmtNum(av.NotaAprovacao);
       cont.appendChild(span);
     });
+    renderizarEscala();
+  }
+
+  function fmtNum(v){return String(v).replace('.',',');}
+
+  // Aviso fixo acima da tabela: escala 0–100 e média 70 por componente.
+  function renderizarEscala(){
+    var box=el('n7-escala'); if(!box)return;
+    if(!S.avaliacoes.length){box.style.display='none';return;}
+    var mins={},maxs={},aprs={};
+    S.avaliacoes.forEach(function(av){mins[av.NotaMinima]=1;maxs[av.NotaMaxima]=1;aprs[av.NotaAprovacao]=1;});
+    var nomes=[];S.avaliacoes.forEach(function(av){if(av.ComponenteNota&&nomes.indexOf(av.ComponenteNota)===-1)nomes.push(av.ComponenteNota);});
+    var uniforme=Object.keys(mins).length===1&&Object.keys(maxs).length===1&&Object.keys(aprs).length===1;
+    var txt;
+    if(uniforme){
+      var a=S.avaliacoes[0];
+      txt='<strong>Escala de notas: '+fmtNum(a.NotaMinima)+' a '+fmtNum(a.NotaMaxima)+'.</strong> Para aprovação, o aluno precisa de média mínima <strong>'+fmtNum(a.NotaAprovacao)+'</strong> em <strong>cada</strong> componente'+(nomes.length?' ('+nomes.join(', ')+')':'')+'.';
+    } else {
+      txt='<strong>Escala de notas por componente:</strong> '+S.avaliacoes.map(function(av){return av.ComponenteNota+': '+fmtNum(av.NotaMinima)+' a '+fmtNum(av.NotaMaxima)+', aprovação '+fmtNum(av.NotaAprovacao);}).join(' · ')+'. A aprovação exige a média mínima em <strong>cada</strong> componente.';
+    }
+    box.innerHTML='<span class="material-icons-round">info</span><span>'+txt+'</span>';
+    box.style.display='flex';
+  }
+
+  function notaForaDaEscala(valor,av){
+    if(valor===''||valor===null||valor===undefined)return false;
+    var n=Number(valor);
+    return isNaN(n)||n<av.NotaMinima||n>av.NotaMaxima;
   }
 
   function calcularMedia(matId){
@@ -372,13 +411,19 @@
         if(col.av.NotaMinima!==undefined&&col.av.NotaMinima!==null)input.min=col.av.NotaMinima;
         if(col.av.NotaMaxima!==undefined&&col.av.NotaMaxima!==null)input.max=col.av.NotaMaxima;
         input.step='0.1';
+        input.placeholder=fmtNum(col.av.NotaMinima)+'–'+fmtNum(col.av.NotaMaxima);
+        input.title='Nota de '+fmtNum(col.av.NotaMinima)+' a '+fmtNum(col.av.NotaMaxima);
         input.value=valorAtual!==undefined?valorAtual:'';
         if(valorAtual!==valorSalvo)input.classList.add('modificado');
+        if(notaForaDaEscala(input.value,col.av))input.classList.add('invalido');
         input.dataset.mat=m.id;input.dataset.comp=col.componente;input.dataset.sub=col.subcomponente;input.dataset.chave=col.chave;
         input.addEventListener('change',function(){
           S.notas[m.id]=S.notas[m.id]||{};
           S.notas[m.id][col.chave]=this.value;
           this.classList.toggle('modificado',this.value!==(S.notasSalvas[m.id]||{})[col.chave]);
+          var fora=notaForaDaEscala(this.value,col.av);
+          this.classList.toggle('invalido',fora);
+          if(fora&&typeof toast==='function')toast('Nota inválida: use valores de '+fmtNum(col.av.NotaMinima)+' a '+fmtNum(col.av.NotaMaxima)+'.','error');
           S.medias[m.id]=calcularMedia(m.id);
           atualizarMediaTr(tr,m.id);
         });
@@ -417,7 +462,7 @@
 
   function salvarNotas(){
     if(!S.turmaSel){if(typeof toast==='function')toast('Selecione uma turma.','error');return;}
-    var notas=[];
+    var notas=[],invalidas=0;
     S.matriculas.forEach(function(m){
       Object.keys(S.notas[m.id]||{}).forEach(function(chave){
         var valor=S.notas[m.id][chave];
@@ -425,9 +470,11 @@
         var comp=partes[0],sub=partes.slice(1).join('|');
         var av=S.avaliacoes.find(function(a){return a.ComponenteNota===comp;});
         if(!av)return;
+        if(notaForaDaEscala(valor,av)){invalidas++;return;}
         notas.push({matricula_id:m.id,semestre_id:S.turmaSel.semestre_id,avaliacao_id:av.id,componente_nota:comp,subcomponente_nota:sub,valor_nota:valor===''||valor===null||valor===undefined?null:parseFloat(valor)});
       });
     });
+    if(invalidas){if(typeof toast==='function')toast(invalidas+' nota(s) fora da escala (destacadas em vermelho). Corrija para valores de '+fmtNum(ESCALA_MIN)+' a '+fmtNum(ESCALA_MAX)+' antes de salvar.','error');return;}
     if(!notas.length){if(typeof toast==='function')toast('Nenhuma nota para salvar.','error');return;}
     var btn=el('btn-n7-salvar'); if(btn){btn.disabled=true;btn.classList.add('loading');}
     postApi('notas.salvar',{notas:notas}).then(function(res){
