@@ -819,12 +819,19 @@
     lista.forEach(function(t){
       var tr=document.createElement('tr');
       if(S.turmaSel&&S.turmaSel.TurmaID===t.TurmaID)tr.classList.add('selecionada');
+      // Dia / Horário (como no legado): dia abreviado ("Segunda") e, abaixo,
+      // o horário em cinza. Turmas com mais de um dia mostram todos ("Segunda, Quarta").
+      var diaAbrev=String(t.DiaSemana||'').split(',').map(function(d){return d.trim().split('-')[0];}).filter(Boolean).join(', ');
+      // Modalidade (como no legado): badge colorido por tipo.
+      var modCls={PRESENCIAL:'presencial',EAD:'ead','HÍBRIDO':'hibrido',HIBRIDO:'hibrido'}[(t.Modalidade||'').toUpperCase()]||'presencial';
       tr.innerHTML=
         '<td class="t5-id">'+(t.TurmaID||'—')+'</td>'+
         '<td class="t5-estagio">'+(t.Estagio||t.CursoSigla||'—')+'</td>'+
-        '<td>'+(t.ProfessorNome||'—')+'</td>'+
-        '<td>'+(t.DiaSemana||'—')+'</td>'+
-        '<td>'+(t.Horario||'—')+'</td>'+
+        '<td style="font-size:12.5px;">'+(t.ProfessorNome||'—')+'</td>'+
+        '<td style="font-size:12.5px;">'+(diaAbrev||'—')+
+          (t.Horario?'<br><span style="color:var(--c-text-3);font-size:11px;">'+t.Horario+'</span>':'')+
+        '</td>'+
+        '<td>'+(t.Modalidade?'<span class="badge-modal '+modCls+'">'+t.Modalidade+'</span>':'—')+'</td>'+
         '<td>'+barraVagas(t)+'</td>'+
         '<td><span class="badge-sit-turma '+(t.SituacaoTurma||'ativa').toLowerCase()+'">'+(t.SituacaoTurma||'ATIVA')+'</span></td>';
       tr.addEventListener('click',function(){selecionarTurma(t);});
