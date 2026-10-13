@@ -345,8 +345,11 @@
       AlunoID:al.external_id||m.aluno_id,NomeCompleto:al.nome_completo||'',
       NomeExibicao:ns||al.nome_completo||'',
       TurmaID:t.external_id||m.turma_id,CursoSigla:c.sigla||'',
+      Estagio:t.estagio||'',
       SituacaoMatricula:m.situacao||'ATIVA',DataMatricula:m.data_matricula||'',
       MotivoCancelamento:m.motivo_cancelamento||'',
+      DataCancelamento:m.data_cancelamento||'',
+      CanceladoPor:(m.cancelado_por&&m.cancelado_por.nome)||'',
       aluno_id:m.aluno_id,turma_id:m.turma_id,semestre_id:m.semestre_id,
     };
   }
@@ -367,6 +370,8 @@
   function init(){
     var u=(typeof App!=='undefined'&&App.usuario)?App.usuario:null;
     if(u){state.papel=u.papel||u.Papel||'';state.podeEditar=['admin','coordenacao','secretaria'].indexOf(state.papel)!==-1;}
+    // Botão "Nova matrícula" (como no legado): visível para admin, coordenação e secretaria.
+    if(state.podeEditar&&el('btn-m5-nova-matricula'))el('btn-m5-nova-matricula').style.display='inline-flex';
     carregarTurmas();
     registrarEventos();
   }
@@ -422,6 +427,27 @@
     });
   }
 
+  // Data/hora no fuso da escola (Fortaleza), ex.: 13/10/2026 10:43
+  function formatarDataHora(iso){
+    if(!iso)return '';
+    var d=new Date(iso); if(isNaN(d.getTime()))return String(iso);
+    return d.toLocaleString('pt-BR',{timeZone:'America/Fortaleza',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  }
+  function escAttr(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+  // Badge de situação (como no legado): em matrículas canceladas, passar o
+  // mouse mostra a data, o motivo e quem cancelou.
+  function badgeSituacao(m){
+    var sit=m.SituacaoMatricula||'ATIVA';
+    if(sit==='CANCELADA'&&(m.MotivoCancelamento||m.DataCancelamento||m.CanceladoPor)){
+      var titulo='Cancelada em '+(formatarDataHora(m.DataCancelamento)||'—')+
+        (m.MotivoCancelamento?'\nMotivo: '+m.MotivoCancelamento:'')+
+        (m.CanceladoPor?'\nPor: '+m.CanceladoPor:'');
+      return '<span class="badge-m5 '+sit+'" title="'+escAttr(titulo)+'" style="cursor:help;border-bottom:1px dotted currentColor;">'+sit+'</span>';
+    }
+    return '<span class="badge-m5 '+sit+'">'+sit+'</span>';
+  }
+
   function renderizar(){
     var lista=filtradas();
     var tbody=el('m5-tbody');if(!tbody)return;
@@ -440,16 +466,20 @@
       var tr=document.createElement('tr');
       var acoes='';
       if(state.podeEditar){
-        acoes+='<button class="btn-m5-acao trans" data-acao="trans" data-id="'+m.id+'"><span class="material-icons-round">swap_horiz</span>Transferir</button>';
         acoes+='<button class="btn-m5-acao" data-acao="sit" data-id="'+m.id+'"><span class="material-icons-round">edit</span>Situação</button>';
+        // Como no legado: só matrícula ATIVA pode ser transferida.
+        if(m.SituacaoMatricula==='ATIVA')
+          acoes+='<button class="btn-m5-acao trans" data-acao="trans" data-id="'+m.id+'"><span class="material-icons-round">swap_horiz</span>Transferir</button>';
       }
+      // 6 células, na mesma ordem do cabeçalho: MatriculaID · Aluno · TurmaID · Estágio · Situação · ações
       tr.innerHTML=
         '<td class="m5-mat-id">'+(m.MatriculaID||'—')+'</td>'+
         '<td><div class="m5-nome">'+(m.NomeExibicao||m.AlunoID||'—')+'</div>'+
             '<div style="font-size:11.5px;color:var(--c-text-3);">'+(m.AlunoID||'')+'</div></td>'+
         '<td class="m5-turma-id">'+(m.TurmaID||'—')+'</td>'+
-        '<td><span class="badge-sit-mat '+(m.SituacaoMatricula||'').toLowerCase()+'">'+(m.SituacaoMatricula||'—')+'</span></td>'+
-        '<td class="m5-acoes">'+acoes+'</td>';
+        '<td style="font-size:13px;">'+(m.Estagio||'—')+'</td>'+
+        '<td>'+badgeSituacao(m)+'</td>'+
+        '<td><div class="m5-acoes">'+acoes+'</div></td>';
       var btnSit=tr.querySelector('button[data-acao="sit"]');
       if(btnSit)btnSit.addEventListener('click',function(){
         state.matriculaParaSit=m;
