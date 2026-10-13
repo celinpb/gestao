@@ -944,7 +944,13 @@ async function _matriculasListar(sb, dados) {
     return query;
   });
   if (res.error) return _err(res.error.message);
-  return _ok(res.data);
+  var linhas = res.data || [];
+  // Nome de quem cancelou (aparece ao passar o mouse na situação CANCELADA).
+  var mapaNomes = await _nomesPublicos(sb, linhas.map(function(m) { return m.cancelado_por_id; }));
+  linhas.forEach(function(m) {
+    m.cancelado_por = m.cancelado_por_id ? { nome: (mapaNomes[m.cancelado_por_id] || {}).nome || '' } : null;
+  });
+  return _ok(linhas);
 }
 
 // Papéis que podem matricular/transferir além da capacidade de vagas de uma
