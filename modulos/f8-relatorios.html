@@ -274,6 +274,11 @@
     <div class="r8-tipo-nome">Alunos com faltas</div>
     <div class="r8-tipo-desc">Alunos com 3 ou mais faltas no semestre, por idioma, turma ou dia da semana</div>
   </div>
+  <div class="r8-tipo-card" data-tipo="evasao">
+    <div class="r8-tipo-icone"><span class="material-icons-round">trending_down</span></div>
+    <div class="r8-tipo-nome">Transferências, desistência e evasão</div>
+    <div class="r8-tipo-desc">Saídas de alunos por idioma, turma ou professor, com taxas sobre o total de matrículas</div>
+  </div>
 </div>
 
 <!-- PARÂMETROS -->
@@ -477,6 +482,63 @@
 <!-- Área de impressão do condensado -->
 <div id="r8c-print-area" style="display:none;"></div>
 
+<!-- PAINEL TRANSFERÊNCIAS, DESISTÊNCIA E EVASÃO (admin/coordenação/secretaria) -->
+<div class="r8c-painel" id="r8e-painel">
+  <div class="r8c-titulo">
+    <span class="material-icons-round">trending_down</span>
+    Transferências, desistência e evasão — configurar
+  </div>
+  <div class="r8c-grid">
+    <div class="r8c-field">
+      <label>Semestre</label>
+      <select class="r8c-select" id="r8e-semestre"></select>
+    </div>
+    <div class="r8c-field">
+      <label>Agrupar por</label>
+      <select class="r8c-select" id="r8e-agrupar">
+        <option value="idioma">Idioma</option>
+        <option value="turma">Turma</option>
+        <option value="professor">Professor</option>
+      </select>
+    </div>
+    <div class="r8c-field">
+      <label>Idioma</label>
+      <select class="r8c-select" id="r8e-idioma"><option value="">Todos os idiomas</option></select>
+    </div>
+    <div class="r8c-field">
+      <label>Dia da semana da aula</label>
+      <select class="r8c-select" id="r8e-dia">
+        <option value="">Todos os dias</option>
+        <option value="1">Segunda-feira</option>
+        <option value="2">Terça-feira</option>
+        <option value="3">Quarta-feira</option>
+        <option value="4">Quinta-feira</option>
+        <option value="5">Sexta-feira</option>
+        <option value="6">Sábado</option>
+      </select>
+    </div>
+  </div>
+  <p class="r8f-nota">
+    <strong>Transferência:</strong> aluno que saiu da turma para outra. <strong>Recebida:</strong> aluno que entrou vindo de outra turma.
+    <strong>Desistência:</strong> matrícula cancelada sem nenhuma presença (P). <strong>Evasão:</strong> matrícula cancelada depois de pelo menos uma presença.
+    Se o aluno foi transferido e cancelado na nova turma sem presença lá, mas teve presença na turma de origem, conta como evasão na turma de origem (no lugar da transferência).
+  </p>
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--c-text-2,#5C5C7A);cursor:pointer;user-select:none;margin-bottom:14px;">
+    <input type="checkbox" id="r8e-chk-nomes" style="accent-color:#E63946;width:15px;height:15px;cursor:pointer;">
+    Incluir a lista com o nome dos alunos de cada categoria
+  </label>
+  <div class="r8c-acoes">
+    <button class="btn-r8 btn-r8-primario" id="r8e-btn-gerar">
+      <div class="spinner-btn"></div>
+      <span class="material-icons-round btn-txt">play_arrow</span>
+      <span class="btn-txt">Gerar</span>
+    </button>
+    <button class="btn-r8 btn-r8-sec" id="r8e-btn-cancelar">
+      <span class="material-icons-round">close</span>Cancelar
+    </button>
+  </div>
+</div>
+
 <!-- PAINEL ALUNOS COM FALTAS (admin/coordenação/secretaria) -->
 <div class="r8c-painel" id="r8f-painel">
   <div class="r8c-titulo">
@@ -563,12 +625,14 @@
     turmas: [], semestres: [], semestreAtual: null, config: {},
     avaliacoes: [], cursos: [], calendario: [], papel: '', usuarioId: '',
     tipoAtual: '', alunosTodos: null, ultimoAlunosTurmaCampos: null,
-    ultimoAlunosFaltas: null
+    ultimoAlunosFaltas: null, ultimoEvasao: null
   };
 
   // "Alunos com faltas": só admin, coordenação e secretaria (o card fica
   // escondido para qualquer outro papel, e o gerador recusa).
+  // Mesma regra para "Transferências, desistência e evasão".
   var PAPEIS_ALUNOS_FALTAS = ['admin', 'coordenacao', 'secretaria'];
+  var TIPOS_SO_GESTAO = ['alunos-faltas', 'evasao'];
 
   // Tipos de relatório ocultados do menu, e bloqueados no gerador, para o
   // papel 'professor'. Motivo: ao contrário de turmas.listar (já filtrada
@@ -586,8 +650,10 @@
 
   function aplicarRestricoesPapel(){
     if(PAPEIS_ALUNOS_FALTAS.indexOf(S.papel) === -1){
-      var cardFaltas = document.querySelector('.r8-tipo-card[data-tipo="alunos-faltas"]');
-      if(cardFaltas) cardFaltas.style.display = 'none';
+      TIPOS_SO_GESTAO.forEach(function(tipo){
+        var card = document.querySelector('.r8-tipo-card[data-tipo="'+tipo+'"]');
+        if(card) card.style.display = 'none';
+      });
     }
     if(S.papel !== 'professor') return;
     TIPOS_OCULTOS_PROFESSOR.forEach(function(tipo){
@@ -773,7 +839,7 @@
 
   // ── NAVEGAÇÃO ENTRE PAINÉIS ─────────────────────────────────────────────
   function fecharTudo(){
-    ['r8-params','r8c-painel','r8cr-painel','r8f-painel','r8-preview-wrap','r8c-resultado','r8cr-resultado'].forEach(function(id){
+    ['r8-params','r8c-painel','r8cr-painel','r8f-painel','r8e-painel','r8-preview-wrap','r8c-resultado','r8cr-resultado'].forEach(function(id){
       if(el(id)) el(id).classList.remove('show');
     });
     document.querySelectorAll('.r8-tipo-card').forEach(function(c){ c.classList.remove('sel'); });
@@ -785,7 +851,14 @@
     if(el('r8c-resultado')) el('r8c-resultado').classList.remove('show');
     if(el('r8cr-resultado')) el('r8cr-resultado').classList.remove('show');
     if(el('r8f-painel')) el('r8f-painel').classList.remove('show');
-    if(tipo==='alunos-faltas'){
+    if(el('r8e-painel')) el('r8e-painel').classList.remove('show');
+    if(tipo==='evasao'){
+      if(el('r8-params')) el('r8-params').classList.remove('show');
+      if(el('r8c-painel')) el('r8c-painel').classList.remove('show');
+      if(el('r8cr-painel')) el('r8cr-painel').classList.remove('show');
+      if(el('r8e-painel')) el('r8e-painel').classList.add('show');
+      popularEvasaoFiltros();
+    } else if(tipo==='alunos-faltas'){
       if(el('r8-params')) el('r8-params').classList.remove('show');
       if(el('r8c-painel')) el('r8c-painel').classList.remove('show');
       if(el('r8cr-painel')) el('r8cr-painel').classList.remove('show');
@@ -816,7 +889,8 @@
     'boletim':'Boletim individual','turmas-alunos':'Turmas com alunos','alunos-geral':'Listagem geral de alunos',
     'frequencia-turma':'Frequência por turma','resultados-turma':'Resultados por turma',
     'alunos-turma-campos':'Alunos por turma (campos)','conteudo-turma':'Conteúdos da turma',
-    'grade-frequencia':'Grade de frequência','alunos-faltas':'Alunos com faltas'
+    'grade-frequencia':'Grade de frequência','alunos-faltas':'Alunos com faltas',
+    'evasao':'Transferências, desistência e evasão'
   };
   var TIPOS_COM_TURMA=['boletim','turmas-alunos','frequencia-turma','resultados-turma','alunos-turma-campos','conteudo-turma','grade-frequencia'];
   var TIPOS_OUTRAS_SIT=['boletim','alunos-turma-campos','turmas-alunos','frequencia-turma','resultados-turma','grade-frequencia'];
@@ -989,6 +1063,7 @@
     if(el('r8-preview-conteudo')) el('r8-preview-conteudo').innerHTML=html;
     if(el('r8-params')) el('r8-params').classList.remove('show');
     if(el('r8f-painel')) el('r8f-painel').classList.remove('show');
+    if(el('r8e-painel')) el('r8e-painel').classList.remove('show');
     if(el('r8-preview-wrap')) el('r8-preview-wrap').classList.add('show');
     // "Baixar XLSX" só aparece para 'alunos-turma-campos' e 'alunos-faltas',
     // e só quando essa geração realmente produziu dados (os dados de
@@ -996,7 +1071,8 @@
     // nunca chega a preenchê-los).
     if(el('btn-r8-xlsx')) el('btn-r8-xlsx').style.display =
       ((S.tipoAtual==='alunos-turma-campos' && S.ultimoAlunosTurmaCampos) ||
-       (S.tipoAtual==='alunos-faltas' && S.ultimoAlunosFaltas)) ? 'inline-flex' : 'none';
+       (S.tipoAtual==='alunos-faltas' && S.ultimoAlunosFaltas) ||
+       (S.tipoAtual==='evasao' && S.ultimoEvasao)) ? 'inline-flex' : 'none';
   }
   function mostrarEstadoVazio(msg){
     mostrarPreview(TITULOS_TIPO[S.tipoAtual]||'Relatório', '<p class="r8-estado">'+esc(msg)+'</p>');
@@ -1433,16 +1509,21 @@
   }
 
   function baixarTabelaXLSX(){
-    var dados = (S.tipoAtual==='alunos-faltas') ? S.ultimoAlunosFaltas : S.ultimoAlunosTurmaCampos;
-    if(!dados || !dados.linhas.length){ alert('Gere o relatório antes de baixar.'); return; }
+    var dados = (S.tipoAtual==='alunos-faltas') ? S.ultimoAlunosFaltas
+              : (S.tipoAtual==='evasao') ? S.ultimoEvasao
+              : S.ultimoAlunosTurmaCampos;
+    // Uma ou várias abas: { abas:[{nome, cabecalho, linhas}] } ou { aba, cabecalho, linhas }
+    var abas = (dados && dados.abas) ? dados.abas : (dados ? [{nome:dados.aba||'Alunos', cabecalho:dados.cabecalho, linhas:dados.linhas}] : []);
+    if(!abas.length || !abas[0].linhas.length){ alert('Gere o relatório antes de baixar.'); return; }
     var btn=el('btn-r8-xlsx');
     if(btn){ btn.disabled=true; btn.classList.add('loading'); }
     var finalizar=function(){ if(btn){ btn.disabled=false; btn.classList.remove('loading'); } };
     carregarLibXLSX().then(function(XLSX){
-      var aoa=[dados.cabecalho].concat(dados.linhas);
-      var ws=XLSX.utils.aoa_to_sheet(aoa);
       var wb=XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, dados.aba||'Alunos');
+      abas.forEach(function(a){
+        var ws=XLSX.utils.aoa_to_sheet([a.cabecalho].concat(a.linhas));
+        XLSX.utils.book_append_sheet(wb, ws, String(a.nome).substring(0,31));
+      });
       if(dados.nomeArquivo){
         XLSX.writeFile(wb, dados.nomeArquivo);
       } else {
@@ -1992,6 +2073,230 @@
     });
   }
 
+  // ── 12) TRANSFERÊNCIAS, DESISTÊNCIA E EVASÃO ────────────────────────────
+  // Regras (decididas em 16/10):
+  //  • Transferência (saída): matrícula TRANSFERIDA → conta na turma de origem.
+  //  • Recebida: matrícula que veio de outra turma (matricula_origem_id) → conta
+  //    na turma que recebeu, qualquer que tenha sido o destino dela depois.
+  //  • Cancelada COM presença (P) na própria turma → evasão nessa turma.
+  //  • Cancelada SEM presença na própria turma, mas que veio transferida: sobe
+  //    pela cadeia de origens até achar uma matrícula com presença. Se achar,
+  //    é evasão na turma dessa origem e a transferência dela deixa de contar
+  //    (cada aluno conta uma vez). Se não achar → desistência na turma onde
+  //    foi cancelada.
+  //  • Total = todas as matrículas que existiram no grupo (qualquer situação);
+  //    as taxas são sobre esse total.
+  var CATEGORIAS_EVASAO = [
+    {k:'transferencia', l:'Transferências (saídas)'},
+    {k:'recebida',      l:'Transferências recebidas'},
+    {k:'desistencia',   l:'Desistências'},
+    {k:'evasao',        l:'Evasões'}
+  ];
+
+  function popularEvasaoFiltros(){
+    var selSem=el('r8e-semestre');
+    if(selSem && !selSem.options.length){
+      S.semestres.forEach(function(s){
+        var opt=document.createElement('option');
+        opt.value=s.id; opt.textContent=s.rotulo||s.external_id||s.id;
+        if(s.semestre_atual) opt.selected=true;
+        selSem.appendChild(opt);
+      });
+    }
+    var selId=el('r8e-idioma');
+    if(selId && selId.options.length<=1){
+      var nomes={};
+      S.cursos.forEach(function(c){ if(c.idiomas && c.idiomas.nome) nomes[c.idiomas.nome]=true; });
+      Object.keys(nomes).sort(function(a,b){return a.localeCompare(b,'pt-BR');}).forEach(function(n){
+        var opt=document.createElement('option'); opt.value=n; opt.textContent=n; selId.appendChild(opt);
+      });
+    }
+  }
+
+  function fmtPct(n, total){
+    if(!total) return '—';
+    return (Math.round(n/total*1000)/10).toLocaleString('pt-BR')+'%';
+  }
+
+  function gerarEvasao(){
+    if(PAPEIS_ALUNOS_FALTAS.indexOf(S.papel)===-1){
+      alert('Este relatório não está disponível para o seu papel.');
+      return Promise.resolve();
+    }
+    var semestreId=val('r8e-semestre');
+    if(!semestreId){ alert('Selecione o semestre.'); return Promise.resolve(); }
+    var agrupar=val('r8e-agrupar')||'idioma';
+    var idiomaF=val('r8e-idioma'), diaF=val('r8e-dia');
+    var comNomes=el('r8e-chk-nomes')?el('r8e-chk-nomes').checked:false;
+
+    // Turmas que entram na contagem (semestre + idioma + dia)
+    var mapaTurmas={};
+    S.turmas.forEach(function(t){
+      if(t.semestre_id!==semestreId) return;
+      if(idiomaF && idiomaDaTurma(t)!==idiomaF) return;
+      if(diaF && diasTurmaNumeros(t).indexOf(parseInt(diaF,10))===-1) return;
+      mapaTurmas[t.id]=t;
+    });
+    if(!Object.keys(mapaTurmas).length){ alert('Nenhuma turma encontrada para os filtros selecionados.'); return Promise.resolve(); }
+    var todasTurmas={}; S.turmas.forEach(function(t){ todasTurmas[t.id]=t; });
+
+    S.ultimoEvasao=null;
+    var btn=el('r8e-btn-gerar');
+    if(btn){ btn.disabled=true; btn.classList.add('loading'); }
+    var finalizar=function(){ if(btn){ btn.disabled=false; btn.classList.remove('loading'); } };
+
+    return Promise.all([
+      postApi('matriculas.listar',{semestre_id:semestreId}),
+      postApi('frequencias.listar',{}),
+    ]).then(function(r){
+      finalizar();
+      if(!r[0].sucesso) throw new Error(r[0].mensagem||'Erro ao buscar matrículas.');
+      if(!r[1].sucesso) throw new Error(r[1].mensagem||'Erro ao buscar frequências.');
+      var mats=r[0].dados||[];
+      var porId={}; mats.forEach(function(m){ porId[m.id]=m; });
+      // Matrículas com pelo menos uma presença (P)
+      var comPresenca={};
+      (r[1].dados||[]).forEach(function(f){ if(f.frequencia==='P' && porId[f.matricula_id]) comPresenca[f.matricula_id]=true; });
+
+      // 1) Eventos atribuídos a uma turma
+      var eventos=[];           // {cat, m (matrícula de referência), turmaId, detalhe, data, motivo, por}
+      var transfAnuladas={};    // id da matrícula de origem cuja transferência virou evasão
+      mats.forEach(function(m){
+        if(m.situacao!=='CANCELADA') return;
+        var base={ m:m, data:m.data_cancelamento||'', motivo:m.motivo_cancelamento||'',
+          por:(m.cancelado_por&&m.cancelado_por.nome)||'' };
+        if(comPresenca[m.id]){
+          eventos.push(Object.assign({cat:'evasao', turmaId:m.turma_id, detalhe:''}, base));
+          return;
+        }
+        // Sem presença aqui: procura presença nas turmas de origem (cadeia de transferências)
+        var o=m.matricula_origem_id?porId[m.matricula_origem_id]:null, voltas=0;
+        while(o && !comPresenca[o.id] && voltas<20){ o=o.matricula_origem_id?porId[o.matricula_origem_id]:null; voltas++; }
+        if(o && comPresenca[o.id]){
+          transfAnuladas[o.id]=true;
+          var tCanc=todasTurmas[m.turma_id];
+          eventos.push(Object.assign({cat:'evasao', turmaId:o.turma_id,
+            detalhe:'Transferido e cancelado em '+(tCanc?tCanc.TurmaID:'outra turma')}, base));
+        } else {
+          eventos.push(Object.assign({cat:'desistencia', turmaId:m.turma_id, detalhe:''}, base));
+        }
+      });
+      mats.forEach(function(m){
+        if(m.situacao==='TRANSFERIDA' && !transfAnuladas[m.id]){
+          var dest=m.matricula_destino_id?porId[m.matricula_destino_id]:null;
+          var tDest=todasTurmas[m.turma_destino_id||(dest&&dest.turma_id)];
+          eventos.push({cat:'transferencia', m:m, turmaId:m.turma_id,
+            detalhe:'Para '+(tDest?tDest.TurmaID:'outra turma'),
+            data:(dest&&(dest.data_matricula||dest.criado_em))||'', motivo:'', por:''});
+        }
+        if(m.matricula_origem_id || m.turma_origem_id){
+          var orig=m.matricula_origem_id?porId[m.matricula_origem_id]:null;
+          var tOrig=todasTurmas[m.turma_origem_id||(orig&&orig.turma_id)];
+          eventos.push({cat:'recebida', m:m, turmaId:m.turma_id,
+            detalhe:'De '+(tOrig?tOrig.TurmaID:'outra turma'),
+            data:m.data_matricula||m.criado_em||'', motivo:'', por:''});
+        }
+      });
+      eventos=eventos.filter(function(e){ return !!mapaTurmas[e.turmaId]; });
+
+      // 2) Agrupamento
+      function chaveGrupo(t){
+        if(agrupar==='turma') return t.TurmaID+' — '+(t.Estagio||t.CursoSigla||'')+(t.ProfessorNome?' ('+t.ProfessorNome+')':'');
+        if(agrupar==='professor') return t.ProfessorNome||'Sem professor';
+        return idiomaDaTurma(t)||'Sem idioma';
+      }
+      var grupos={};
+      function grupo(t){
+        var k=chaveGrupo(t);
+        if(!grupos[k]) grupos[k]={nome:k, total:0, transferencia:0, recebida:0, desistencia:0, evasao:0};
+        return grupos[k];
+      }
+      mats.forEach(function(m){ var t=mapaTurmas[m.turma_id]; if(t) grupo(t).total++; });
+      eventos.forEach(function(e){ grupo(mapaTurmas[e.turmaId])[e.cat]++; });
+      var lista=Object.keys(grupos).map(function(k){return grupos[k];})
+        .sort(function(a,b){ return a.nome.localeCompare(b.nome,'pt-BR'); });
+      if(!lista.length){ mostrarEstadoVazio('Nenhuma matrícula encontrada para os filtros selecionados.'); return; }
+      var tot={total:0, transferencia:0, recebida:0, desistencia:0, evasao:0};
+      lista.forEach(function(g){ Object.keys(tot).forEach(function(k){ tot[k]+=g[k]; }); });
+
+      // 3) Montagem
+      var sem=S.semestres.find(function(s){return s.id===semestreId;});
+      var rotAgr={idioma:'Idioma', turma:'Turma', professor:'Professor'}[agrupar];
+      var filtrosTxt=['Agrupado por '+rotAgr.toLowerCase()];
+      if(idiomaF) filtrosTxt.push('Idioma: '+idiomaF);
+      if(diaF) filtrosTxt.push('Dia: '+NOMES_DIA_FALTAS[parseInt(diaF,10)]);
+
+      var html='<div class="r8-folha paisagem">'+headerInstitucional('Transferências, desistência e evasão');
+      html+='<h2 class="r8-titulo-rel">Transferências, desistência e evasão — '+esc(sem?(sem.rotulo||''):'')+'</h2>';
+      html+='<div class="r8-subtitulo-rel">'+esc(filtrosTxt.join(' · '))+' · Emitido em '+fmtData(hoje())+'</div>';
+      html+='<table class="r8-table"><thead><tr><th>'+esc(rotAgr)+'</th><th class="c">Matrículas</th>'+
+        '<th class="c">Transf. (saídas)</th><th class="c">%</th><th class="c">Transf. recebidas</th>'+
+        '<th class="c">Desistências</th><th class="c">%</th><th class="c">Evasões</th><th class="c">%</th></tr></thead><tbody>';
+      function linhaHtml(g, negrito){
+        var td=function(v){ return '<td class="c">'+(negrito?'<strong>'+v+'</strong>':v)+'</td>'; };
+        return '<tr'+(negrito?' style="background:#F0EEE8;"':'')+'><td>'+(negrito?'<strong>Total</strong>':esc(g.nome))+'</td>'+
+          td(g.total)+td(g.transferencia)+td(fmtPct(g.transferencia,g.total))+td(g.recebida)+
+          td(g.desistencia)+td(fmtPct(g.desistencia,g.total))+td(g.evasao)+td(fmtPct(g.evasao,g.total))+'</tr>';
+      }
+      lista.forEach(function(g){ html+=linhaHtml(g,false); });
+      html+=linhaHtml(tot,true);
+      html+='</tbody></table>';
+      html+='<p style="font-size:7.5pt;color:#9898B0;">Desistência = cancelada sem nenhuma presença (P). Evasão = cancelada após pelo menos uma presença. '+
+        'Transferido e cancelado na nova turma sem presença lá, mas com presença na turma de origem = evasão na turma de origem (no lugar da transferência). '+
+        'Percentuais sobre o total de matrículas do grupo (todas as situações).</p>';
+
+      var pctNum=function(n,t){ return t?Math.round(n/t*1000)/10:''; };
+      var abaResumo={ nome:'Resumo',
+        cabecalho:[rotAgr,'Matrículas','Transf. (saídas)','% transf.','Transf. recebidas','Desistências','% desist.','Evasões','% evasão'],
+        linhas: lista.concat([Object.assign({nome:'Total'},tot)]).map(function(g){
+          return [g.nome, g.total, g.transferencia, pctNum(g.transferencia,g.total), g.recebida,
+            g.desistencia, pctNum(g.desistencia,g.total), g.evasao, pctNum(g.evasao,g.total)];
+        })
+      };
+      var abas=[abaResumo];
+
+      // 4) Lista nominal (opcional)
+      if(comNomes){
+        var abaNomes={ nome:'Alunos', cabecalho:['Categoria','ID do aluno','Aluno','Turma','Idioma','Professor','Detalhe','Data','Motivo','Cancelado por'], linhas:[] };
+        CATEGORIAS_EVASAO.forEach(function(cat){
+          var evs=eventos.filter(function(e){return e.cat===cat.k;});
+          html+='<h3 style="font-size:10.5pt;margin:16px 0 6px;">'+esc(cat.l)+' ('+evs.length+')</h3>';
+          if(!evs.length){ html+='<p style="font-size:8.5pt;color:#9898B0;margin-bottom:10px;">Nenhum aluno nesta categoria.</p>'; return; }
+          evs.sort(function(a,b){
+            var ta=mapaTurmas[a.turmaId], tb=mapaTurmas[b.turmaId];
+            var c=(ta.TurmaID||'').localeCompare(tb.TurmaID||'','pt-BR');
+            if(c!==0) return c;
+            var na=normM(a.m).NomeExibicao, nb=normM(b.m).NomeExibicao;
+            return compararNomes(na,nb);
+          });
+          var cancel=(cat.k==='desistencia'||cat.k==='evasao');
+          html+='<table class="r8-table"><thead><tr><th class="c">#</th><th>ID do aluno</th><th>Aluno</th><th>Turma</th><th>Professor</th>'+
+            '<th>Detalhe</th><th class="c">Data</th>'+(cancel?'<th>Motivo</th><th>Cancelado por</th>':'')+'</tr></thead><tbody>';
+          evs.forEach(function(e,i){
+            var t=mapaTurmas[e.turmaId], n=normM(e.m), idA=(e.m.alunos&&e.m.alunos.external_id)||'—';
+            html+='<tr><td class="c">'+(i+1)+'</td><td style="font-family:monospace;">'+esc(idA)+'</td><td>'+esc(n.NomeExibicao||'—')+'</td>'+
+              '<td>'+esc(t.TurmaID)+'</td><td>'+esc(t.ProfessorNome||'—')+'</td><td>'+esc(e.detalhe||'—')+'</td>'+
+              '<td class="c">'+fmtData(e.data)+'</td>'+
+              (cancel?'<td>'+esc(e.motivo||'—')+'</td><td>'+esc(e.por||'—')+'</td>':'')+'</tr>';
+            abaNomes.linhas.push([cat.l, idA, n.NomeExibicao||'', t.TurmaID||'', idiomaDaTurma(t), t.ProfessorNome||'',
+              e.detalhe||'', e.data?fmtData(e.data):'', e.motivo||'', e.por||'']);
+          });
+          html+='</tbody></table>';
+        });
+        if(abaNomes.linhas.length) abas.push(abaNomes);
+      }
+      html+='</div>';
+
+      var nomeSem=String(sem?(sem.external_id||sem.rotulo||''):'').replace(/[^A-Za-z0-9_-]+/g,'_');
+      S.ultimoEvasao={ abas:abas, nomeArquivo:'transferencias_evasao_'+(nomeSem||'semestre')+'_'+agrupar+'_'+hoje()+'.xlsx' };
+      mostrarPreview('Transferências, desistência e evasão', html);
+    }).catch(function(e){
+      finalizar();
+      console.error('Erro no relatório de evasão:', e);
+      mostrarEstadoVazio('Não foi possível gerar o relatório: '+(e&&e.message?e.message:'erro desconhecido.'));
+    });
+  }
+
   // ── 10) CONTROLE DE REGISTROS ───────────────────────────────────────────
   var NOMES_DIA_CR_R8=['Domingo','Segunda-Feira','Terça-Feira','Quarta-Feira','Quinta-Feira','Sexta-Feira','Sábado'];
 
@@ -2209,7 +2514,7 @@
     el('btn-r8-novo') && el('btn-r8-novo').addEventListener('click', function(){
       el('r8-preview-wrap').classList.remove('show');
       // Alunos com faltas tem painel próprio
-      el(S.tipoAtual==='alunos-faltas' ? 'r8f-painel' : 'r8-params').classList.add('show');
+      el(S.tipoAtual==='alunos-faltas' ? 'r8f-painel' : S.tipoAtual==='evasao' ? 'r8e-painel' : 'r8-params').classList.add('show');
     });
     el('btn-r8-imprimir') && el('btn-r8-imprimir').addEventListener('click', function(){
       imprimirConteudo(el('r8-preview-conteudo').innerHTML);
@@ -2222,6 +2527,9 @@
     el('r8cr-btn-imprimir') && el('r8cr-btn-imprimir').addEventListener('click', function(){
       imprimirConteudo('<div class="r8-folha">'+(el('r8cr-resultado-titulo')?'<h2 class="r8-titulo-rel">'+esc(el('r8cr-resultado-titulo').textContent)+'</h2>':'')+el('r8cr-corpo').innerHTML+'</div>');
     });
+
+    el('r8e-btn-gerar') && el('r8e-btn-gerar').addEventListener('click', gerarEvasao);
+    el('r8e-btn-cancelar') && el('r8e-btn-cancelar').addEventListener('click', fecharTudo);
 
     el('r8f-btn-gerar') && el('r8f-btn-gerar').addEventListener('click', gerarAlunosFaltas);
     el('r8f-btn-cancelar') && el('r8f-btn-cancelar').addEventListener('click', fecharTudo);
