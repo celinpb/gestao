@@ -255,37 +255,27 @@ async function _login(sb, dados) {
     return _err('E-mail e senha são obrigatórios.', 400);
   }
 
-  // Se não parece ser e-mail, buscar e-mail pelo campo login na tabela usuarios
-  var emailFinal = emailOuLogin;
-  if (!emailOuLogin.includes('@')) {
-    // Antes do login não existe sessão (chamada como anon) — a tabela
-    // `usuarios` está travada para admin/coordenação, então essa resolução
-    // login→e-mail passa por uma function SECURITY DEFINER dedicada, que só
-    // devolve o e-mail (nunca o restante do cadastro) de uma conta ativa.
-    var busca = await sb.rpc('login_para_email', { login_busca: emailOuLogin });
-    if (busca.error || !busca.data) {
-      return _err('Usuário não encontrado.', 401);
-    }
-    emailFinal = busca.data;
+  // Login (ou e-mail) + senha → sessão, pela Edge Function `login` (17/10).
+  // A resolução login→e-mail acontece no servidor, então o e-mail de outras
+  // contas nunca chega ao navegador. Substitui a antiga RPC `login_para_email`,
+  // que era chamável sem login. A função já devolve as mensagens em português.
+  var fn = await sb.functions.invoke('login', {
+    body: { login: emailOuLogin, senha: senha },
+  });
+  var r = fn.data;
+  if (fn.error || !r) {
+    return _err('Não foi possível conectar ao servidor de login. Tente novamente.', 500);
+  }
+  if (!r.sucesso) {
+    return _err(r.erro || 'Usuário ou senha incorretos.', r.status || 401);
   }
 
-  var res = await sb.auth.signInWithPassword({
-    email:    emailFinal,
-    password: senha,
+  var res = await sb.auth.setSession({
+    access_token:  r.access_token,
+    refresh_token: r.refresh_token,
   });
-  if (res.error) {
-    // Supabase retorna mensagem em inglês — traduzir as mais comuns
-    var msg = res.error.message || '';
-    if (msg.includes('Invalid login') || msg.includes('invalid_credentials')) {
-      return _err('E-mail ou senha incorretos.', 401);
-    }
-    if (msg.includes('Email not confirmed')) {
-      return _err('Seu acesso ainda não foi ativado. Abra o convite enviado ao seu e-mail ou use "Esqueci minha senha".', 401);
-    }
-    if (msg.toLowerCase().includes('banned')) {
-      return _err('Usuário inativo. Contate a coordenação.', 403);
-    }
-    return _err(msg, 401);
+  if (res.error || !res.data || !res.data.user) {
+    return _err('Não foi possível iniciar a sessão. Tente novamente.', 500);
   }
 
   // Buscar perfil SGE do usuário na tabela usuarios
