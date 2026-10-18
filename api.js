@@ -153,6 +153,8 @@ async function postApi(acao, dados) {
     if (acao === 'cursos.listar')    return await _cursosListar(sb, dados);
     if (acao === 'cursos.criar')     return await _cursosCriar(sb, dados);
     if (acao === 'cursos.atualizar') return await _cursosAtualizar(sb, dados);
+    if (acao === 'cursos.salvarVinculos') return await _cursosSalvarVinculos(sb, dados);
+    if (acao === 'idiomas.listar')        return await _idiomasListar(sb);
 
     // ── AVALIAÇÕES ────────────────────────────────────────────────────────────
     if (acao === 'avaliacoes.listar')    return await _avaliacoesListar(sb);
@@ -720,6 +722,12 @@ async function _cursosListar(sb, dados) {
     return query;
   });
   if (res.error) return _err(res.error.message);
+  // Próximos cursos: consulta à parte (curso_proximos tem duas ligações com
+  // cursos, o que complica o join direto) e junta aqui.
+  var prox = await sb.from('curso_proximos').select('curso_id, proximo_id, ordem');
+  var mapa = {};
+  (prox.data || []).forEach(function(p) { (mapa[p.curso_id] = mapa[p.curso_id] || []).push(p); });
+  (res.data || []).forEach(function(c) { c.curso_proximos = mapa[c.id] || []; });
   return _ok(res.data);
 }
 
@@ -737,6 +745,26 @@ async function _cursosAtualizar(sb, dados) {
   var res = await sb.from('cursos').update(dados).eq('id', dados.id);
   if (res.error) return _err(res.error.message);
   return _ok(null, 'Curso atualizado.');
+}
+
+// Avaliações vinculadas e próximos cursos de um curso, gravados de uma vez
+// pela função cursos_salvar_vinculos (claude/etapa15-cursos-vinculos.sql),
+// que só aceita admin e coordenação.
+async function _cursosSalvarVinculos(sb, dados) {
+  if (!dados.curso_id) return _err('Curso é obrigatório.', 400);
+  var res = await sb.rpc('cursos_salvar_vinculos', {
+    p_curso_id:   dados.curso_id,
+    p_avaliacoes: dados.avaliacoes || [],
+    p_proximos:   dados.proximos || [],
+  });
+  if (res.error) return _err(res.error.message);
+  return _ok(null, 'Vínculos salvos.');
+}
+
+async function _idiomasListar(sb) {
+  var res = await sb.from('idiomas').select('id, nome, ativo').order('nome');
+  if (res.error) return _err(res.error.message);
+  return _ok(res.data || []);
 }
 
 // =============================================================================
