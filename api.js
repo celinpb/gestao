@@ -248,6 +248,19 @@ async function postApi(acao, dados) {
     if (acao === 'remat.registrar')   return await _rpcTransicao(sb, 'rematricula_registrar', { p_origem_id: dados && dados.matricula_id, p_turma_id: dados && dados.turma_id }, 'Rematrícula registrada.');
     if (acao === 'remat.liberarModalidade') return await _rpcTransicao(sb, 'rematricula_liberar_modalidade', { p_origem_id: dados && dados.matricula_id, p_liberar: !!(dados && dados.liberar), p_motivo: (dados && dados.motivo) || null }, 'Exceção de modalidade salva.');
 
+    // Nivelamento (etapa 22 — Fase 6). Os papéis são conferidos no banco.
+    if (acao === 'niv.painel')        return await _rpcTransicao(sb, 'nivel_painel', {});
+    if (acao === 'niv.provas')        return await _rpcTransicao(sb, 'nivel_provas', { p_data: dados && dados.data });
+    if (acao === 'niv.vagasGerar')    return await _rpcTransicao(sb, 'nivel_vagas_gerar', { p: dados || {} }, 'Vagas criadas.');
+    if (acao === 'niv.vagaSalvar')    return await _rpcTransicao(sb, 'nivel_vaga_salvar', { p_id: dados && dados.id, p_capacidade: dados && dados.capacidade != null && dados.capacidade !== '' ? Number(dados.capacidade) : null, p_observacao: (dados && dados.observacao) || null }, 'Vaga salva.');
+    if (acao === 'niv.vagaExcluir')   return await _rpcTransicao(sb, 'nivel_vaga_excluir', { p_id: dados && dados.id }, 'Vaga excluída.');
+    if (acao === 'niv.inscrever')     return await _rpcTransicao(sb, 'nivel_inscrever', { p: dados || {} }, 'Inscrição feita.');
+    if (acao === 'niv.cancelar')      return await _rpcTransicao(sb, 'nivel_cancelar', { p_id: dados && dados.id, p_motivo: (dados && dados.motivo) || null }, 'Inscrição cancelada.');
+    if (acao === 'niv.remarcar')      return await _rpcTransicao(sb, 'nivel_remarcar', { p_id: dados && dados.id, p_vaga_id: dados && dados.vaga_id }, 'Horário trocado.');
+    if (acao === 'niv.oral')          return await _rpcTransicao(sb, 'nivel_oral_registrar', { p: dados || {} }, 'Prova oral registrada.');
+    if (acao === 'niv.final')         return await _rpcTransicao(sb, 'nivel_final_registrar', { p: dados || {} }, 'Resultado final lançado.');
+    if (acao === 'niv.finalLimpar')   return await _rpcTransicao(sb, 'nivel_final_limpar', { p_id: dados && dados.id, p_motivo: (dados && dados.motivo) || null }, 'Resultado final retirado.');
+
     if (acao === 'disp.painel')              return await _rpcTransicao(sb, 'disp_painel', {});
     if (acao === 'disp.slotsGerar')          return await _rpcTransicao(sb, 'disp_slots_gerar', {}, 'Slots gerados.');
     if (acao === 'disp.slotSalvar')          return await _rpcTransicao(sb, 'disp_slot_salvar', { p: dados || {} }, 'Slot salvo.');
