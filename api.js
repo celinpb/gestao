@@ -238,6 +238,16 @@ async function postApi(acao, dados) {
     if (acao === 'enc.recusar')   return await _rpcTransicao(sb, 'encaminhamento_recusar', { p_matricula_id: dados && dados.matricula_id, p_motivo: (dados && dados.motivo) || null }, 'Sugestão recusada.');
 
     // ── TRANSIÇÃO: DISPONIBILIDADE DOS PROFESSORES (etapa 19) ───────────────
+    // Rematrícula (etapa 21 — Fase 5). Os papéis são conferidos no banco.
+    if (acao === 'remat.painel')      return await _rpcTransicao(sb, 'rematricula_painel', {});
+    if (acao === 'remat.cruzar')      return await _rpcTransicao(sb, 'rematricula_cruzar', {}, 'Cruzamento concluído.');
+    if (acao === 'remat.deferir')     return await _rpcTransicao(sb, 'rematricula_deferir', { p_id: dados && dados.id, p_forcar: !!(dados && dados.forcar), p_motivo: (dados && dados.motivo) || null }, 'Rematrícula deferida.');
+    if (acao === 'remat.indeferir')   return await _rpcTransicao(sb, 'rematricula_indeferir', { p_id: dados && dados.id, p_motivo: (dados && dados.motivo) || null }, 'Rematrícula indeferida.');
+    if (acao === 'remat.reavaliar')   return await _rpcTransicao(sb, 'rematricula_reavaliar', { p_id: dados && dados.id }, 'Devolvida para a análise automática.');
+    if (acao === 'remat.aluno')       return await _rpcTransicao(sb, 'rematricula_aluno', { p_codigo: (dados && dados.codigo) || '' });
+    if (acao === 'remat.registrar')   return await _rpcTransicao(sb, 'rematricula_registrar', { p_origem_id: dados && dados.matricula_id, p_turma_id: dados && dados.turma_id }, 'Rematrícula registrada.');
+    if (acao === 'remat.liberarModalidade') return await _rpcTransicao(sb, 'rematricula_liberar_modalidade', { p_origem_id: dados && dados.matricula_id, p_liberar: !!(dados && dados.liberar), p_motivo: (dados && dados.motivo) || null }, 'Exceção de modalidade salva.');
+
     if (acao === 'disp.painel')              return await _rpcTransicao(sb, 'disp_painel', {});
     if (acao === 'disp.slotsGerar')          return await _rpcTransicao(sb, 'disp_slots_gerar', {}, 'Slots gerados.');
     if (acao === 'disp.slotSalvar')          return await _rpcTransicao(sb, 'disp_slot_salvar', { p: dados || {} }, 'Slot salvo.');
@@ -1088,6 +1098,14 @@ async function _turmasAtualizar(sb, dados) {
 // =============================================================================
 
 async function _matriculasListar(sb, dados) {
+  // Semestre OCULTO (próximo semestre em preparação): as matrículas criadas
+  // pela rematrícula (etapa 21) só aparecem quando a tela pede aquele
+  // semestre pelo id. Sem semestre informado, ficam de fora (D-51).
+  var ocultos = [];
+  if (!(dados && dados.semestre_id)) {
+    var rOc = await sb.rpc('semestres_ocultos_ids');
+    if (!rOc.error && Array.isArray(rOc.data)) ocultos = rOc.data;
+  }
   // Por semestre (relatório condensado, painel etc.) são ~3.700 linhas —
   // antes voltavam só as 1000 primeiras.
   var res = await _buscarTodas(function(opcoes) {
@@ -1098,6 +1116,7 @@ async function _matriculasListar(sb, dados) {
     if (dados && dados.aluno_id)    query = query.eq('aluno_id', dados.aluno_id);
     if (dados && dados.semestre_id) query = query.eq('semestre_id', dados.semestre_id);
     if (dados && dados.situacao)    query = query.eq('situacao', dados.situacao);
+    if (ocultos.length) query = query.not('semestre_id', 'in', '(' + ocultos.join(',') + ')');
     return query;
   });
   if (res.error) return _err(res.error.message);
