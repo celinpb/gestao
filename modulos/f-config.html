@@ -2,6 +2,8 @@
   F_Config.html
   Configurações gerais da escola, organizadas em abas: Escola (dados e logo),
   Semestres, Calendário, Público-alvo, Portal do Aluno e Regras de acesso.
+  (23/10) Portal do Aluno: quadro "Manuais no portal" (dois links com nome
+  livre — transição, Fase 5, D-64).
   Visível apenas para admin.
   (07/10) Card "Portal do Aluno" (E1): situação da última atualização da
   cópia que o portal consulta e botão "Atualizar agora"; envio dos códigos
@@ -167,6 +169,9 @@
   .pa-checks input{accent-color:#E63946;width:15px;height:15px;}
   .pa-modal-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 20px;border-top:1px solid var(--c-border,#E8E7E2);background:#FAFAF8;}
 
+  /* Manuais do portal (Fase 5) */
+  .pm-grade{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:0 14px;}
+  @media(max-width:640px){.pm-grade{grid-template-columns:1fr;}}
   /* Portal do Aluno (E1) */
   .pt-status{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;font-size:13px;color:var(--c-text-2,#5C5C7A);line-height:1.5;}
   .pt-status strong{color:var(--c-text-1,#1A1A2E);}
@@ -618,6 +623,34 @@
           <div class="cfg-hint" style="margin-top:10px;">Cada aluno ativo do portal recebe um único e-mail com o código, no próprio e-mail ou, se for menor de idade sem e-mail, no e-mail do responsável. Com o envio automático ligado, o sistema envia até 25 e-mails a cada 15 minutos, das 8h às 20h45, respeitando o limite de 400 por dia (a conta Gmail do sistema divide a cota com os e-mails do SGE). Alunos novos entram na fila sozinhos. Quem não tem e-mail aparece na lista para a secretaria informar o código.</div>
         </div>
       </div>
+
+      <!-- Manuais no portal (Fase 5 da transição — D-64/D-68) -->
+      <div class="cfg-card">
+        <div class="cfg-card-header">
+          <span class="material-icons-round">menu_book</span>
+          <span class="cfg-card-titulo">Manuais no portal</span>
+        </div>
+        <div class="cfg-card-corpo">
+          <div class="cfg-alerta" id="cfg-alerta-manuais">
+            <span class="material-icons-round">check_circle</span>
+            <span id="cfg-alerta-manuais-msg"></span>
+          </div>
+          <div class="pm-grade">
+            <div class="cfg-field"><label for="pm-nome1">Manual 1 — nome</label><input type="text" class="cfg-input" id="pm-nome1" maxlength="80" placeholder="Ex.: Manual de Rematrícula 2027.1"></div>
+            <div class="cfg-field"><label for="pm-url1">Manual 1 — link</label><input type="url" class="cfg-input" id="pm-url1" placeholder="https://…"></div>
+            <div class="cfg-field"><label for="pm-nome2">Manual 2 — nome</label><input type="text" class="cfg-input" id="pm-nome2" maxlength="80" placeholder="Ex.: Manual de Nivelamento 2027.1"></div>
+            <div class="cfg-field"><label for="pm-url2">Manual 2 — link</label><input type="url" class="cfg-input" id="pm-url2" placeholder="https://…"></div>
+          </div>
+          <div class="pt-acoes">
+            <button class="btn-cfg btn-cfg-primario" id="pm-btn-salvar">
+              <div class="spinner-btn"></div>
+              <span class="material-icons-round btn-txt" style="font-size:16px;">save</span>
+              <span class="btn-txt">Salvar manuais</span>
+            </button>
+          </div>
+          <div class="cfg-hint" style="margin-top:10px;" id="pm-hint">Os links aparecem na tela de entrada e no painel do Portal do Aluno, com o nome que você escrever. Só dois manuais ficam ativos por vez: para trocar, escreva por cima; para tirar, apague o nome e o link. O link precisa começar com https:// (ex.: arquivo do Drive compartilhado com "qualquer pessoa com o link").</div>
+        </div>
+      </div>
     </div>
 
     <!-- ABA: TRANSIÇÃO DE SEMESTRE (etapa 17 — claude/transicao-semestre.md, Fase 2) -->
@@ -901,6 +934,7 @@
     carregarTiposPublico();
     carregarPortal();
     carregarEnvio();
+    carregarManuais();
     carregarTransicao();
     registrarEventos();
   }
@@ -1991,7 +2025,36 @@
     });
   }
 
+  // ── Manuais no portal (etapa 21 — D-64/D-68) ─────────────────────────────
+  function carregarManuais(){
+    var sb=sbCliente(); if(!sb)return;
+    sb.rpc('portal_config_ler').then(function(res){
+      if(res.error){
+        mostrarAlertaCampo('cfg-alerta-manuais','Não foi possível ler os manuais: '+res.error.message+'. Se ainda não foi instalado, rode etapa21-transicao-rematricula.sql.','erro',15000);
+        if(el('pm-btn-salvar'))el('pm-btn-salvar').disabled=true;
+        return;
+      }
+      var d=res.data||{};
+      el('pm-nome1').value=d.manual1_nome||''; el('pm-url1').value=d.manual1_url||'';
+      el('pm-nome2').value=d.manual2_nome||''; el('pm-url2').value=d.manual2_url||'';
+      if(d.atualizado_em) el('pm-hint').setAttribute('title','Última alteração: '+fmtMomentoPt(d.atualizado_em)+(d.atualizado_por?' por '+d.atualizado_por:''));
+    });
+  }
+  function salvarManuais(){
+    var sb=sbCliente(); if(!sb)return;
+    var p={manual1_nome:val('pm-nome1'),manual1_url:val('pm-url1'),manual2_nome:val('pm-nome2'),manual2_url:val('pm-url2')};
+    var btn=el('pm-btn-salvar'); btn.disabled=true; btn.classList.add('loading');
+    sb.rpc('portal_config_salvar',{p:p}).then(function(res){
+      btn.disabled=false; btn.classList.remove('loading');
+      if(res.error){ mostrarAlertaCampo('cfg-alerta-manuais',res.error.message,'erro',8000); return; }
+      mostrarAlertaCampo('cfg-alerta-manuais','Manuais salvos. O portal mostra os links novos na próxima vez que for aberto.','sucesso');
+      if(typeof toast==='function')toast('Manuais do portal salvos.','success');
+      carregarManuais();
+    });
+  }
+
   function registrarEventos(){
+    el('pm-btn-salvar')&&el('pm-btn-salvar').addEventListener('click',salvarManuais);
     // Transição de semestre
     el('tr-ativa')&&el('tr-ativa').addEventListener('change',alternarTransicao);
     el('tr-btn-salvar-fases')&&el('tr-btn-salvar-fases').addEventListener('click',salvarFases);
