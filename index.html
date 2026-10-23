@@ -165,6 +165,7 @@ var MODULOS = {
   relatorios: 'modulos/f8-relatorios.html',
   auditoria:  'modulos/f10-auditoria.html',
   transicao:  'modulos/f11-transicao.html',
+  nivelamento: 'modulos/f12-nivelamento.html',
   config:     'modulos/f-config.html',
 };
 
@@ -401,6 +402,14 @@ function normalizarMenu(itens) {
   return resultado;
 }
 
+// A fase do ciclo (semestre_fases) está valendo agora?
+function cicloFaseAgora(tipo) {
+  var f = ((App.ciclo && App.ciclo.fases) || []).filter(function(x) { return x.tipo === tipo; })[0];
+  if (!f || !f.inicio) return false;
+  var agora = Date.now();
+  return new Date(f.inicio).getTime() <= agora && (!f.fim || new Date(f.fim).getTime() >= agora);
+}
+
 function renderizarMenuFallback() {
   var papel = App.usuario ? (App.usuario.papel || App.usuario.Papel || '') : '';
   var itens = [{ id: 'dashboard', label: 'Início', icone: 'home' }];
@@ -423,6 +432,7 @@ function renderizarMenuFallback() {
     // deixar ativada (Configurações → Transição).
     if (App.ciclo && App.ciclo.ativo) {
       itens.push({ id: 'transicao', label: 'Transição de semestre', icone: 'published_with_changes' });
+      itens.push({ id: 'nivelamento', label: 'Nivelamento', icone: 'quiz' });
     }
     if (papel === 'admin') {
       itens.push({ id: 'auditoria', label: 'Auditoria', icone: 'history' });
@@ -436,6 +446,11 @@ function renderizarMenuFallback() {
       { id: 'notas',      label: 'Notas',          icone: 'grade'     },
       { id: 'relatorios', label: 'Relatórios',     icone: 'summarize' }
     );
+    // Nivelamento (Fase 6): o professor avaliador registra a prova oral só
+    // durante as datas das provas (D-76).
+    if (App.ciclo && App.ciclo.ativo && cicloFaseAgora('nivelamento_provas')) {
+      itens.push({ id: 'nivelamento', label: 'Nivelamento', icone: 'quiz' });
+    }
   } else if (papel === 'secretaria') {
     itens.push(
       { id: 'alunos',     label: 'Alunos',     icone: 'school'    },
@@ -447,6 +462,7 @@ function renderizarMenuFallback() {
     // (D-08) — vê só a aba Rematrícula.
     if (App.ciclo && App.ciclo.ativo) {
       itens.push({ id: 'transicao', label: 'Rematrícula', icone: 'how_to_reg' });
+      itens.push({ id: 'nivelamento', label: 'Nivelamento', icone: 'quiz' });
     }
   }
   renderizarMenu(itens);
