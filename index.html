@@ -443,6 +443,11 @@ function renderizarMenuFallback() {
       { id: 'matriculas', label: 'Matrículas', icone: 'assignment'},
       { id: 'relatorios', label: 'Relatórios', icone: 'summarize' }
     );
+    // Transição (Fase 5): a secretaria revisa as exceções da rematrícula
+    // (D-08) — vê só a aba Rematrícula.
+    if (App.ciclo && App.ciclo.ativo) {
+      itens.push({ id: 'transicao', label: 'Rematrícula', icone: 'how_to_reg' });
+    }
   }
   renderizarMenu(itens);
 }
