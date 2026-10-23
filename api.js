@@ -218,6 +218,14 @@ async function postApi(acao, dados) {
     if (acao === 'ciclo.salvarConfig')         return await _cicloSalvarConfig(sb, dados);
     if (acao === 'ciclo.alterarFaseSemestre')  return await _cicloAlterarFaseSemestre(sb, dados);
 
+    // ── TRANSIÇÃO: TURMAS DO PRÓXIMO SEMESTRE (etapa 18) ────────────────────
+    if (acao === 'transicao.viradaCandidatas') return await _rpcTransicao(sb, 'turmas_virada_candidatas', { p_idioma_id: dados && dados.idioma_id });
+    if (acao === 'transicao.virar')            return await _rpcTransicao(sb, 'turmas_virar', { p_turma_ids: (dados && dados.turma_ids) || [] }, 'Virada concluída.');
+    if (acao === 'transicao.turmaSalvar')      return await _rpcTransicao(sb, 'turmas_proximo_salvar', { p: dados || {} }, 'Turma salva.');
+    if (acao === 'transicao.turmaAtribuir')    return await _rpcTransicao(sb, 'turmas_proximo_atribuir', { p_turma_id: dados && dados.turma_id, p_professor_id: (dados && dados.professor_id) || null }, 'Professor atualizado.');
+    if (acao === 'transicao.turmaExcluir')     return await _rpcTransicao(sb, 'turmas_proximo_excluir', { p_turma_id: dados && dados.turma_id }, 'Turma excluída.');
+    if (acao === 'transicao.renumerar')        return await _rpcTransicao(sb, 'turmas_renumerar', { p_semestre_id: dados && dados.semestre_id }, 'Turmas renumeradas.');
+
     // ── RELATÓRIOS ────────────────────────────────────────────────────────────
     // ── COMENTÁRIOS ───────────────────────────────────────────────────────────
     if (acao === 'comentarios.listar') return await _comentariosListar(sb, dados);
@@ -889,6 +897,14 @@ async function _cicloSalvarConfig(sb, dados) {
   return _ok(null, 'Opções do ciclo salvas.');
 }
 
+// Funções do banco da transição (etapa 18): todas conferem o papel
+// (admin/coordenação) e o semestre lá dentro; aqui só repassa.
+async function _rpcTransicao(sb, funcao, params, msgOk) {
+  var res = await sb.rpc(funcao, params);
+  if (res.error) return _err(res.error.message);
+  return _ok(res.data, msgOk);
+}
+
 var FASES_SEMESTRE = ['planejamento', 'inscricoes', 'em_andamento', 'encerrado'];
 
 // dados = { semestre_id, fase } — só para o próximo semestre (planejamento ↔ inscrições).
@@ -946,12 +962,21 @@ async function _calendarioSalvar(sb, dados) {
 // =============================================================================
 
 async function _turmasListar(sb, dados) {
+  // Semestre OCULTO (o próximo semestre em preparação na transição — D-51):
+  // as turmas dele só aparecem quando a tela pede aquele semestre pelo id
+  // (tela de Transição). Sem semestre informado, ficam de fora.
+  var ocultos = [];
+  if (!(dados && dados.semestre_id)) {
+    var rOc = await sb.rpc('semestres_ocultos_ids');
+    if (!rOc.error && Array.isArray(rOc.data)) ocultos = rOc.data;
+  }
   // ~270 turmas por semestre: sem filtro de semestre, passa de 1000 em poucos semestres.
   var res = await _buscarTodas(function(opcoes) {
     var query = sb.from('turmas')
       .select('*, semestres(rotulo), cursos(nome, sigla, external_id)', opcoes)
       .order('external_id').order('id');
     if (dados && dados.semestre_id) query = query.eq('semestre_id', dados.semestre_id);
+    if (ocultos.length) query = query.not('semestre_id', 'in', '(' + ocultos.join(',') + ')');
     if (dados && dados.professor_id) query = query.eq('professor_id', dados.professor_id);
     if (dados && dados.situacao)     query = query.eq('situacao', dados.situacao);
     return query;
