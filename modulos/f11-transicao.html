@@ -135,6 +135,18 @@
   .tt-motivo.ja{background:rgba(69,123,157,0.12);color:#185FA5;}
   .tt-motivo.enc{background:rgba(230,57,70,0.10);color:#A32D2D;}
 
+  /* Disponibilidade */
+  .dp-linha{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;padding-bottom:4px;}
+  .dp-min{margin:8px 0;}
+  .dp-dia{font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:var(--c-text-3,#9898B0);padding:12px 0 4px;}
+  .dp-slot{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--c-border,#E8E7E2);font-size:13px;}
+  .dp-slot-h{flex:1;min-width:0;}
+  .dp-cont{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:99px;background:rgba(69,123,157,0.10);color:#185FA5;cursor:help;white-space:nowrap;}
+  .dp-st{display:inline-flex;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap;}
+  .dp-st.ok{background:rgba(42,157,143,0.12);color:#1A6E65;}
+  .dp-st.falta{background:rgba(212,168,67,0.18);color:#8A6412;}
+  .dp-st.nao{background:rgba(230,57,70,0.10);color:#A32D2D;}
+
   .tr11-estado{padding:48px 24px;text-align:center;color:var(--c-text-3,#9898B0);}
   .tr11-estado .material-icons-round{font-size:36px;display:block;margin:0 auto 10px;}
 </style>
@@ -153,7 +165,6 @@
 
   // O que cada fase do roteiro vai trazer para esta tela (claude/transicao-semestre.md, seção 10).
   var FERRAMENTAS = [
-    { icone: 'event_available',  nome: 'Disponibilidade dos professores', desc: 'Slots de dia e horário marcados pelos professores (próxima entrega).' },
     { icone: 'task_alt',         nome: 'Encerramento do semestre', desc: 'Entrega das turmas pelos professores e conclusão pela coordenação.' },
     { icone: 'how_to_reg',       nome: 'Rematrícula',              desc: 'Intenções dos alunos, cruzamento com o resultado final e análise das exceções.' },
     { icone: 'quiz',             nome: 'Nivelamento',              desc: 'Vagas, agendamento, provas e resultado.' },
@@ -252,17 +263,21 @@
       '<div class="tr11-abas" id="tr11-abas">' +
         '<button class="tr11-aba" data-aba="visao"><span class="material-icons-round">dashboard</span>Visão geral</button>' +
         '<button class="tr11-aba" data-aba="turmas"><span class="material-icons-round">groups</span>Turmas do ' + esc(p.rotulo) + '</button>' +
+        '<button class="tr11-aba" data-aba="disp"><span class="material-icons-round">event_available</span>Disponibilidade</button>' +
       '</div>' +
       '<div class="tr11-painel" data-painel="visao">' + grade + '</div>' +
-      '<div class="tr11-painel" data-painel="turmas" id="tr11-turmas"></div>';
+      '<div class="tr11-painel" data-painel="turmas" id="tr11-turmas"></div>' +
+      '<div class="tr11-painel" data-painel="disp" id="tr11-disp"></div>';
     iniciarAbas();
     Turmas.iniciar(c);
+    Disp.iniciar(c);
   }
 
   // ── Abas (a última aberta fica guardada até fechar o navegador) ──────────
   var CHAVE_ABA = 'sge.transicao.aba';
   function mostrarAba(nome) {
-    if (nome !== 'visao' && nome !== 'turmas') nome = 'visao';
+    if (['visao', 'turmas', 'disp'].indexOf(nome) === -1) nome = 'visao';
+    if (nome === 'disp' && typeof Disp !== 'undefined') Disp.atualizar();
     document.querySelectorAll('#tr11-abas .tr11-aba').forEach(function(b) { b.classList.toggle('ativa', b.dataset.aba === nome); });
     document.querySelectorAll('#tr11-raiz .tr11-painel').forEach(function(p) { p.classList.toggle('ativo', p.dataset.painel === nome); });
     try { sessionStorage.setItem(CHAVE_ABA, nome); } catch (e) {}
@@ -312,6 +327,7 @@
       if (!t || !t.professor_id || sel.querySelector('option[value="' + t.professor_id + '"]')) return;
       var o = document.createElement('option');
       o.value = t.professor_id; o.textContent = (t.professor && t.professor.nome) || 'Professor atual';
+      o.dataset.nome = o.textContent;
       sel.appendChild(o);
     }
     function cursoDe(id) { return T.cursos.filter(function(c) { return c.id === id; })[0] || null; }
@@ -384,10 +400,15 @@
       el('tt-e-curso').addEventListener('change', function() {
         var c = cursoDe(this.value); if (c) el('tt-e-estagio').value = String(c.nome || '').toUpperCase();
       });
-      el('tt-e-ok').addEventListener('click', salvarEdicao);
-      el('tt-a-ok').addEventListener('click', salvarAtribuicao);
+      el('tt-e-ok').addEventListener('click', function() { salvarEdicao(false); });
+      el('tt-a-ok').addEventListener('click', function() { salvarAtribuicao(false); });
       el('tt-a-prof').addEventListener('change', mostrarCargaProf);
       renderLista();
+    }
+
+    function opcoesProf() {
+      return '<option value="">— A definir —</option>' + T.profs.map(function(p) {
+        return '<option value="' + esc(p.id) + '" data-nome="' + esc(p.nome) + '">' + esc(p.nome) + '</option>'; }).join('');
     }
 
     function modais() {
@@ -397,8 +418,7 @@
         return '<optgroup label="' + esc(i.nome) + '">' + cs.map(function(c) {
           return '<option value="' + esc(c.id) + '">' + esc(c.sigla) + ' · ' + esc(c.nome) + '</option>'; }).join('') + '</optgroup>';
       }).join('');
-      var optsProf = '<option value="">— A definir —</option>' + T.profs.map(function(p) {
-        return '<option value="' + esc(p.id) + '">' + esc(p.nome) + '</option>'; }).join('');
+      var optsProf = opcoesProf();
       return '' +
       // Virada
       '<div class="tt-overlay" id="tt-m-virada"><div class="tt-modal largo">' +
@@ -592,7 +612,7 @@
       el('tt-e-prof').value = t ? (t.professor_id || '') : '';
       abrir('tt-m-edicao');
     }
-    function salvarEdicao() {
+    function salvarEdicao(forcar) {
       var dias = [];
       document.querySelectorAll('#tt-e-dias input:checked').forEach(function(c) { dias.push(Number(c.value)); });
       var dados = {
@@ -602,6 +622,7 @@
         professor_id: el('tt-e-prof').value || null,
       };
       if (T.editando) dados.id = T.editando.id;
+      if (forcar === true) dados.forcar = true;
       if (!dados.curso_id) return alerta('tt-e-alerta', 'Escolha o curso.');
       if (!dias.length) return alerta('tt-e-alerta', 'Marque pelo menos um dia da semana.');
       if (!dados.horario) return alerta('tt-e-alerta', 'Informe o horário.');
@@ -609,6 +630,10 @@
       el('tt-e-ok').disabled = true;
       api('transicao.turmaSalvar', dados).then(function(res) {
         el('tt-e-ok').disabled = false;
+        if (!res.sucesso && res.dados && res.dados.confirmacaoNecessaria) {
+          if (confirm(res.mensagem + '\n\nSalvar mesmo assim?')) salvarEdicao(true);
+          return;
+        }
         if (!res.sucesso) return alerta('tt-e-alerta', res.mensagem);
         fechar('tt-m-edicao');
         aviso((T.editando ? 'Turma salva: ' : 'Turma criada: ') + ((res.dados && res.dados.external_id) || ''));
@@ -621,11 +646,48 @@
       T.atribuindo = t;
       alerta('tt-a-alerta', '');
       el('tt-a-titulo').textContent = 'Professor da turma ' + t.external_id;
+      el('tt-a-prof').innerHTML = opcoesProf();   // a lista agrupada chega logo em seguida
       el('tt-a-info').innerHTML = esc(t.estagio || '') + ' · ' + diasCurto(t.dia_semana) + ' ' + esc(t.horario || '') + ' · ' + esc(t.turno || '') + ' · ' + esc(t.modalidade || '');
       garantirOpcao('tt-a-prof', t);
       el('tt-a-prof').value = t.professor_id || '';
       mostrarCargaProf();
+      marcarDisponiveis(t);
       abrir('tt-m-atrib');
+    }
+    // Lista de professores separada pela disponibilidade para esta turma:
+    // disponíveis neste dia/horário, marcaram mas fora deste horário, e não
+    // marcaram. Em cada grupo, ordem alfabética, com as turmas que já têm.
+    var GRUPOS_DISP = [
+      ['ok', 'Com disponibilidade neste dia e horário'],
+      ['fora', 'Marcaram disponibilidade, mas não neste dia/horário'],
+      ['sem_marcacao', 'Não marcaram disponibilidade'],
+      ['outro', 'Outros']
+    ];
+    function marcarDisponiveis(t) {
+      var sel = el('tt-a-prof');
+      api('disp.professoresTurma', { turma_id: t.id }).then(function(res) {
+        if (!res.sucesso || !res.dados || T.atribuindo !== t) return;
+        var mapa = res.dados, valor = sel.value;
+        var atuais = Array.prototype.filter.call(sel.querySelectorAll('option'), function(o) { return o.value; })
+          .map(function(o) { return { id: o.value, nome: o.dataset.nome || o.textContent }; });
+        var grupos = {};
+        atuais.forEach(function(p) {
+          var st = mapa[p.id] || 'outro';
+          (grupos[st] = grupos[st] || []).push(p);
+        });
+        var html = '<option value="">— A definir —</option>';
+        GRUPOS_DISP.forEach(function(g) {
+          var lista = grupos[g[0]]; if (!lista || !lista.length) return;
+          lista.sort(function(a, b) { return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }); });
+          html += '<optgroup label="' + esc(g[1]) + ' (' + lista.length + ')">' + lista.map(function(p) {
+            var n = T.turmas.filter(function(x) { return x.professor_id === p.id && x.id !== t.id; }).length;
+            return '<option value="' + esc(p.id) + '" data-nome="' + esc(p.nome) + '">' + (g[0] === 'ok' ? '✓ ' : '') + esc(p.nome) +
+              (n ? ' · ' + n + ' turma' + (n > 1 ? 's' : '') : '') + '</option>';
+          }).join('') + '</optgroup>';
+        });
+        sel.innerHTML = html;
+        sel.value = valor;
+      });
     }
     function mostrarCargaProf() {
       var id = el('tt-a-prof').value, box = el('tt-a-carga');
@@ -635,12 +697,16 @@
         ? 'Já tem ' + dele.length + ' turma(s) no ' + esc(T.prox.rotulo) + ': ' + dele.map(function(t) { return esc(t.external_id) + ' (' + diasCurto(t.dia_semana) + ' ' + esc(t.horario || '') + ')'; }).join(', ') + '.'
         : 'Ainda sem turmas no ' + esc(T.prox.rotulo) + '.';
     }
-    function salvarAtribuicao() {
+    function salvarAtribuicao(forcar) {
       var t = T.atribuindo; if (!t) return;
       var prof = el('tt-a-prof').value || null;
       el('tt-a-ok').disabled = true;
-      api('transicao.turmaAtribuir', { turma_id: t.id, professor_id: prof }).then(function(res) {
+      api('transicao.turmaAtribuir', { turma_id: t.id, professor_id: prof, forcar: forcar === true }).then(function(res) {
         el('tt-a-ok').disabled = false;
+        if (!res.sucesso && res.dados && res.dados.confirmacaoNecessaria) {
+          if (confirm(res.mensagem + '\n\nAtribuir mesmo assim?')) salvarAtribuicao(true);
+          return;
+        }
         if (!res.sucesso) return alerta('tt-a-alerta', res.mensagem);
         fechar('tt-m-atrib');
         aviso(prof ? 'Professor atribuído à ' + t.external_id + '.' : 'Turma ' + t.external_id + ' com professor a definir.');
@@ -674,6 +740,350 @@
     }
 
     return { iniciar: iniciar };
+  }());
+
+  // ===========================================================================
+  // DISPONIBILIDADE DOS PROFESSORES (etapa 19 — D-52 a D-54)
+  // Slots (dia + horário + turno) montados pela coordenação; mínimo padrão e
+  // individual; painel de quem já marcou; marcar por um professor.
+  // ===========================================================================
+  var Disp = (function() {
+    var D = { ciclo: null, prox: null, dados: null, carregado: false, soPendentes: false, slotEdit: null, profMarcar: null };
+    var NOME_DIA = ['', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+    function api(a, d) { return window.postApi(a, d); }
+    function aviso(msg, tipo) { if (typeof toast === 'function') toast(msg, tipo || 'success'); }
+    function fmtDH(iso) {
+      if (!iso) return '—';
+      var d = new Date(iso); if (isNaN(d)) return '—';
+      return d.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit' }) + ' ' +
+             d.toLocaleTimeString('pt-BR', { timeZone: 'America/Fortaleza', hour: '2-digit', minute: '2-digit' });
+    }
+    function situacao(p) {
+      if (!p.marcados) return { cls: 'nao', txt: 'Não marcou' };
+      var faltam = [];
+      if (p.marcados < p.minimo) faltam.push('Faltam ' + (p.minimo - p.marcados));
+      var sab = p.minimo_sabado || 0, msab = p.marcados_sabado || 0;
+      if (msab < sab) faltam.push((faltam.length ? '' : 'Faltam ') + (sab - msab) + ' no sábado');
+      if (faltam.length) return { cls: 'falta', txt: faltam.join(' + ') };
+      return { cls: 'ok', txt: 'OK' };
+    }
+
+    function iniciar(ciclo) { D.ciclo = ciclo; D.prox = ciclo.proximo; D.carregado = false; }
+
+    // ── Planilha (.xlsx) para distribuir as turmas no Excel ────────────────
+    // Biblioteca SheetJS carregada só quando necessária (a mesma usada em
+    // Relatórios → Baixar XLSX).
+    function carregarLibXLSX() {
+      if (window.XLSX) return Promise.resolve(window.XLSX);
+      if (window.__xlsxCarregando) return window.__xlsxCarregando;
+      window.__xlsxCarregando = new Promise(function(resolve, reject) {
+        var sc = document.createElement('script');
+        sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        sc.onload = function() { resolve(window.XLSX); };
+        sc.onerror = function() { window.__xlsxCarregando = null; reject(new Error('Não foi possível carregar a biblioteca da planilha. Verifique a conexão e tente novamente.')); };
+        document.head.appendChild(sc);
+      });
+      return window.__xlsxCarregando;
+    }
+    var DIA_CURTO = ['', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    var DIA_NUM_X = { 'SEGUNDA-FEIRA': 1, 'SEGUNDA': 1, 'TERCA-FEIRA': 2, 'TERÇA-FEIRA': 2, 'TERCA': 2, 'TERÇA': 2,
+                      'QUARTA-FEIRA': 3, 'QUARTA': 3, 'QUINTA-FEIRA': 4, 'QUINTA': 4, 'SEXTA-FEIRA': 5, 'SEXTA': 5,
+                      'SABADO': 6, 'SÁBADO': 6 };
+    function diasDe(txt) {
+      var out = [];
+      String(txt || '').split(',').forEach(function(d) { var n = DIA_NUM_X[d.trim().toUpperCase()]; if (n && out.indexOf(n) === -1) out.push(n); });
+      return out.sort();
+    }
+    // Mesma leitura de horário do banco (turma_horario_intervalo): minutos [ini, fim).
+    function intervalo(h) {
+      var m = String(h || '').toLowerCase().match(/(\d{1,2})\s*[h:]\s*(\d{2})?\s*(?:às|as|a|até|-|–)\s*(\d{1,2})\s*[h:]\s*(\d{2})?/);
+      if (!m) return null;
+      var ini = Number(m[1]) * 60 + Number(m[2] || 0), fim = Number(m[3]) * 60 + Number(m[4] || 0);
+      return (fim > ini && fim <= 1440) ? [ini, fim] : null;
+    }
+    function semEspaco(h) { return String(h || '').replace(/\s/g, '').toLowerCase(); }
+    // O slot cobre a turma naquele dia? (mesma regra de disp_situacao_turma)
+    function cobre(slot, horarioTurma) {
+      var a = intervalo(slot.horario), b = intervalo(horarioTurma);
+      if (a && b) return a[0] <= b[0] && a[1] >= b[1];
+      return semEspaco(slot.horario) === semEspaco(horarioTurma);
+    }
+    function baixarPlanilha() {
+      var d = D.dados || {}, slots = d.slots || [], profs = d.professores || [];
+      var btn = el('dp-xlsx'); btn.disabled = true;
+      Promise.all([carregarLibXLSX(), api('turmas.listar', { semestre_id: D.prox.id }), api('cursos.listar', {})])
+        .then(function(r) {
+          var XLSX = r[0];
+          var turmas = (r[1].sucesso && r[1].dados) ? r[1].dados : [];
+          var cursos = {}; ((r[2].sucesso && r[2].dados) || []).forEach(function(c) { cursos[c.id] = c; });
+          var nomeProf = {}; profs.forEach(function(p) { nomeProf[p.id] = p.nome; });
+          var marcadosPor = {};   // professor_id → [slots]
+          slots.forEach(function(s) { (s.professores || []).forEach(function(pid) { (marcadosPor[pid] = marcadosPor[pid] || []).push(s); }); });
+          function rotSlot(s) { return DIA_CURTO[s.dia] + ' ' + s.horario + ' (' + s.turno + ')'; }
+
+          // 1) Professores × horários (X = marcou)
+          var cab1 = ['Professor', 'Mínimo', 'Mínimo no sábado', 'Marcados', 'Marcados no sábado', 'Situação', 'Última marcação']
+            .concat(slots.map(rotSlot));
+          var aba1 = [cab1].concat(profs.map(function(p) {
+            var meus = marcadosPor[p.id] || [];
+            return [p.nome, p.minimo, p.minimo_sabado || '', p.marcados, p.marcados_sabado || 0, situacao(p).txt,
+                    p.ultima_marcacao ? fmtDH(p.ultima_marcacao) : '']
+              .concat(slots.map(function(s) { return meus.indexOf(s) !== -1 ? 'X' : ''; }));
+          }));
+
+          // 2) Horários: quem marcou cada slot
+          var aba2 = [['Dia', 'Horário', 'Turno', 'Nº de professores', 'Professores']].concat(slots.map(function(s) {
+            var nomes = (s.professores || []).map(function(id) { return nomeProf[id] || '?'; })
+              .sort(function(a, b) { return a.localeCompare(b, 'pt-BR'); });
+            return [NOME_DIA[s.dia], s.horario, s.turno, nomes.length, nomes.join('; ')];
+          }));
+
+          // 3) Turmas do próximo semestre com os professores disponíveis
+          var aba3 = [['Código', 'Curso', 'Estágio', 'Dias', 'Horário', 'Turno', 'Modalidade', 'Vagas',
+                       'Professor atual', 'Professor atual está disponível?', 'Nº de disponíveis', 'Professores disponíveis']];
+          turmas.slice().sort(function(a, b) { return String(a.external_id).localeCompare(String(b.external_id), 'pt-BR', { numeric: true }); })
+            .forEach(function(t) {
+              var dias = diasDe(t.dia_semana);
+              var disp = profs.filter(function(p) {
+                var meus = marcadosPor[p.id] || [];
+                return dias.length && dias.every(function(dia) {
+                  return meus.some(function(s) { return s.dia === dia && cobre(s, t.horario); });
+                });
+              }).map(function(p) { return p.nome; }).sort(function(a, b) { return a.localeCompare(b, 'pt-BR'); });
+              var c = cursos[t.curso_id] || {};
+              var atual = t.professor_id ? (nomeProf[t.professor_id] || (t.professor && t.professor.nome) || '') : '';
+              var atualDisp = !t.professor_id ? '' : (disp.indexOf(atual) !== -1 ? 'Sim'
+                : ((marcadosPor[t.professor_id] || []).length ? 'Não (fora do horário)' : 'Não marcou'));
+              aba3.push([t.external_id, c.sigla || '', t.estagio || c.nome || '', dias.map(function(x) { return DIA_CURTO[x]; }).join(', '),
+                         t.horario || '', t.turno || '', t.modalidade || '', t.vagas_totais == null ? '' : t.vagas_totais,
+                         atual || 'a definir', atualDisp, disp.length, disp.join('; ')]);
+            });
+
+          var wb = XLSX.utils.book_new();
+          function addAba(linhas, nome, larguras) {
+            var ws = XLSX.utils.aoa_to_sheet(linhas);
+            ws['!cols'] = larguras.map(function(w) { return { wch: w }; });
+            if (linhas.length > 1) ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: linhas.length - 1, c: linhas[0].length - 1 } }) };
+            XLSX.utils.book_append_sheet(wb, ws, nome);
+          }
+          addAba(aba1, 'Professores x horários', [32, 8, 10, 9, 10, 22, 16].concat(slots.map(function() { return 14; })));
+          addAba(aba2, 'Horários', [10, 16, 8, 10, 80]);
+          addAba(aba3, 'Turmas ' + D.prox.rotulo, [16, 8, 24, 12, 16, 8, 12, 7, 30, 20, 10, 80]);
+          var hoje = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' }).split('/').reverse().join('-');
+          XLSX.writeFile(wb, 'disponibilidade-professores-' + D.prox.external_id + '-' + hoje + '.xlsx');
+          aviso('Planilha baixada.');
+        })
+        .catch(function(e) { aviso((e && e.message) || 'Erro ao gerar a planilha.', 'error'); })
+        .then(function() { btn.disabled = false; });
+    }
+    function atualizar() {
+      var box = el('tr11-disp'); if (!box) return;
+      if (!D.carregado) box.innerHTML = '<div class="tr11-estado"><div class="spinner" style="margin:0 auto 10px;"></div><p>Carregando…</p></div>';
+      return api('disp.painel', {}).then(function(res) {
+        if (!res.sucesso) { box.innerHTML = '<div class="tt-vazio">' + esc(res.mensagem) + '<br>Confira se o arquivo <strong>etapa19-transicao-disponibilidade.sql</strong> já foi rodado.</div>'; return; }
+        D.dados = res.dados || {};
+        if (!D.carregado) { montar(); D.carregado = true; }
+        render();
+      });
+    }
+
+    function montar() {
+      el('tr11-disp').innerHTML =
+        '<div class="tr11-card"><div class="tr11-card-h"><span class="material-icons-round">schedule</span>Período e mínimo<span class="tt-espaco" style="flex:1"></span>' +
+            '<button class="tt-btn" id="dp-xlsx" title="Professores × horários, horários e turmas com os professores disponíveis"><span class="material-icons-round">download</span>Baixar planilha (.xlsx)</button></div>' +
+          '<div class="tr11-card-c"><div class="dp-linha">' +
+            '<div id="dp-periodo" class="tt-aviso" style="margin:8px 0;flex:1;min-width:240px;"></div>' +
+            '<div class="tt-campo dp-min"><label for="dp-padrao">Mínimo de slots por professor (padrão)</label>' +
+              '<span style="display:flex;gap:6px;"><input type="number" class="tt-input" id="dp-padrao" min="0" max="50" style="width:90px;">' +
+              '<button class="tt-btn" id="dp-padrao-ok">Salvar</button></span></div>' +
+          '</div></div></div>' +
+        '<div class="tr11-grade">' +
+          '<div class="tr11-card"><div class="tr11-card-h"><span class="material-icons-round">view_agenda</span>Slots<span class="tt-espaco" style="flex:1"></span>' +
+              '<button class="tt-btn" id="dp-gerar"><span class="material-icons-round">auto_fix_high</span>Gerar das turmas</button>' +
+              '<button class="tt-btn" id="dp-novo"><span class="material-icons-round">add</span>Novo</button></div>' +
+            '<div class="tr11-card-c" id="dp-slots"></div></div>' +
+          '<div class="tr11-card"><div class="tr11-card-h"><span class="material-icons-round">badge</span>Professores<span class="tt-espaco" style="flex:1"></span>' +
+              '<label class="tt-chk" style="font-weight:400;"><input type="checkbox" id="dp-pend">Só pendentes</label></div>' +
+            '<div class="tr11-card-c" id="dp-profs"></div></div>' +
+        '</div>' +
+        // modal slot
+        '<div class="tt-overlay" id="dp-m-slot"><div class="tt-modal">' +
+          '<div class="tt-modal-h"><span id="dp-s-titulo">Novo slot</span><button class="tt-ico" data-dfechar="dp-m-slot"><span class="material-icons-round">close</span></button></div>' +
+          '<div class="tt-modal-c"><div class="tt-alerta" id="dp-s-alerta"></div><div class="tt-grid">' +
+            '<div class="tt-campo"><label for="dp-s-dia">Dia</label><select class="tt-select" id="dp-s-dia">' +
+              [1, 2, 3, 4, 5, 6].map(function(d) { return '<option value="' + d + '">' + NOME_DIA[d] + '</option>'; }).join('') + '</select></div>' +
+            '<div class="tt-campo"><label for="dp-s-turno">Turno</label><select class="tt-select" id="dp-s-turno"><option>MANHÃ</option><option>TARDE</option><option>NOITE</option></select></div>' +
+            '<div class="tt-campo span2"><label for="dp-s-horario">Horário</label><input class="tt-input" id="dp-s-horario" placeholder="Ex.: 14h às 15h30" maxlength="40"></div>' +
+          '</div><p class="tt-aviso" style="margin-top:10px;">Um slot mais largo (ex.: 13h às 18h) cobre todas as turmas que cabem nele.</p></div>' +
+          '<div class="tt-modal-f"><button class="tt-btn" data-dfechar="dp-m-slot">Cancelar</button><button class="tt-btn prim" id="dp-s-ok"><span class="material-icons-round">save</span>Salvar</button></div>' +
+        '</div></div>' +
+        // modal marcar por professor
+        '<div class="tt-overlay" id="dp-m-marcar"><div class="tt-modal">' +
+          '<div class="tt-modal-h"><span id="dp-mm-titulo">Disponibilidade</span><button class="tt-ico" data-dfechar="dp-m-marcar"><span class="material-icons-round">close</span></button></div>' +
+          '<div class="tt-modal-c"><div class="tt-alerta" id="dp-mm-alerta"></div><p class="tt-aviso" id="dp-mm-info"></p><div class="tt-vlista" id="dp-mm-lista"></div></div>' +
+          '<div class="tt-modal-f"><button class="tt-btn" data-dfechar="dp-m-marcar">Cancelar</button><button class="tt-btn prim" id="dp-mm-ok"><span class="material-icons-round">save</span>Salvar</button></div>' +
+        '</div></div>';
+      document.querySelectorAll('#tr11-disp [data-dfechar]').forEach(function(b) { b.addEventListener('click', function() { el(b.dataset.dfechar).classList.remove('show'); }); });
+      document.querySelectorAll('#tr11-disp .tt-overlay').forEach(function(o) { o.addEventListener('click', function(e) { if (e.target === o) o.classList.remove('show'); }); });
+      el('dp-padrao-ok').addEventListener('click', salvarPadrao);
+      el('dp-xlsx').addEventListener('click', baixarPlanilha);
+      el('dp-gerar').addEventListener('click', gerar);
+      el('dp-novo').addEventListener('click', function() { abrirSlot(null); });
+      el('dp-pend').addEventListener('change', function() { D.soPendentes = this.checked; renderProfs(); });
+      el('dp-s-ok').addEventListener('click', salvarSlot);
+      el('dp-mm-ok').addEventListener('click', salvarMarcacao);
+    }
+
+    function render() {
+      var d = D.dados, per = d.periodo || {};
+      el('dp-periodo').innerHTML = (d.periodo_aberto
+        ? '<span class="tt-selo nova" style="margin:0 6px 0 0;">aberto</span>'
+        : '<span class="tt-selo" style="margin:0 6px 0 0;background:#F5F4F0;color:#9898B0;">fechado</span>') +
+        'Período da fase "Disponibilidade dos professores": <strong>' + fmtDH(per.inicio) + '</strong> a <strong>' + fmtDH(per.fim) + '</strong>. ' +
+        'Os professores marcam no Início só dentro desse período (as datas ficam em Configurações → Transição).';
+      if (document.activeElement !== el('dp-padrao')) el('dp-padrao').value = d.minimo_padrao == null ? '' : d.minimo_padrao;
+      renderSlots(); renderProfs();
+    }
+    function nomeDe(id) {
+      var p = (D.dados.professores || []).filter(function(x) { return x.id === id; })[0];
+      return p ? p.nome : '?';
+    }
+
+    function renderSlots() {
+      var slots = D.dados.slots || [], box = el('dp-slots');
+      if (!slots.length) { box.innerHTML = '<div class="tt-vazio">Nenhum slot. Use <strong>Gerar das turmas</strong> depois da virada, ou crie com <strong>Novo</strong>.</div>'; return; }
+      var html = '', diaAtual = 0;
+      slots.forEach(function(s) {
+        if (s.dia !== diaAtual) { diaAtual = s.dia; html += '<div class="dp-dia">' + NOME_DIA[s.dia] + '</div>'; }
+        var n = (s.professores || []).length;
+        var nomes = (s.professores || []).map(nomeDe).sort().join(', ');
+        html += '<div class="dp-slot" data-id="' + esc(s.id) + '">' +
+          '<span class="dp-slot-h">' + esc(s.horario) + '<span class="tt-sub">' + esc(s.turno) + '</span></span>' +
+          '<span class="dp-cont" title="' + esc(nomes || 'Ninguém marcou') + '">' + n + ' prof.</span>' +
+          '<span class="tt-acoes"><button class="tt-ico" data-acao="editar" title="Editar"><span class="material-icons-round">edit</span></button>' +
+          '<button class="tt-ico perigo" data-acao="excluir" title="Excluir"><span class="material-icons-round">delete</span></button></span></div>';
+      });
+      box.innerHTML = html;
+      box.querySelectorAll('button[data-acao]').forEach(function(b) {
+        b.addEventListener('click', function() {
+          var id = b.closest('.dp-slot').dataset.id;
+          var s = slots.filter(function(x) { return x.id === id; })[0]; if (!s) return;
+          if (b.dataset.acao === 'editar') abrirSlot(s); else excluirSlot(s);
+        });
+      });
+    }
+
+    function renderProfs() {
+      var lista = (D.dados.professores || []).filter(function(p) { return !D.soPendentes || situacao(p).cls !== 'ok'; });
+      var todos = D.dados.professores || [];
+      var ok = todos.filter(function(p) { return situacao(p).cls === 'ok'; }).length;
+      var box = el('dp-profs');
+      if (!todos.length) { box.innerHTML = '<div class="tt-vazio">Nenhum professor ativo.</div>'; return; }
+      box.innerHTML = '<p class="tt-aviso" style="margin:8px 0;">' + ok + ' de ' + todos.length + ' professores já marcaram o mínimo. Deixe o mínimo em branco para usar o padrão. Em <strong>Sábado</strong>, informe quantos horários de sábado o professor deve marcar obrigatoriamente (vazio = sem obrigação).</p>' +
+        '<div class="tt-tabela-wrap"><table class="tt-tabela"><thead><tr><th>Professor</th><th>Mínimo</th><th>Sábado</th><th>Marcados</th><th>Situação</th><th></th></tr></thead><tbody>' +
+        lista.map(function(p) {
+          var st = situacao(p);
+          return '<tr data-id="' + esc(p.id) + '"><td>' + esc(p.nome) + '<span class="tt-sub">' + (p.ultima_marcacao ? 'Última marcação: ' + fmtDH(p.ultima_marcacao) : '') + '</span></td>' +
+            '<td><input type="number" class="tt-input dp-min-ind" min="0" max="50" style="width:70px;" placeholder="' + esc(D.dados.minimo_padrao) + '" value="' + (p.minimo_individual == null ? '' : esc(p.minimo_individual)) + '"></td>' +
+            '<td><input type="number" class="tt-input dp-min-sab" min="0" max="50" style="width:64px;" placeholder="—" title="Mínimo obrigatório de horários no sábado" value="' + (p.minimo_sabado ? esc(p.minimo_sabado) : '') + '"></td>' +
+            '<td>' + p.marcados + ' / ' + p.minimo + (p.minimo_sabado ? '<span class="tt-sub">sábado: ' + (p.marcados_sabado || 0) + ' / ' + p.minimo_sabado + '</span>' : '') + '</td>' +
+            '<td><span class="dp-st ' + st.cls + '">' + st.txt + '</span></td>' +
+            '<td><button class="tt-btn" data-acao="marcar" style="height:30px;">Marcar por ele</button></td></tr>';
+        }).join('') + '</tbody></table></div>';
+      box.querySelectorAll('.dp-min-ind').forEach(function(inp) {
+        inp.addEventListener('change', function() {
+          var id = inp.closest('tr').dataset.id;
+          api('disp.minimoProfessor', { professor_id: id, minimo: inp.value === '' ? null : inp.value }).then(function(res) {
+            if (!res.sucesso) { aviso(res.mensagem, 'error'); return; }
+            aviso('Mínimo salvo.'); atualizar();
+          });
+        });
+      });
+      box.querySelectorAll('.dp-min-sab').forEach(function(inp) {
+        inp.addEventListener('change', function() {
+          var id = inp.closest('tr').dataset.id;
+          api('disp.minimoSabado', { professor_id: id, minimo: inp.value === '' ? null : inp.value }).then(function(res) {
+            if (!res.sucesso) { aviso(res.mensagem, 'error'); return; }
+            aviso(inp.value && Number(inp.value) > 0 ? 'Sábado obrigatório salvo.' : 'Sem obrigação no sábado.'); atualizar();
+          });
+        });
+      });
+      box.querySelectorAll('button[data-acao="marcar"]').forEach(function(b) {
+        b.addEventListener('click', function() {
+          var id = b.closest('tr').dataset.id;
+          abrirMarcar((D.dados.professores || []).filter(function(x) { return x.id === id; })[0]);
+        });
+      });
+    }
+
+    function salvarPadrao() {
+      var v = el('dp-padrao').value;
+      if (v === '' || isNaN(Number(v))) return aviso('Informe um número de 0 a 50.', 'error');
+      api('disp.minimoPadrao', { minimo: Number(v) }).then(function(res) {
+        if (!res.sucesso) return aviso(res.mensagem, 'error');
+        aviso('Mínimo padrão salvo.'); atualizar();
+      });
+    }
+    function gerar() {
+      el('dp-gerar').disabled = true;
+      api('disp.slotsGerar', {}).then(function(res) {
+        el('dp-gerar').disabled = false;
+        if (!res.sucesso) return aviso(res.mensagem, 'error');
+        var n = res.dados || 0;
+        aviso(n ? n + ' slot(s) criado(s) a partir das turmas.' : 'Nenhum slot novo: todos os dias/horários das turmas já têm slot.');
+        atualizar();
+      });
+    }
+    function abrirSlot(s) {
+      D.slotEdit = s;
+      el('dp-s-alerta').className = 'tt-alerta';
+      el('dp-s-titulo').textContent = s ? 'Editar slot' : 'Novo slot';
+      el('dp-s-dia').value = s ? String(s.dia) : '1';
+      el('dp-s-turno').value = s ? s.turno : 'MANHÃ';
+      el('dp-s-horario').value = s ? s.horario : '';
+      el('dp-m-slot').classList.add('show');
+    }
+    function salvarSlot() {
+      var dados = { dia: Number(el('dp-s-dia').value), turno: el('dp-s-turno').value, horario: el('dp-s-horario').value.trim() };
+      if (D.slotEdit) dados.id = D.slotEdit.id;
+      api('disp.slotSalvar', dados).then(function(res) {
+        if (!res.sucesso) { var a = el('dp-s-alerta'); a.textContent = res.mensagem; a.className = 'tt-alerta show'; return; }
+        el('dp-m-slot').classList.remove('show'); aviso('Slot salvo.'); atualizar();
+      });
+    }
+    function excluirSlot(s) {
+      var n = (s.professores || []).length;
+      if (!confirm('Excluir o slot ' + NOME_DIA[s.dia] + ' ' + s.horario + '?' + (n ? '\n\n' + n + ' professor(es) marcaram este slot; as marcações serão apagadas.' : ''))) return;
+      api('disp.slotExcluir', { slot_id: s.id }).then(function(res) {
+        if (!res.sucesso) return aviso(res.mensagem, 'error');
+        aviso('Slot excluído.'); atualizar();
+      });
+    }
+    function abrirMarcar(p) {
+      if (!p) return;
+      D.profMarcar = p;
+      el('dp-mm-alerta').className = 'tt-alerta';
+      el('dp-mm-titulo').textContent = 'Disponibilidade de ' + p.nome;
+      el('dp-mm-info').textContent = 'Mínimo pedido: ' + p.minimo + (p.minimo_sabado ? ', sendo ' + p.minimo_sabado + ' no sábado' : '') + '. Pela coordenação é possível salvar com menos.';
+      var slots = D.dados.slots || [];
+      el('dp-mm-lista').innerHTML = slots.length ? slots.map(function(s) {
+        var on = (s.professores || []).indexOf(p.id) !== -1;
+        return '<label class="tt-vitem"><input type="checkbox" value="' + esc(s.id) + '"' + (on ? ' checked' : '') + '>' +
+          '<span>' + NOME_DIA[s.dia] + ' · ' + esc(s.horario) + '<span class="tt-sub">' + esc(s.turno) + '</span></span><span></span></label>';
+      }).join('') : '<div class="tt-vazio">Nenhum slot cadastrado.</div>';
+      el('dp-m-marcar').classList.add('show');
+    }
+    function salvarMarcacao() {
+      var p = D.profMarcar; if (!p) return;
+      var ids = [];
+      document.querySelectorAll('#dp-mm-lista input:checked').forEach(function(c) { ids.push(c.value); });
+      api('disp.marcar', { slot_ids: ids, professor_id: p.id }).then(function(res) {
+        if (!res.sucesso) { var a = el('dp-mm-alerta'); a.textContent = res.mensagem; a.className = 'tt-alerta show'; return; }
+        el('dp-m-marcar').classList.remove('show'); aviso('Disponibilidade de ' + p.nome + ' salva.'); atualizar();
+      });
+    }
+
+    return { iniciar: iniciar, atualizar: atualizar };
   }());
 
   function init() {
