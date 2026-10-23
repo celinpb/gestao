@@ -232,6 +232,34 @@
   .cal-editor-acoes .cal-remover{margin-left:auto;color:#B01020;}
   .cal-rodape{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center;margin-top:16px;padding-top:16px;border-top:1px solid var(--c-border,#E8E7E2);}
   .cal-rodape .cal-rodape-esq{margin-right:auto;}
+
+  /* Transição de semestre (etapa 17) */
+  .sem-badge.fase{background:rgba(212,168,67,0.16);color:#8A6412;}
+  .tr-linha{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .tr-sem-nome{font-size:18px;font-weight:600;color:var(--c-text-1,#1A1A2E);font-family:var(--font-mono,monospace);}
+  .tr-texto{font-size:13px;color:var(--c-text-2,#5C5C7A);line-height:1.55;}
+  .tr-texto strong{color:var(--c-text-1,#1A1A2E);}
+  .tr-acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .tr-select{height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:7px;padding:0 10px;font-family:var(--font-sans,sans-serif);font-size:13px;background:#FAFAF8;color:var(--c-text-1,#1A1A2E);}
+  .tr-chave{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--c-border,#E8E7E2);font-size:13px;color:var(--c-text-1,#1A1A2E);cursor:pointer;}
+  .tr-chave:last-of-type{border-bottom:none;}
+  .tr-chave input{margin-top:2px;accent-color:#E63946;width:16px;height:16px;flex-shrink:0;}
+  .tr-chave small{display:block;color:var(--c-text-3,#9898B0);font-size:11.5px;margin-top:2px;line-height:1.45;}
+  .tr-num-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0;}
+  .tr-tabela-wrap{overflow-x:auto;border:1px solid var(--c-border,#E8E7E2);border-radius:8px;margin-bottom:14px;}
+  table.tr-tabela{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.tr-tabela th,table.tr-tabela td{padding:7px 9px;border-bottom:1px solid var(--c-border,#E8E7E2);text-align:left;vertical-align:middle;}
+  table.tr-tabela tr:last-child td{border-bottom:none;}
+  table.tr-tabela th{font-size:11px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;color:var(--c-text-3,#9898B0);background:#FAFAF8;white-space:nowrap;}
+  table.tr-tabela td.tr-fase{min-width:190px;}
+  table.tr-tabela td.tr-fase b{display:block;font-weight:600;color:var(--c-text-1,#1A1A2E);}
+  table.tr-tabela td.tr-fase small{color:var(--c-text-3,#9898B0);font-size:11px;}
+  .tr-dt{height:32px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:6px;padding:0 6px;font-family:var(--font-sans,sans-serif);font-size:12.5px;background:#FAFAF8;color:var(--c-text-1,#1A1A2E);}
+  .tr-dt:focus{border-color:#E63946;outline:none;background:#fff;}
+  .tr-obs{width:100%;min-width:160px;}
+  .tr-ord{font-family:var(--font-mono,monospace);color:var(--c-text-3,#9898B0);width:28px;}
+  .tr-bloqueado{opacity:0.55;pointer-events:none;}
+  @media(max-width:560px){.tr-num-grid{grid-template-columns:1fr;}}
 </style>
 
 <div>
@@ -258,6 +286,7 @@
       <button class="cfg-aba" role="tab" data-aba="calendario"><span class="material-icons-round">event</span>Calendário<span class="cfg-aba-selo alerta" id="aba-selo-calendario"></span></button>
       <button class="cfg-aba" role="tab" data-aba="publico"><span class="material-icons-round">groups</span>Público-alvo</button>
       <button class="cfg-aba" role="tab" data-aba="portal"><span class="material-icons-round">school</span>Portal do Aluno<span class="cfg-aba-selo" id="aba-selo-portal"></span></button>
+      <button class="cfg-aba" role="tab" data-aba="transicao"><span class="material-icons-round">published_with_changes</span>Transição<span class="cfg-aba-selo" id="aba-selo-transicao"></span></button>
       <button class="cfg-aba" role="tab" data-aba="regras"><span class="material-icons-round">shield</span>Regras de acesso</button>
     </div>
 
@@ -591,6 +620,117 @@
       </div>
     </div>
 
+    <!-- ABA: TRANSIÇÃO DE SEMESTRE (etapa 17 — claude/transicao-semestre.md, Fase 2) -->
+    <div class="cfg-painel" data-painel="transicao" role="tabpanel">
+      <div class="cfg-alerta" id="cfg-alerta-tr">
+        <span class="material-icons-round">info</span>
+        <span id="cfg-alerta-tr-msg"></span>
+      </div>
+
+      <!-- Próximo semestre -->
+      <div class="cfg-card">
+        <div class="cfg-card-header">
+          <span class="material-icons-round">event_upcoming</span>
+          <span class="cfg-card-titulo">Próximo semestre</span>
+        </div>
+        <div class="cfg-card-corpo" id="tr-proximo">
+          <div class="cfg-spinner"><div class="cfg-spinner-anim"></div><span>Carregando…</span></div>
+        </div>
+      </div>
+
+      <!-- Ativação -->
+      <div class="cfg-card tr-requer-proximo">
+        <div class="cfg-card-header">
+          <span class="material-icons-round">toggle_on</span>
+          <span class="cfg-card-titulo">Ativar a transição</span>
+        </div>
+        <div class="cfg-card-corpo">
+          <label class="tr-chave">
+            <input type="checkbox" id="tr-ativa">
+            <span>Transição ativada
+              <small>Ativada, o item "Transição de semestre" aparece no menu de admin e coordenação, e o quadro com as datas do ciclo aparece no Início para todos os usuários. Desativada, tudo fica escondido (as datas e opções continuam guardadas).</small>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Datas do ciclo -->
+      <div class="cfg-card tr-requer-proximo">
+        <div class="cfg-card-header">
+          <span class="material-icons-round">date_range</span>
+          <span class="cfg-card-titulo">Datas do ciclo</span>
+        </div>
+        <div class="cfg-card-corpo">
+          <p class="tr-texto" style="margin-bottom:12px;">Horários de Brasília (UTC−3). Deixe em branco o que ainda não está definido. Uma fase só abre para os usuários dentro do período informado aqui.</p>
+          <div class="tr-tabela-wrap">
+            <table class="tr-tabela">
+              <thead><tr><th>#</th><th>Fase</th><th>Início</th><th>Fim</th><th>Observação</th></tr></thead>
+              <tbody id="tr-fases-corpo"></tbody>
+            </table>
+          </div>
+          <div class="tr-acoes">
+            <button class="btn-cfg btn-cfg-primario" id="tr-btn-salvar-fases">
+              <div class="spinner-btn"></div>
+              <span class="material-icons-round btn-txt">save</span>
+              <span class="btn-txt">Salvar datas</span>
+            </button>
+            <button class="btn-cfg btn-cfg-sec" id="tr-btn-desfazer-fases">Desfazer alterações</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Opções do ciclo -->
+      <div class="cfg-card tr-requer-proximo">
+        <div class="cfg-card-header">
+          <span class="material-icons-round">tune</span>
+          <span class="cfg-card-titulo">Opções do ciclo</span>
+        </div>
+        <div class="cfg-card-corpo">
+          <label class="tr-chave">
+            <input type="checkbox" id="tr-op-manter_modalidade">
+            <span>Manter a modalidade na rematrícula
+              <small>Ligada, quem cursou presencial só se rematricula em presencial (e vice-versa); coordenação e admin podem abrir exceção individual. Padrão: desligada.</small>
+            </span>
+          </label>
+          <label class="tr-chave">
+            <input type="checkbox" id="tr-op-aplicar_decreto_46371">
+            <span>Aplicar o impedimento do Decreto 46.371
+              <small>Ligada, aluno de matrícula inicial com frequência abaixo de 75% fica impedido no semestre seguinte; os atingidos que registrarem intenção aparecem num relatório para deferimento/indeferimento manual. Padrão: ligada.</small>
+            </span>
+          </label>
+          <label class="tr-chave">
+            <input type="checkbox" id="tr-op-freq_baixa_desistente">
+            <span>Frequência abaixo de 75% = desistente
+              <small>Ligada, o aluno RETIDO (frequência abaixo de 75%) é desistente e a rematrícula é cancelada. Desligada, ele refaz o mesmo estágio. Padrão: ligada.</small>
+            </span>
+          </label>
+          <label class="tr-chave">
+            <input type="checkbox" id="tr-op-autoinscricao_nivelamento">
+            <span>Autoinscrição online no nivelamento
+              <small>Ligada, o candidato também pode se inscrever no nivelamento pela internet. Desligada, a inscrição é feita pela secretaria. Padrão: desligada.</small>
+            </span>
+          </label>
+          <div class="tr-num-grid">
+            <div class="cfg-field" style="margin-bottom:0;">
+              <label for="tr-op-cota_prioritaria_pct">Teto da cota prioritária (%)</label>
+              <input type="number" class="cfg-input" id="tr-op-cota_prioritaria_pct" min="0" max="100" step="1">
+              <div class="cfg-hint">Vagas prioritárias por turma (novatos) = este percentual, arredondado para cima. Padrão: 80.</div>
+            </div>
+            <div class="cfg-field" style="margin-bottom:0;">
+              <label for="tr-op-limite_lembrete_documentos">Lembrete de importação a cada</label>
+              <input type="number" class="cfg-input" id="tr-op-limite_lembrete_documentos" min="1" step="1">
+              <div class="cfg-hint">Avisa coordenação e admin a cada N solicitações sem links de documentos (importar o CSV). Padrão: 200.</div>
+            </div>
+          </div>
+          <button class="btn-cfg btn-cfg-primario" id="tr-btn-salvar-opcoes">
+            <div class="spinner-btn"></div>
+            <span class="material-icons-round btn-txt">save</span>
+            <span class="btn-txt">Salvar opções</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- ABA: REGRAS DE ACESSO (RLS) — SOMENTE LEITURA -->
     <div class="cfg-painel" data-painel="regras" role="tabpanel">
       <div class="cfg-card">
@@ -728,7 +868,7 @@
 
   function normSemestre(s){
     if(!s)return s;
-    return{id:s.id,SemestreID:s.external_id||s.id,Semestre:s.rotulo||'',SemestreAtual:s.semestre_atual||false,EdicaoAtiva:s.edicao_ativa!==false,VisualizacaoAtiva:s.visualizacao_ativa!==false};
+    return{id:s.id,SemestreID:s.external_id||s.id,Semestre:s.rotulo||'',SemestreAtual:s.semestre_atual||false,EdicaoAtiva:s.edicao_ativa!==false,VisualizacaoAtiva:s.visualizacao_ativa!==false,Fase:s.fase||''};
   }
 
   function mostrarAlertaCampo(id,msg,tipo,ms){
@@ -761,6 +901,7 @@
     carregarTiposPublico();
     carregarPortal();
     carregarEnvio();
+    carregarTransicao();
     registrarEventos();
   }
 
@@ -836,14 +977,15 @@
     var badges='';
     if(s.SemestreAtual) badges+='<span class="sem-badge atual">Atual</span>';
     badges+= s.EdicaoAtiva ? '<span class="sem-badge edicao">Edição aberta</span>' : '<span class="sem-badge fechado">Edição fechada</span>';
-    badges+= s.VisualizacaoAtiva ? '<span class="sem-badge vis">Visível</span>' : '';
+    badges+= s.VisualizacaoAtiva ? '<span class="sem-badge vis">Visível</span>' : '<span class="sem-badge fechado">Oculto</span>';
+    if(s.Fase==='planejamento'||s.Fase==='inscricoes') badges+='<span class="sem-badge fase">'+(NOMES_FASE_SEM[s.Fase])+'</span>';
     return badges;
   }
 
   function carregarSemestres(){
     var wrap=el('sem-lista'); if(!wrap) return; // ID real: sem-lista (não cfg-semestres-lista)
     wrap.innerHTML='<div class="cfg-spinner"><div class="cfg-spinner-anim"></div><span>Carregando…</span></div>';
-    postApi('semestres.listar',{}).then(function(res){
+    postApi('semestres.listar',{incluirOcultos:true}).then(function(res){
       var lista=(res.sucesso&&res.dados)?res.dados.map(normSemestre):[];
       if(!lista.length){wrap.innerHTML='<p style="font-size:13px;color:var(--c-text-3);">Nenhum semestre cadastrado.</p>';return;}
       wrap.innerHTML='';
@@ -859,7 +1001,9 @@
             '<button class="btn-sem" data-id="'+s.id+'" data-acao="'+(s.EdicaoAtiva?'fechar':'abrir')+'">'+
               '<span class="material-icons-round">'+(s.EdicaoAtiva?'lock':'lock_open')+'</span>'+(s.EdicaoAtiva?'Fechar edição':'Abrir edição')+
             '</button>'+
-            (!s.SemestreAtual?'<button class="btn-sem" data-id="'+s.id+'" data-acao="tornarAtual"><span class="material-icons-round">star</span>Tornar atual</button>':'')+
+            // O próximo semestre em preparação (planejamento/inscrições) só vira
+            // o atual na virada do semestre (Fase 8), não por este botão.
+            (!s.SemestreAtual&&s.Fase!=='planejamento'&&s.Fase!=='inscricoes'?'<button class="btn-sem" data-id="'+s.id+'" data-acao="tornarAtual"><span class="material-icons-round">star</span>Tornar atual</button>':'')+
           '</div>';
         wrap.appendChild(div);
       });
@@ -1633,7 +1777,226 @@
     });
   }
 
+  // =========================================================================
+  // TRANSIÇÃO DE SEMESTRE (etapa 17 — claude/transicao-semestre.md, Fase 2)
+  // Tudo vem de ciclo.estado (função ciclo_estado do banco). Criar o próximo
+  // semestre e gravar as datas passam por funções do banco que só aceitam
+  // admin. Depois de cada mudança, window.atualizarCiclo() (index.html)
+  // redesenha o menu.
+  // Datas: o banco guarda com fuso; a tela mostra e lê no horário de
+  // Brasília (UTC−3, sem horário de verão).
+  // =========================================================================
+  var NOMES_FASE_SEM={planejamento:'Planejamento',inscricoes:'Inscrições',em_andamento:'Em andamento',encerrado:'Encerrado'};
+  var tr={estado:null,fasesOrig:null};
+  var OPCOES_BOOL=['manter_modalidade','aplicar_decreto_46371','freq_baixa_desistente','autoinscricao_nivelamento'];
+  var OPCOES_NUM=['cota_prioritaria_pct','limite_lembrete_documentos'];
+
+  // timestamptz (ISO) → 'YYYY-MM-DDTHH:MM' em UTC−3, para <input type="datetime-local">
+  function isoParaLocalBR(iso){
+    if(!iso)return '';
+    var d=new Date(iso); if(isNaN(d))return '';
+    var b=new Date(d.getTime()-3*3600*1000);
+    return b.toISOString().slice(0,16);
+  }
+  // 'YYYY-MM-DDTHH:MM' (UTC−3) → ISO com fuso
+  function localBRParaIso(v){ return v?(v+':00-03:00'):''; }
+
+  function carregarTransicao(){
+    return postApi('ciclo.estado',{}).then(function(res){
+      if(!res.sucesso){
+        el('tr-proximo').innerHTML='<p class="tr-texto">Não foi possível carregar a transição: '+esc(res.mensagem||'erro')+'.<br>Confira se o arquivo <strong>etapa17-transicao-calendario.sql</strong> já foi rodado neste banco.</p>';
+        document.querySelectorAll('.tr-requer-proximo').forEach(function(c){c.style.display='none';});
+        return;
+      }
+      tr.estado=res.dados;
+      renderTransicao();
+    });
+  }
+
+  function renderTransicao(){
+    var e=tr.estado||{}, p=e.proximo, wrap=el('tr-proximo');
+    definirSelo('aba-selo-transicao', e.ativo?'Ativa':'', '');
+    document.querySelectorAll('.tr-requer-proximo').forEach(function(c){c.style.display=p?'':'none';});
+    if(!p){
+      var atual=e.atual?(e.atual.rotulo||e.atual.external_id):'—';
+      wrap.innerHTML=
+        '<p class="tr-texto" style="margin-bottom:14px;">Semestre atual: <strong>'+esc(atual)+'</strong>. Ainda não há próximo semestre em preparação.</p>'+
+        '<p class="tr-texto" style="margin-bottom:14px;">Criar o próximo semestre não muda nada para os usuários: ele nasce <strong>oculto</strong>, em <strong>Planejamento</strong>, com a transição <strong>desativada</strong>. Depois disso você define as datas e as opções e, quando quiser, ativa a transição.</p>'+
+        '<button class="btn-cfg btn-cfg-primario" id="tr-btn-criar"><div class="spinner-btn"></div><span class="material-icons-round btn-txt">add</span><span class="btn-txt">Criar o próximo semestre</span></button>';
+      el('tr-btn-criar').addEventListener('click',criarProximoSemestre);
+      return;
+    }
+    wrap.innerHTML=
+      '<div class="tr-linha">'+
+        '<div>'+
+          '<div class="tr-sem-nome">'+esc(p.rotulo)+' <span style="font-size:12px;color:var(--c-text-3,#9898B0);">('+esc(p.external_id)+')</span></div>'+
+          '<div class="sem-badges">'+
+            (p.visualizacao_ativa===false?'<span class="sem-badge fechado">Oculto</span>':'<span class="sem-badge vis">Visível</span>')+
+            '<span class="sem-badge fase">'+esc(NOMES_FASE_SEM[p.fase]||p.fase)+'</span>'+
+            (e.ativo?'<span class="sem-badge edicao">Transição ativa</span>':'<span class="sem-badge fechado">Transição desativada</span>')+
+          '</div>'+
+        '</div>'+
+        '<div class="tr-acoes">'+
+          '<label for="tr-fase-sem" class="tr-texto">Fase:</label>'+
+          '<select class="tr-select" id="tr-fase-sem">'+
+            '<option value="planejamento"'+(p.fase==='planejamento'?' selected':'')+'>Planejamento</option>'+
+            '<option value="inscricoes"'+(p.fase==='inscricoes'?' selected':'')+'>Inscrições</option>'+
+          '</select>'+
+        '</div>'+
+      '</div>'+
+      '<p class="tr-texto" style="margin-top:12px;">Semestre atual: <strong>'+esc(e.atual?(e.atual.rotulo||e.atual.external_id):'—')+'</strong>. O próximo semestre fica oculto nas telas comuns (Turmas, Matrículas, Relatórios) até a virada do semestre.</p>';
+    el('tr-fase-sem').addEventListener('change',alterarFaseSemestre);
+
+    el('tr-ativa').checked=!!e.ativo;
+    renderFases();
+    var c=e.config||{};
+    OPCOES_BOOL.forEach(function(k){ var i=el('tr-op-'+k); if(i)i.checked=!!c[k]; });
+    OPCOES_NUM.forEach(function(k){ var i=el('tr-op-'+k); if(i)i.value=(c[k]===null||c[k]===undefined)?'':c[k]; });
+  }
+
+  function renderFases(){
+    var corpo=el('tr-fases-corpo'); if(!corpo)return;
+    var fases=(tr.estado&&tr.estado.fases)||[];
+    tr.fasesOrig=JSON.stringify(lerFases(fases));
+    corpo.innerHTML=fases.map(function(f){
+      return '<tr data-tipo="'+esc(f.tipo)+'">'+
+        '<td class="tr-ord">'+f.ordem+'</td>'+
+        '<td class="tr-fase"><b>'+esc(f.nome)+'</b>'+(f.descricao?'<small>'+esc(f.descricao)+'</small>':'')+'</td>'+
+        '<td><input type="datetime-local" class="tr-dt" data-campo="inicio" value="'+isoParaLocalBR(f.inicio)+'"></td>'+
+        '<td><input type="datetime-local" class="tr-dt" data-campo="fim" value="'+isoParaLocalBR(f.fim)+'"></td>'+
+        '<td><input type="text" class="tr-dt tr-obs" data-campo="observacao" maxlength="300" value="'+esc(f.observacao||'')+'"></td>'+
+      '</tr>';
+    }).join('');
+  }
+
+  // Lê as fases: da tabela na tela (sem argumento) ou de uma lista do banco.
+  function lerFases(lista){
+    if(lista){
+      return lista.map(function(f){ return {tipo:f.tipo,inicio:isoParaLocalBR(f.inicio),fim:isoParaLocalBR(f.fim),observacao:(f.observacao||'').trim()}; });
+    }
+    var out=[];
+    document.querySelectorAll('#tr-fases-corpo tr[data-tipo]').forEach(function(linha){
+      var v=function(c){ var i=linha.querySelector('[data-campo="'+c+'"]'); return i?i.value.trim():''; };
+      out.push({tipo:linha.dataset.tipo,inicio:v('inicio'),fim:v('fim'),observacao:v('observacao')});
+    });
+    return out;
+  }
+
+  function fasesAlteradas(){ return tr.fasesOrig!==null && JSON.stringify(lerFases())!==tr.fasesOrig; }
+
+  function botaoCarregando(id,on){ var b=el(id); if(b){b.disabled=on;b.classList.toggle('loading',on);} }
+
+  function aposMudancaCiclo(dados,msg){
+    if(dados) tr.estado=dados;
+    renderTransicao();
+    mostrarAlertaCampo('cfg-alerta-tr',msg,'sucesso');
+    if(typeof toast==='function')toast(msg,'success');
+    if(typeof window.atualizarCiclo==='function')window.atualizarCiclo();
+  }
+  function erroCiclo(res){
+    var m=(res&&res.mensagem)||'Erro.';
+    mostrarAlertaCampo('cfg-alerta-tr',m,'erro',7000);
+    if(typeof toast==='function')toast(m,'error');
+  }
+
+  function criarProximoSemestre(){
+    var atual=(tr.estado&&tr.estado.atual)?(tr.estado.atual.rotulo||tr.estado.atual.external_id):'atual';
+    if(!confirm('Criar o semestre seguinte ao '+atual+'?\n\nEle nasce oculto e em Planejamento; nada muda para os usuários até você ativar a transição.'))return;
+    botaoCarregando('tr-btn-criar',true);
+    postApi('ciclo.criarProximo',{}).then(function(res){
+      botaoCarregando('tr-btn-criar',false);
+      if(!res.sucesso)return erroCiclo(res);
+      aposMudancaCiclo(res.dados,'Semestre '+((res.dados&&res.dados.proximo&&res.dados.proximo.rotulo)||'')+' criado.');
+      carregarSemestres();
+    });
+  }
+
+  function alterarFaseSemestre(){
+    var p=tr.estado&&tr.estado.proximo; if(!p)return;
+    var sel=el('tr-fase-sem'), nova=sel.value;
+    if(nova===p.fase)return;
+    sel.disabled=true;
+    postApi('ciclo.alterarFaseSemestre',{semestre_id:p.id,fase:nova}).then(function(res){
+      sel.disabled=false;
+      if(!res.sucesso){ sel.value=p.fase; return erroCiclo(res); }
+      carregarTransicao().then(function(){
+        mostrarAlertaCampo('cfg-alerta-tr','Fase do semestre: '+NOMES_FASE_SEM[nova]+'.','sucesso');
+        if(typeof window.atualizarCiclo==='function')window.atualizarCiclo();
+      });
+      carregarSemestres();
+    });
+  }
+
+  function alternarTransicao(){
+    var p=tr.estado&&tr.estado.proximo; if(!p)return;
+    var chk=el('tr-ativa'), ligar=chk.checked;
+    var msg=ligar
+      ? 'Ativar a transição?\n\nO item "Transição de semestre" aparece no menu de admin e coordenação, e as datas do ciclo aparecem no Início para todos.'
+      : 'Desativar a transição?\n\nO item do menu e o quadro de datas do Início somem. Nada é apagado.';
+    if(!confirm(msg)){ chk.checked=!ligar; return; }
+    chk.disabled=true;
+    postApi('ciclo.salvarConfig',{semestre_id:p.id,transicao_ativa:ligar}).then(function(res){
+      chk.disabled=false;
+      if(!res.sucesso){ chk.checked=!ligar; return erroCiclo(res); }
+      carregarTransicao().then(function(){
+        mostrarAlertaCampo('cfg-alerta-tr',ligar?'Transição ativada.':'Transição desativada.','sucesso');
+        if(typeof window.atualizarCiclo==='function')window.atualizarCiclo();
+      });
+    });
+  }
+
+  function salvarFases(){
+    var p=tr.estado&&tr.estado.proximo; if(!p)return;
+    var lista=lerFases();
+    // Conferência rápida na tela (o banco confere de novo).
+    for(var i=0;i<lista.length;i++){
+      var f=lista[i];
+      if(f.inicio&&f.fim&&f.fim<f.inicio){
+        var nome=((tr.estado.fases||[]).filter(function(x){return x.tipo===f.tipo;})[0]||{}).nome||f.tipo;
+        return erroCiclo({mensagem:'"'+nome+'": o fim está antes do início.'});
+      }
+    }
+    var envio=lista.map(function(f){ return {tipo:f.tipo,inicio:localBRParaIso(f.inicio),fim:localBRParaIso(f.fim),observacao:f.observacao}; });
+    botaoCarregando('tr-btn-salvar-fases',true);
+    postApi('ciclo.salvarFases',{semestre_id:p.id,fases:envio}).then(function(res){
+      botaoCarregando('tr-btn-salvar-fases',false);
+      if(!res.sucesso)return erroCiclo(res);
+      aposMudancaCiclo(res.dados,'Datas do ciclo salvas.');
+    });
+  }
+
+  function desfazerFases(){
+    if(fasesAlteradas()&&!confirm('Descartar as datas alteradas e ainda não salvas?'))return;
+    renderFases();
+  }
+
+  function salvarOpcoes(){
+    var p=tr.estado&&tr.estado.proximo; if(!p)return;
+    var dados={semestre_id:p.id};
+    OPCOES_BOOL.forEach(function(k){ dados[k]=!!(el('tr-op-'+k)&&el('tr-op-'+k).checked); });
+    var cota=parseInt(val('tr-op-cota_prioritaria_pct'),10);
+    var lim=parseInt(val('tr-op-limite_lembrete_documentos'),10);
+    if(isNaN(cota)||cota<0||cota>100)return erroCiclo({mensagem:'O teto da cota prioritária deve ser um número de 0 a 100.'});
+    if(isNaN(lim)||lim<1)return erroCiclo({mensagem:'O lembrete de documentos deve ser um número a partir de 1.'});
+    dados.cota_prioritaria_pct=cota;
+    dados.limite_lembrete_documentos=lim;
+    botaoCarregando('tr-btn-salvar-opcoes',true);
+    postApi('ciclo.salvarConfig',dados).then(function(res){
+      botaoCarregando('tr-btn-salvar-opcoes',false);
+      if(!res.sucesso)return erroCiclo(res);
+      carregarTransicao().then(function(){
+        mostrarAlertaCampo('cfg-alerta-tr','Opções do ciclo salvas.','sucesso');
+        if(typeof window.atualizarCiclo==='function')window.atualizarCiclo();
+      });
+    });
+  }
+
   function registrarEventos(){
+    // Transição de semestre
+    el('tr-ativa')&&el('tr-ativa').addEventListener('change',alternarTransicao);
+    el('tr-btn-salvar-fases')&&el('tr-btn-salvar-fases').addEventListener('click',salvarFases);
+    el('tr-btn-desfazer-fases')&&el('tr-btn-desfazer-fases').addEventListener('click',desfazerFases);
+    el('tr-btn-salvar-opcoes')&&el('tr-btn-salvar-opcoes').addEventListener('click',salvarOpcoes);
     el('btn-salvar-dados')&&el('btn-salvar-dados').addEventListener('click',salvarConfig);
     el('btn-novo-sem')&&el('btn-novo-sem').addEventListener('click',abrirFormNovoSemestre);
     el('btn-cancelar-novo-sem')&&el('btn-cancelar-novo-sem').addEventListener('click',fecharFormNovoSemestre);
