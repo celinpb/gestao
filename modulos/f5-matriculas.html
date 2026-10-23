@@ -332,7 +332,7 @@
 <script>
 (function(){
   'use strict';
-  var state={matriculas:[],turmas:[],busca:'',filtroTurma:'',filtroSit:'ATIVA',papel:'',podeEditar:false,matriculaParaSit:null,matriculaParaTrans:null,turmaTransSelecionada:null,novaAlunoSel:null,novaMatriculaPendente:null};
+  var state={todas:[],matriculas:[],turmas:[],busca:'',filtroTurma:'',filtroSit:'ATIVA',papel:'',podeEditar:false,matriculaParaSit:null,matriculaParaTrans:null,turmaTransSelecionada:null,novaAlunoSel:null,novaMatriculaPendente:null};
   function postApi(a,d){return window.postApi(a,d);}
   function el(id){return document.getElementById(id);}
   function val(id){return el(id)?el(id).value.trim():'';}
@@ -372,6 +372,9 @@
     if(u){state.papel=u.papel||u.Papel||'';state.podeEditar=['admin','coordenacao','secretaria'].indexOf(state.papel)!==-1;}
     // Botão "Nova matrícula" (como no legado): visível para admin, coordenação e secretaria.
     if(state.podeEditar&&el('btn-m5-nova-matricula'))el('btn-m5-nova-matricula').style.display='inline-flex';
+    // Filtro inicial "Ativas": deixa o select e o card correspondentes marcados.
+    if(el('m5-filtro-sit'))el('m5-filtro-sit').value=state.filtroSit;
+    document.querySelectorAll('.m5-resumo-item').forEach(function(i){i.classList.toggle('sel',(i.dataset.sit||'')===state.filtroSit);});
     carregarTurmas();
     registrarEventos();
   }
@@ -394,17 +397,23 @@
     if(el('m5-estado')){el('m5-estado').style.display='block';el('m5-estado').innerHTML='<div class="m5-spinner"></div><p>Carregando matrículas…</p>';}
     if(el('m5-tabela'))el('m5-tabela').style.display='none';
     if(el('m5-paginacao'))el('m5-paginacao').style.display='none';
+    // Busca TODAS as situações (só o filtro de turma vai para o banco) e
+    // filtra a situação aqui: assim os contadores dos cards mostram sempre os
+    // totais reais de cada situação, qualquer que seja o filtro escolhido.
+    // (Antes os cards contavam só a lista já filtrada — ex.: "Concluídas"
+    // ficava 0 até escolher o filtro "Concluídas".)
     var filtros={};
     if(state.filtroTurma) filtros.turma_id=state.filtroTurma;
-    if(state.filtroSit)   filtros.situacao=state.filtroSit;
     postApi('matriculas.listar',filtros).then(function(res){
-      state.matriculas=(res.sucesso&&res.dados)?res.dados.map(normM):[];
+      state.todas=(res.sucesso&&res.dados)?res.dados.map(normM):[];
+      aplicarFiltroSit();
       // Atualizar contadores do resumo
-      var todos=state.matriculas.length;
-      var ativas=state.matriculas.filter(function(m){return m.SituacaoMatricula==='ATIVA';}).length;
-      var trancadas=state.matriculas.filter(function(m){return m.SituacaoMatricula==='TRANCADA';}).length;
-      var concluidas=state.matriculas.filter(function(m){return m.SituacaoMatricula==='CONCLUIDA';}).length;
-      var canceladas=state.matriculas.filter(function(m){return m.SituacaoMatricula==='CANCELADA';}).length;
+      var lista=state.todas;
+      var todos=lista.length;
+      var ativas=lista.filter(function(m){return m.SituacaoMatricula==='ATIVA';}).length;
+      var trancadas=lista.filter(function(m){return m.SituacaoMatricula==='TRANCADA';}).length;
+      var concluidas=lista.filter(function(m){return m.SituacaoMatricula==='CONCLUIDA';}).length;
+      var canceladas=lista.filter(function(m){return m.SituacaoMatricula==='CANCELADA';}).length;
       if(el('cnt-todas'))el('cnt-todas').textContent=todos;
       if(el('cnt-ativas'))el('cnt-ativas').textContent=ativas;
       if(el('cnt-trancadas'))el('cnt-trancadas').textContent=trancadas;
@@ -414,6 +423,10 @@
     }).catch(function(){
       if(el('m5-estado')){el('m5-estado').style.display='block';el('m5-estado').innerHTML='<span class="material-icons-round">error_outline</span><p>Erro ao carregar matrículas.</p>';}
     });
+  }
+
+  function aplicarFiltroSit(){
+    state.matriculas=(state.todas||[]).filter(function(m){ return !state.filtroSit||m.SituacaoMatricula===state.filtroSit; });
   }
 
   function filtradas(){
@@ -696,7 +709,11 @@
   function registrarEventos(){
     el('m5-busca')&&el('m5-busca').addEventListener('input',function(){state.busca=this.value.trim();renderizar();});
     el('m5-filtro-turma')&&el('m5-filtro-turma').addEventListener('change',function(){state.filtroTurma=this.value;carregarMatriculas();});
-    el('m5-filtro-sit')&&el('m5-filtro-sit').addEventListener('change',function(){state.filtroSit=this.value;carregarMatriculas();});
+    el('m5-filtro-sit')&&el('m5-filtro-sit').addEventListener('change',function(){
+      state.filtroSit=this.value;
+      document.querySelectorAll('.m5-resumo-item').forEach(function(i){i.classList.toggle('sel',(i.dataset.sit||'')===state.filtroSit);});
+      aplicarFiltroSit(); renderizar();
+    });
     // Botão nova matrícula — ID real: btn-m5-nova-matricula
     el('btn-m5-nova-matricula')&&el('btn-m5-nova-matricula').addEventListener('click',abrirNovaMatricula);
     // Busca de aluno no modal — ID real: m5-nova-aluno-busca
@@ -757,7 +774,7 @@
         this.classList.add('sel');
         state.filtroSit=this.dataset.sit||'';
         if(el('m5-filtro-sit'))el('m5-filtro-sit').value=state.filtroSit;
-        carregarMatriculas();
+        aplicarFiltroSit(); renderizar();
       });
     });
   }
