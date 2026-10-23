@@ -1,5 +1,7 @@
 <!--
   f11-transicao.html — Transição de semestre (etapa 17 — claude/transicao-semestre.md, Fase 2)
+  (23/10) Fase 5: aba Rematrícula (etapa 21). A secretaria entra nesta tela
+  só para a aba Rematrícula (D-08).
   Admin e coordenação, e só enquanto o admin deixar a transição ativada
   (Configurações → Transição). Nesta fase a tela só mostra a situação do
   ciclo; as ferramentas (virada de turmas, rematrícula, nivelamento…) entram
@@ -151,6 +153,11 @@
   .en-comp{display:inline-block;font-size:11.5px;padding:1px 6px;border-radius:4px;background:#F5F4F0;margin:1px 2px 1px 0;white-space:nowrap;}
   .en-comp.RETIDO{background:rgba(212,168,67,0.18);color:#8A6412;}
   .en-comp.PENDENTE{color:var(--c-text-3,#9898B0);}
+  /* Rematrícula (etapa 21) */
+  .en-est.indef{background:rgba(230,57,70,0.10);color:#A32D2D;}
+  .en-est.pend{background:rgba(212,168,67,0.18);color:#8A6412;}
+  #tr11-remat .tt-tabela td .tt-selo{margin:3px 4px 0 0;}
+  #rm-info{margin-bottom:14px;}
   .dp-linha{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;padding-bottom:4px;}
   .dp-min{margin:8px 0;}
   .dp-dia{font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:var(--c-text-3,#9898B0);padding:12px 0 4px;}
@@ -180,7 +187,6 @@
 
   // O que cada fase do roteiro vai trazer para esta tela (claude/transicao-semestre.md, seção 10).
   var FERRAMENTAS = [
-    { icone: 'how_to_reg',       nome: 'Rematrícula',              desc: 'Intenções dos alunos, cruzamento com o resultado final e análise das exceções.' },
     { icone: 'quiz',             nome: 'Nivelamento',              desc: 'Vagas, agendamento, provas e resultado.' },
     { icone: 'person_add',       nome: 'Matrícula de novatos',     desc: 'Solicitações, documentos, classificação e lista de espera.' },
     { icone: 'flag',             nome: 'Virada do semestre',       desc: 'O próximo semestre passa a ser o atual.' },
@@ -273,28 +279,46 @@
             '<div class="tr11-card-c">' + ferr + '<div class="tr11-nota">Entram nesta tela à medida que cada etapa for liberada.</div></div></div>' +
         '</div>' +
       '</div>';
+    // Secretaria (D-08): só a aba Rematrícula.
+    if (soSecretaria()) {
+      el('tr11-raiz').innerHTML = visao +
+        '<div class="tr11-abas" id="tr11-abas">' +
+          '<button class="tr11-aba" data-aba="remat"><span class="material-icons-round">how_to_reg</span>Rematrícula ' + esc(p.rotulo) + '</button>' +
+        '</div>' +
+        '<div class="tr11-painel" data-painel="remat" id="tr11-remat"></div>';
+      iniciarAbas();
+      return;
+    }
     el('tr11-raiz').innerHTML = visao +
       '<div class="tr11-abas" id="tr11-abas">' +
         '<button class="tr11-aba" data-aba="visao"><span class="material-icons-round">dashboard</span>Visão geral</button>' +
         '<button class="tr11-aba" data-aba="turmas"><span class="material-icons-round">groups</span>Turmas do ' + esc(p.rotulo) + '</button>' +
         '<button class="tr11-aba" data-aba="disp"><span class="material-icons-round">event_available</span>Disponibilidade</button>' +
         '<button class="tr11-aba" data-aba="enc"><span class="material-icons-round">verified</span>Encerramento do ' + esc(atual) + '</button>' +
+        '<button class="tr11-aba" data-aba="remat"><span class="material-icons-round">how_to_reg</span>Rematrícula ' + esc(p.rotulo) + '</button>' +
       '</div>' +
       '<div class="tr11-painel" data-painel="visao">' + grade + '</div>' +
       '<div class="tr11-painel" data-painel="turmas" id="tr11-turmas"></div>' +
       '<div class="tr11-painel" data-painel="disp" id="tr11-disp"></div>' +
-      '<div class="tr11-painel" data-painel="enc" id="tr11-enc"></div>';
+      '<div class="tr11-painel" data-painel="enc" id="tr11-enc"></div>' +
+      '<div class="tr11-painel" data-painel="remat" id="tr11-remat"></div>';
     iniciarAbas();
     Turmas.iniciar(c);
     Disp.iniciar(c);
+  }
+  function soSecretaria() {
+    var u = (typeof App !== 'undefined') ? App.usuario : null;
+    return !!u && (u.papel || u.Papel || '') === 'secretaria';
   }
 
   // ── Abas (a última aberta fica guardada até fechar o navegador) ──────────
   var CHAVE_ABA = 'sge.transicao.aba';
   function mostrarAba(nome) {
-    if (['visao', 'turmas', 'disp', 'enc'].indexOf(nome) === -1) nome = 'visao';
+    if (soSecretaria()) nome = 'remat';
+    if (['visao', 'turmas', 'disp', 'enc', 'remat'].indexOf(nome) === -1) nome = 'visao';
     if (nome === 'disp' && typeof Disp !== 'undefined') Disp.atualizar();
     if (nome === 'enc' && typeof Enc !== 'undefined') Enc.atualizar();
+    if (nome === 'remat' && typeof Remat !== 'undefined') Remat.atualizar();
     document.querySelectorAll('#tr11-abas .tr11-aba').forEach(function(b) { b.classList.toggle('ativa', b.dataset.aba === nome); });
     document.querySelectorAll('#tr11-raiz .tr11-painel').forEach(function(p) { p.classList.toggle('ativo', p.dataset.painel === nome); });
     try { sessionStorage.setItem(CHAVE_ABA, nome); } catch (e) {}
@@ -1425,11 +1449,375 @@
     return { atualizar: atualizar };
   }());
 
+  // ===========================================================================
+  // REMATRÍCULA (etapa 21 — Fase 5: D-04, D-08 a D-11, D-36, D-65 a D-69)
+  // Painel das solicitações, cruzamento (admin/coordenação), exceções
+  // (secretaria, coordenação e admin) e planilha do resultado.
+  // ===========================================================================
+  var Remat = (function() {
+    var R = { carregado: false, dados: null, cursos: [], idiomas: [], ver: 'solic', filtroSit: '', filtroIdioma: '', busca: '',
+              acao: null, registro: null };
+    var NOME_ST = { enviada: 'Enviada', aguardando_conclusao: 'Aguardando conclusão', deferida: 'Deferida',
+                    lista_espera: 'Lista de espera', indeferida: 'Indeferida', pendente: 'Pendente' };
+    var COR_ST = { enviada: 'aberta', aguardando_conclusao: 'aberta', deferida: 'concluida', lista_espera: 'entregue',
+                   indeferida: 'indef', pendente: 'pend' };
+    var NOME_RES = { APROVADO: 'Aprovado', RETIDO: 'Retido', RETIDO_FALTAS: 'Retido por faltas' };
+    var NOME_SIT = { ATIVA: 'Ativa', CONCLUIDA: 'Concluída', TRANCADA: 'Trancada' };
+    function api(a, d) { return window.postApi(a, d); }
+    function aviso(msg, tipo) { if (typeof toast === 'function') toast(msg, tipo || 'success'); }
+    function papel() { var u = (typeof App !== 'undefined') ? App.usuario : null; return u ? (u.papel || u.Papel || '') : ''; }
+    function coord() { return papel() === 'admin' || papel() === 'coordenacao'; }
+    function fmtD(iso) {
+      if (!iso) return '';
+      var d = new Date(iso); if (isNaN(d)) return '';
+      return d.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit' }) + ' ' +
+             d.toLocaleTimeString('pt-BR', { timeZone: 'America/Fortaleza', hour: '2-digit', minute: '2-digit' });
+    }
+    function turmaTxt(t) { return t ? [t.dia_semana, t.horario, t.modalidade].filter(Boolean).join(' · ') : ''; }
+    function stTxt(s) { return s.status === 'lista_espera' && s.posicao ? 'Lista de espera (' + s.posicao + 'º)' : (NOME_ST[s.status] || s.status); }
+
+    function atualizar() {
+      var box = el('tr11-remat'); if (!box) return;
+      if (!R.carregado) box.innerHTML = '<div class="tr11-estado"><div class="spinner" style="margin:0 auto 10px;"></div><p>Carregando a rematrícula…</p></div>';
+      return Promise.all([api('remat.painel', {}), R.cursos.length ? null : api('cursos.listar', {})]).then(function(r) {
+        if (!r[0].sucesso) { box.innerHTML = '<div class="tt-vazio">' + esc(r[0].mensagem) + '<br>Confira se o arquivo <strong>etapa21-transicao-rematricula.sql</strong> já foi rodado.</div>'; R.carregado = false; return; }
+        if (r[1] && r[1].sucesso) {
+          R.cursos = r[1].dados || [];
+          var mapa = {};
+          R.cursos.forEach(function(c) { if (c.idiomas && c.idiomas.id) mapa[c.idiomas.id] = c.idiomas.nome; });
+          R.idiomas = Object.keys(mapa).map(function(id) { return { id: id, nome: mapa[id] }; }).sort(function(a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
+        }
+        R.dados = r[0].dados || {};
+        if (!R.carregado) { montar(); R.carregado = true; }
+        renderResumo(); renderLista();
+      });
+    }
+
+    function montar() {
+      el('tr11-remat').innerHTML =
+        '<div class="tt-resumo" id="rm-resumo"></div>' +
+        '<p class="tt-aviso" id="rm-info"></p>' +
+        '<div class="tt-barra">' +
+          '<select class="tt-select" id="rm-ver"><option value="solic">Solicitações</option><option value="turmas">Por turma</option><option value="sem">Sem solicitação</option></select>' +
+          '<select class="tt-select" id="rm-f-sit"><option value="">Todas as situações</option><option value="excecoes">Exceções (pendentes e indeferidas)</option>' +
+            Object.keys(NOME_ST).map(function(k) { return '<option value="' + k + '">' + NOME_ST[k] + '</option>'; }).join('') +
+            '<option value="retardatario">Retardatários</option></select>' +
+          '<select class="tt-select" id="rm-f-idioma"><option value="">Todos os idiomas</option>' +
+            R.idiomas.map(function(i) { return '<option value="' + esc(i.id) + '">' + esc(i.nome) + '</option>'; }).join('') + '</select>' +
+          '<input type="search" class="tt-input tt-busca" id="rm-f-busca" placeholder="Buscar aluno, código, protocolo ou turma…">' +
+          '<span class="tt-espaco"></span>' +
+          '<button class="tt-btn" id="rm-atualizar"><span class="material-icons-round">refresh</span>Atualizar</button>' +
+          '<button class="tt-btn" id="rm-registrar"><span class="material-icons-round">person_search</span>Registrar pelo aluno</button>' +
+          '<button class="tt-btn" id="rm-xlsx"><span class="material-icons-round">download</span>Baixar planilha (.xlsx)</button>' +
+          (coord() ? '<button class="tt-btn prim" id="rm-cruzar"><span class="material-icons-round">merge_type</span>Rodar cruzamento</button>' : '') +
+        '</div>' +
+        '<div class="tt-card"><div class="tt-tabela-wrap"><table class="tt-tabela"><thead id="rm-cab"></thead><tbody id="rm-corpo"></tbody></table></div></div>' +
+        // motivo (deferir/indeferir)
+        '<div class="tt-overlay" id="rm-m-motivo"><div class="tt-modal">' +
+          '<div class="tt-modal-h"><span id="rm-mo-titulo">Indeferir</span><button class="tt-ico" data-rfechar="rm-m-motivo"><span class="material-icons-round">close</span></button></div>' +
+          '<div class="tt-modal-c"><div class="tt-alerta" id="rm-mo-alerta"></div><p class="tt-aviso" id="rm-mo-info"></p>' +
+            '<div class="tt-campo"><label for="rm-mo-texto" id="rm-mo-rot">Motivo</label><input class="tt-input" id="rm-mo-texto" maxlength="300"></div></div>' +
+          '<div class="tt-modal-f"><button class="tt-btn" data-rfechar="rm-m-motivo">Cancelar</button><button class="tt-btn prim" id="rm-mo-ok">Confirmar</button></div>' +
+        '</div></div>' +
+        // registrar pelo aluno
+        '<div class="tt-overlay" id="rm-m-reg"><div class="tt-modal largo">' +
+          '<div class="tt-modal-h"><span>Registrar rematrícula pelo aluno</span><button class="tt-ico" data-rfechar="rm-m-reg"><span class="material-icons-round">close</span></button></div>' +
+          '<div class="tt-modal-c"><div class="tt-alerta" id="rm-r-alerta"></div>' +
+            '<p class="tt-aviso">Para quem procurou a secretaria. Valem as mesmas regras do portal: só as turmas do estágio de destino e, com a trava ligada, da mesma modalidade. Fora do período, a solicitação entra como rematrícula.</p>' +
+            '<div class="tt-barra"><input class="tt-input" id="rm-r-cod" inputmode="numeric" maxlength="11" placeholder="Código do aluno (9 números)">' +
+            '<button class="tt-btn" id="rm-r-buscar"><span class="material-icons-round">search</span>Buscar</button></div>' +
+            '<div id="rm-r-corpo"></div></div>' +
+          '<div class="tt-modal-f"><button class="tt-btn" data-rfechar="rm-m-reg">Fechar</button></div>' +
+        '</div></div>';
+      document.querySelectorAll('#tr11-remat [data-rfechar]').forEach(function(b) { b.addEventListener('click', function() { el(b.dataset.rfechar).classList.remove('show'); }); });
+      el('rm-ver').addEventListener('change', function() { R.ver = this.value; el('rm-f-sit').style.display = R.ver === 'solic' ? '' : 'none'; renderLista(); });
+      el('rm-f-sit').addEventListener('change', function() { R.filtroSit = this.value; renderLista(); });
+      el('rm-f-idioma').addEventListener('change', function() { R.filtroIdioma = this.value; renderLista(); });
+      el('rm-f-busca').addEventListener('input', function() { R.busca = this.value.trim().toLowerCase(); renderLista(); });
+      el('rm-atualizar').addEventListener('click', atualizar);
+      el('rm-registrar').addEventListener('click', abrirRegistro);
+      el('rm-xlsx').addEventListener('click', baixarPlanilha);
+      if (el('rm-cruzar')) el('rm-cruzar').addEventListener('click', cruzar);
+      el('rm-mo-ok').addEventListener('click', confirmarMotivo);
+      el('rm-r-buscar').addEventListener('click', buscarAluno);
+      el('rm-r-cod').addEventListener('keydown', function(e) { if (e.key === 'Enter') buscarAluno(); });
+      el('rm-corpo').addEventListener('click', function(e) {
+        var b = e.target.closest('[data-racao]'); if (!b) return;
+        var s = (R.dados.solicitacoes || []).filter(function(x) { return x.id === b.dataset.id; })[0]; if (!s) return;
+        if (b.dataset.racao === 'deferir') abrirMotivo('deferir', s);
+        else if (b.dataset.racao === 'indeferir') abrirMotivo('indeferir', s);
+        else if (b.dataset.racao === 'reavaliar') reavaliar(s);
+      });
+    }
+
+    function contar(f) { return (R.dados.solicitacoes || []).filter(f).length; }
+    function renderResumo() {
+      var d = R.dados, sol = d.solicitacoes || [];
+      function item(n, rot, cls) { return '<div class="tt-resumo-item' + (cls ? ' ' + cls : '') + '"><b>' + n + '</b>' + rot + '</div>'; }
+      el('rm-resumo').innerHTML =
+        item(sol.length, 'solicitações') +
+        item(contar(function(s) { return s.status === 'deferida'; }), 'deferidas') +
+        item(contar(function(s) { return s.status === 'lista_espera'; }), 'na lista de espera') +
+        item(contar(function(s) { return s.status === 'enviada' || s.status === 'aguardando_conclusao'; }), 'aguardando análise') +
+        item(contar(function(s) { return s.status === 'pendente'; }), 'pendentes', contar(function(s) { return s.status === 'pendente'; }) ? 'alerta' : '') +
+        item(contar(function(s) { return s.status === 'indeferida'; }), 'indeferidas') +
+        item(contar(function(s) { return s.tipo === 'retardatario'; }), 'retardatários') +
+        item((d.sem_solicitacao || []).length, 'matrículas sem solicitação');
+      var p = d.periodo || {}, cfg = d.config || {}, cz = d.cruzamento || {};
+      var rem = p.rematricula || {};
+      el('rm-info').innerHTML =
+        'Período: ' + (rem.inicio ? fmtD(rem.inicio) + ' a ' + fmtD(rem.fim) : '<em>sem data</em>') +
+        (p.aberto ? ' <span class="en-est concluida">' + (p.tipo === 'retardatario' ? 'Retardatários' : 'Aberta') + '</span>' : ' <span class="en-est aberta">Fechada</span>') +
+        ' · Último cruzamento: ' + (cz.em ? fmtD(cz.em) + (cz.por ? ' por ' + esc(cz.por) : '') : '<em>nenhum</em>') +
+        ' · Trava de modalidade: <b>' + (cfg.manter_modalidade ? 'ligada' : 'desligada') + '</b>' +
+        ' · Decreto 46.371: <b>' + (cfg.aplicar_decreto_46371 ? 'ligado' : 'desligado') + '</b>' +
+        (d.canceladas ? ' · ' + d.canceladas + ' cancelada(s) pelos alunos' : '');
+    }
+
+    function passaFiltroIdioma(idiomaId) { return !R.filtroIdioma || idiomaId === R.filtroIdioma; }
+    function renderLista() {
+      var cab = el('rm-cab'), corpo = el('rm-corpo'), q = R.busca;
+      if (R.ver === 'turmas') {
+        cab.innerHTML = '<tr><th>Turma</th><th>Dia e horário</th><th>Vagas</th><th>Ocupadas</th><th>Deferidas</th><th>Lista de espera</th><th>Aguardando</th></tr>';
+        var ts = (R.dados.turmas || []).filter(function(t) {
+          return passaFiltroIdioma(t.idioma_id) && (!q || (t.codigo || '').toLowerCase().indexOf(q) !== -1);
+        });
+        corpo.innerHTML = ts.length ? ts.map(function(t) {
+          var cheia = t.vagas != null && t.ocupadas >= t.vagas;
+          return '<tr><td class="tt-cod">' + esc(t.codigo) + '</td><td>' + esc(turmaTxt(t)) + '<span class="tt-sub">' + esc(t.turno || '') + '</span></td>' +
+            '<td>' + (t.vagas == null ? '—' : t.vagas) + '</td><td class="' + (cheia ? 'en-falta' : '') + '">' + t.ocupadas + '</td>' +
+            '<td>' + t.deferidas + '</td><td>' + (t.espera || '') + '</td><td>' + (t.enviadas || '') + '</td></tr>';
+        }).join('') : '<tr><td colspan="7" class="tt-vazio">Nenhuma turma.</td></tr>';
+        return;
+      }
+      if (R.ver === 'sem') {
+        cab.innerHTML = '<tr><th>Aluno</th><th>Turma atual</th><th>Situação</th><th>Resultado</th><th>Destino</th></tr>';
+        var ss = (R.dados.sem_solicitacao || []).filter(function(m) {
+          return passaFiltroIdioma(m.idioma_id) && (!q || [m.nome, m.codigo, m.turma].join(' ').toLowerCase().indexOf(q) !== -1);
+        });
+        corpo.innerHTML = ss.length ? ss.slice(0, 500).map(function(m) {
+          return '<tr><td>' + esc(m.nome) + '<span class="tt-sub">' + esc(m.codigo) + '</span></td><td class="tt-cod">' + esc(m.turma) + '</td>' +
+            '<td>' + esc(NOME_SIT[m.situacao] || m.situacao) + '</td><td>' + (m.resultado ? '<span class="en-res ' + m.resultado + '">' + esc(NOME_RES[m.resultado] || m.resultado) + '</span>' : '') + '</td>' +
+            '<td>' + esc(m.destino || (m.situacao === 'TRANCADA' ? m.sigla : '')) + '</td></tr>';
+        }).join('') + (ss.length > 500 ? '<tr><td colspan="5" class="tt-vazio">Mostrando 500 de ' + ss.length + '. Use a busca ou baixe a planilha.</td></tr>' : '')
+          : '<tr><td colspan="5" class="tt-vazio">Todas as matrículas têm solicitação.</td></tr>';
+        return;
+      }
+      cab.innerHTML = '<tr><th>Protocolo</th><th>Aluno</th><th>Origem</th><th>Turma escolhida</th><th>Grupo</th><th>Situação</th><th></th></tr>';
+      var lista = (R.dados.solicitacoes || []).filter(function(s) {
+        if (!passaFiltroIdioma(s.origem && s.origem.idioma_id)) return false;
+        if (R.filtroSit === 'excecoes' && ['pendente', 'indeferida'].indexOf(s.status) === -1) return false;
+        if (R.filtroSit === 'retardatario' && s.tipo !== 'retardatario') return false;
+        if (R.filtroSit && ['excecoes', 'retardatario'].indexOf(R.filtroSit) === -1 && s.status !== R.filtroSit) return false;
+        if (q && [s.protocolo, s.aluno.nome, s.aluno.codigo, s.origem.turma, s.turma && s.turma.codigo].join(' ').toLowerCase().indexOf(q) === -1) return false;
+        return true;
+      });
+      corpo.innerHTML = lista.length ? lista.map(linhaSolic).join('') : '<tr><td colspan="7" class="tt-vazio">Nenhuma solicitação com estes filtros.</td></tr>';
+    }
+
+    function linhaSolic(s) {
+      var o = s.origem || {}, acoes = [];
+      var podeDeferir = s.tipo === 'rematricula' && s.status !== 'deferida' && (o.situacao === 'CONCLUIDA' || o.situacao === 'TRANCADA');
+      if (podeDeferir) acoes.push('<button class="tt-ico" title="Deferir" data-racao="deferir" data-id="' + s.id + '"><span class="material-icons-round">check</span></button>');
+      if (s.status !== 'indeferida' && (s.status !== 'deferida' || coord())) acoes.push('<button class="tt-ico perigo" title="Indeferir" data-racao="indeferir" data-id="' + s.id + '"><span class="material-icons-round">block</span></button>');
+      if (coord() && (s.analisado_por || s.status === 'deferida')) acoes.push('<button class="tt-ico" title="Devolver para a análise automática" data-racao="reavaliar" data-id="' + s.id + '"><span class="material-icons-round">undo</span></button>');
+      var marcas = [];
+      if (s.tipo === 'retardatario') marcas.push('<span class="tt-selo virada">Retardatário</span>');
+      if (s.canal === 'secretaria') marcas.push('<span class="tt-selo nova" title="Registrada por ' + esc(s.registrado_por || '') + '">Secretaria</span>');
+      if (s.modalidade_liberada) marcas.push('<span class="tt-selo virada">Modalidade liberada</span>');
+      return '<tr>' +
+        '<td class="tt-cod">' + esc(s.protocolo) + '<span class="tt-sub">' + fmtD(s.enviada_em) + '</span>' + marcas.join(' ') + '</td>' +
+        '<td>' + esc(s.aluno.nome) + '<span class="tt-sub">' + esc(s.aluno.codigo) + '</span></td>' +
+        '<td><span class="tt-cod">' + esc(o.turma || '') + '</span><span class="tt-sub">' + esc(NOME_SIT[o.situacao] || o.situacao || '') +
+          (o.resultado ? ' · ' + esc(NOME_RES[o.resultado] || o.resultado) : '') + (o.situacao === 'ATIVA' ? ' · turma não concluída' : '') + '</span></td>' +
+        '<td><span class="tt-cod">' + esc((s.turma && s.turma.codigo) || '—') + '</span><span class="tt-sub">' + esc(turmaTxt(s.turma)) + '</span></td>' +
+        '<td>' + (s.grupo === 'prioritario' ? 'Prioritário' : s.grupo === 'sem_cota' ? '—' : 'Geral') + '</td>' +
+        '<td><span class="en-est ' + (COR_ST[s.status] || 'aberta') + '">' + esc(stTxt(s)) + '</span>' +
+          (s.motivo ? '<span class="tt-sub">' + esc(s.motivo) + '</span>' : '') +
+          (s.analisado_por ? '<span class="tt-sub">por ' + esc(s.analisado_por) + ' em ' + fmtD(s.analisado_em) + '</span>' : '') + '</td>' +
+        '<td><div class="tt-acoes">' + acoes.join('') + '</div></td></tr>';
+    }
+
+    // ── Cruzamento ──────────────────────────────────────────────────────────
+    function cruzar() {
+      if (!confirm('Rodar o cruzamento da rematrícula agora?\n\n• Quem ainda não tem a turma concluída fica "aguardando conclusão".\n• Quem está certo é deferido pela ordem (prioritário, geral, envio) até acabarem as vagas; o restante vai para a lista de espera.\n• Deferimentos já feitos e decisões manuais não mudam.\n\nPode ser rodado de novo à medida que as turmas forem concluídas.')) return;
+      var btn = el('rm-cruzar'); btn.disabled = true;
+      api('remat.cruzar', {}).then(function(res) {
+        btn.disabled = false;
+        if (!res.sucesso) { aviso(res.mensagem, 'error'); return; }
+        var c = res.dados || {};
+        aviso('Cruzamento concluído: ' + (c.deferida || 0) + ' deferida(s), ' + (c.lista_espera || 0) + ' na lista de espera, ' +
+              (c.aguardando_conclusao || 0) + ' aguardando conclusão, ' + (c.pendente || 0) + ' pendente(s), ' + (c.indeferida || 0) + ' indeferida(s).');
+        atualizar();
+      });
+    }
+
+    // ── Deferir / indeferir / reavaliar ─────────────────────────────────────
+    function abrirMotivo(tipo, s) {
+      R.acao = { tipo: tipo, s: s };
+      el('rm-mo-titulo').textContent = (tipo === 'deferir' ? 'Deferir ' : 'Indeferir ') + s.protocolo;
+      el('rm-mo-info').innerHTML = esc(s.aluno.nome) + ' · ' + esc(s.origem.turma) + ' → <b>' + esc((s.turma && s.turma.codigo) || '') + '</b>' +
+        (tipo === 'indeferir' && s.status === 'deferida' ? '<br>A matrícula criada no próximo semestre será desfeita.' : '');
+      el('rm-mo-rot').textContent = tipo === 'deferir' ? 'Observação (opcional)' : 'Motivo (aparece para o aluno depois da divulgação)';
+      el('rm-mo-texto').value = '';
+      el('rm-mo-alerta').className = 'tt-alerta';
+      el('rm-mo-ok').textContent = tipo === 'deferir' ? 'Deferir' : 'Indeferir';
+      el('rm-m-motivo').classList.add('show');
+      el('rm-mo-texto').focus();
+    }
+    function confirmarMotivo(forcar) {
+      var a = R.acao; if (!a) return;
+      var motivo = el('rm-mo-texto').value.trim();
+      if (a.tipo === 'indeferir' && !motivo) { var al = el('rm-mo-alerta'); al.textContent = 'Informe o motivo.'; al.className = 'tt-alerta show'; return; }
+      api(a.tipo === 'deferir' ? 'remat.deferir' : 'remat.indeferir', { id: a.s.id, motivo: motivo, forcar: forcar === true }).then(function(res) {
+        if (!res.sucesso && res.dados && res.dados.confirmacaoNecessaria) {
+          if (confirm(res.mensagem)) confirmarMotivo(true);
+          return;
+        }
+        if (!res.sucesso) { var al2 = el('rm-mo-alerta'); al2.textContent = res.mensagem; al2.className = 'tt-alerta show'; return; }
+        el('rm-m-motivo').classList.remove('show');
+        aviso(res.mensagem || 'Pronto.');
+        atualizar();
+      });
+    }
+    function reavaliar(s) {
+      if (!confirm('Devolver ' + s.protocolo + ' para a análise automática?' + (s.status === 'deferida' ? '\n\nA matrícula criada no próximo semestre será desfeita.' : '') + '\n\nO próximo cruzamento avalia de novo.')) return;
+      api('remat.reavaliar', { id: s.id }).then(function(res) {
+        if (!res.sucesso) { aviso(res.mensagem, 'error'); return; }
+        aviso(res.mensagem); atualizar();
+      });
+    }
+
+    // ── Registrar pelo aluno (secretaria) + exceção de modalidade ───────────
+    function abrirRegistro() {
+      el('rm-r-cod').value = ''; el('rm-r-corpo').innerHTML = ''; el('rm-r-alerta').className = 'tt-alerta';
+      el('rm-m-reg').classList.add('show'); el('rm-r-cod').focus();
+    }
+    function alertaReg(msg, ok) { var a = el('rm-r-alerta'); a.textContent = msg; a.className = 'tt-alerta show' + (ok ? ' ok' : ''); }
+    function buscarAluno() {
+      var cod = el('rm-r-cod').value.replace(/\D/g, '');
+      if (cod.length !== 9) { alertaReg('Digite o código do aluno (9 números).'); return; }
+      el('rm-r-alerta').className = 'tt-alerta';
+      el('rm-r-corpo').innerHTML = '<div class="tt-vazio">Buscando…</div>';
+      api('remat.aluno', { codigo: cod }).then(function(res) {
+        if (!res.sucesso) { el('rm-r-corpo').innerHTML = ''; alertaReg(res.mensagem); return; }
+        R.registro = res.dados; renderRegistro();
+      });
+    }
+    function renderRegistro() {
+      var d = R.registro, sit = d.situacao || {}, orig = sit.origens || [];
+      var html = '<p class="tt-aviso"><b>' + esc(d.aluno.nome) + '</b> · ' + esc(d.aluno.codigo) + '</p>';
+      if (!orig.length) html += '<div class="tt-vazio">Sem matrícula no semestre atual com direito a rematrícula.</div>';
+      orig.forEach(function(o, i) {
+        var dst = o.destino || {}, s = o.solicitacao, tu = o.turma || {};
+        html += '<div class="tr11-card" style="margin-bottom:12px;"><div class="tr11-card-c" style="padding-top:12px;">' +
+          '<p><b class="tt-cod">' + esc(tu.codigo) + '</b> · ' + esc(tu.estagio || tu.sigla || '') + ' · ' + esc(NOME_SIT[o.situacao] || o.situacao) +
+            (dst.resultado ? ' · <span class="en-res ' + dst.resultado + '">' + esc(NOME_RES[dst.resultado] || dst.resultado) + '</span>' : '') +
+            ' · ' + esc(tu.modalidade || '') + '</p>' +
+          '<p class="tt-aviso">' + (dst.estado === 'liberada' ? 'Destino: <b>' + esc(dst.curso ? dst.curso.sigla + ' — ' + dst.curso.nome : '') + '</b>' + (dst.provisorio ? ' (provisório: turma não concluída)' : '') : esc(dst.mensagem || 'Sem rematrícula.')) + '</p>' +
+          (s ? '<p class="tt-aviso">Solicitação atual: <b>' + esc(s.protocolo) + '</b> · ' + esc((s.turma && s.turma.codigo) || '') + ' · ' + esc(NOME_ST[s.status] || s.status) + (s.motivo ? ' — ' + esc(s.motivo) : '') + '</p>' : '');
+        if (sit.trava_modalidade && coord() && dst.estado === 'liberada') {
+          html += '<label class="tt-chk" style="margin:4px 0 10px;"><input type="checkbox" data-rlib="' + i + '"' + (o.modalidade_liberada ? ' checked' : '') + '> Liberar outra modalidade para este aluno (exceção da coordenação)</label>';
+        }
+        if (o.pode_escolher) {
+          html += (o.opcoes || []).length
+            ? '<div class="tt-barra"><select class="tt-select" data-rsel="' + i + '" style="min-width:320px;">' +
+                o.opcoes.map(function(op) { return '<option value="' + op.id + '"' + (s && s.turma && s.turma.id === op.id ? ' selected' : '') + '>' + esc(op.codigo + ' · ' + turmaTxt(op) + (op.lotada ? ' · LOTADA' : '')) + '</option>'; }).join('') +
+              '</select><button class="tt-btn prim" data-rreg="' + i + '"><span class="material-icons-round">how_to_reg</span>' + (s ? 'Trocar turma' : 'Registrar') + '</button></div>'
+            : '<div class="tt-aviso">Nenhuma turma do destino no próximo semestre' + (sit.trava_modalidade && !o.modalidade_liberada ? ' nesta modalidade' : '') + '.</div>';
+        } else if (s && s.status === 'deferida') {
+          html += '<div class="tt-aviso">Deferida. Para mudar, indefira na lista e registre de novo.</div>';
+        }
+        html += '</div></div>';
+      });
+      el('rm-r-corpo').innerHTML = html;
+      el('rm-r-corpo').querySelectorAll('[data-rreg]').forEach(function(b) {
+        b.addEventListener('click', function() {
+          var o = orig[Number(b.dataset.rreg)], turma = el('rm-r-corpo').querySelector('[data-rsel="' + b.dataset.rreg + '"]').value;
+          b.disabled = true;
+          api('remat.registrar', { matricula_id: o.matricula_id, turma_id: turma }).then(function(res) {
+            b.disabled = false;
+            if (!res.sucesso) { alertaReg(res.mensagem); return; }
+            R.registro.situacao = res.dados.situacao; renderRegistro();
+            alertaReg('Registrada: protocolo ' + res.dados.protocolo + '.', true);
+            atualizar();
+          });
+        });
+      });
+      el('rm-r-corpo').querySelectorAll('[data-rlib]').forEach(function(c) {
+        c.addEventListener('change', function() {
+          var o = orig[Number(c.dataset.rlib)], motivo = '';
+          if (c.checked) {
+            motivo = prompt('Motivo da exceção de modalidade (fica registrado):', '') || '';
+            if (!motivo.trim()) { c.checked = false; return; }
+          }
+          api('remat.liberarModalidade', { matricula_id: o.matricula_id, liberar: c.checked, motivo: motivo }).then(function(res) {
+            if (!res.sucesso) { alertaReg(res.mensagem); c.checked = !c.checked; return; }
+            R.registro.situacao = res.dados; renderRegistro();
+            alertaReg(c.checked ? 'Modalidade liberada para este aluno.' : 'Exceção retirada.', true);
+          });
+        });
+      });
+    }
+
+    // ── Planilha ────────────────────────────────────────────────────────────
+    function carregarLib() {
+      if (window.XLSX) return Promise.resolve(window.XLSX);
+      if (window.__xlsxCarregando) return window.__xlsxCarregando;
+      window.__xlsxCarregando = new Promise(function(resolve, reject) {
+        var sc = document.createElement('script');
+        sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        sc.onload = function() { resolve(window.XLSX); };
+        sc.onerror = function() { window.__xlsxCarregando = null; reject(new Error('Não foi possível carregar a biblioteca da planilha. Verifique a conexão e tente novamente.')); };
+        document.head.appendChild(sc);
+      });
+      return window.__xlsxCarregando;
+    }
+    function baixarPlanilha() {
+      var btn = el('rm-xlsx'); btn.disabled = true;
+      carregarLib().then(function(XLSX) {
+        var d = R.dados, sol = d.solicitacoes || [];
+        function linha(s) {
+          var o = s.origem || {}, t = s.turma || {};
+          return { 'Protocolo': s.protocolo, 'Tipo': s.tipo === 'retardatario' ? 'Retardatário' : 'Rematrícula', 'Enviada em': fmtD(s.enviada_em),
+                   'Canal': s.canal === 'secretaria' ? 'Secretaria' : 'Portal', 'Código do aluno': s.aluno.codigo, 'Aluno': s.aluno.nome,
+                   'Turma atual': o.turma, 'Situação atual': NOME_SIT[o.situacao] || o.situacao, 'Resultado': NOME_RES[o.resultado] || '',
+                   'Destino': (s.destino && s.destino.sigla) || '', 'Turma escolhida': t.codigo || '', 'Dia': t.dia_semana || '', 'Horário': t.horario || '',
+                   'Turno': t.turno || '', 'Modalidade': t.modalidade || '', 'Grupo': s.grupo === 'prioritario' ? 'Prioritário' : s.grupo === 'sem_cota' ? '' : 'Geral',
+                   'Situação': stTxt(s), 'Posição na espera': s.posicao || '', 'Motivo': s.motivo || '',
+                   'Analisado por': s.analisado_por || '', 'Primeiro semestre na escola': s.primeiro_semestre ? 'Sim' : 'Não' };
+        }
+        var wb = XLSX.utils.book_new();
+        function aba(nome, linhas, vazio) { XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(linhas.length ? linhas : [{ '': vazio }]), nome); }
+        aba('Solicitações', sol.map(linha), 'Nenhuma solicitação.');
+        aba('Por turma', (d.turmas || []).map(function(t) {
+          return { 'Turma': t.codigo, 'Curso': t.sigla, 'Dia': t.dia_semana, 'Horário': t.horario, 'Turno': t.turno, 'Modalidade': t.modalidade,
+                   'Vagas': t.vagas, 'Ocupadas': t.ocupadas, 'Deferidas na rematrícula': t.deferidas, 'Lista de espera': t.espera, 'Aguardando análise': t.enviadas };
+        }), 'Nenhuma turma.');
+        aba('Lista de espera', sol.filter(function(s) { return s.status === 'lista_espera'; })
+          .sort(function(a, b) { return ((a.turma || {}).codigo || '').localeCompare((b.turma || {}).codigo || '') || (a.posicao || 0) - (b.posicao || 0); })
+          .map(linha), 'Ninguém na lista de espera.');
+        aba('Decreto 46.371', sol.filter(function(s) { return s.origem && s.origem.resultado === 'RETIDO_FALTAS'; }).map(linha), 'Ninguém atingido.');
+        aba('Exceções', sol.filter(function(s) { return s.status === 'pendente' || s.status === 'indeferida'; }).map(linha), 'Nenhuma exceção.');
+        aba('Sem solicitação', (d.sem_solicitacao || []).map(function(m) {
+          return { 'Código do aluno': m.codigo, 'Aluno': m.nome, 'Turma atual': m.turma, 'Curso': m.sigla,
+                   'Situação': NOME_SIT[m.situacao] || m.situacao, 'Resultado': NOME_RES[m.resultado] || '', 'Destino': m.destino || '' };
+        }), 'Todas as matrículas têm solicitação.');
+        var sem = (d.periodo && d.periodo.semestre && d.periodo.semestre.codigo) || '';
+        var hoje = new Date().toISOString().slice(0, 10);
+        XLSX.writeFile(wb, 'rematricula-' + sem + '-' + hoje + '.xlsx');
+        btn.disabled = false;
+      }).catch(function(e) { btn.disabled = false; aviso(e.message, 'error'); });
+    }
+
+    return { atualizar: atualizar };
+  }());
+
   function init() {
     var u = (typeof App !== 'undefined') ? App.usuario : null;
     var papel = u ? (u.papel || u.Papel || '') : '';
-    if (papel !== 'admin' && papel !== 'coordenacao') {
-      estadoVazio('lock', 'Esta área é restrita a admin e coordenação.');
+    if (papel !== 'admin' && papel !== 'coordenacao' && papel !== 'secretaria') {
+      estadoVazio('lock', 'Esta área é restrita a admin, coordenação e secretaria.');
       return;
     }
     // Sempre busca de novo: as datas podem ter mudado desde o login.
