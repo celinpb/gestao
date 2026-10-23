@@ -898,8 +898,9 @@
     if(!cont)return;
     cont.innerHTML='<div class="t5-spinner" style="margin:16px auto;"></div>';
     if(el('inf-matriculados'))el('inf-matriculados').textContent='…';
-    postApi('matriculas.listar',{turma_id:S.turmaSel.id,situacao:'ATIVA'}).then(function(res){
-      S.matriculas=(res.sucesso&&res.dados)?res.dados.map(normM):[];
+    // ATIVA e CONCLUIDA (turma concluída pela coordenação no fim do semestre — etapa 20).
+    postApi('matriculas.listar',{turma_id:S.turmaSel.id}).then(function(res){
+      S.matriculas=(res.sucesso&&res.dados)?res.dados.filter(function(m){return m.situacao==='ATIVA'||m.situacao==='CONCLUIDA';}).map(normM):[];
       S.matriculas.sort(function(a,b){return (a.NomeExibicao||'').localeCompare(b.NomeExibicao||'','pt-BR',{sensitivity:'base'});}); // ordem alfabética
       renderizarMatriculas();
       if(el('inf-matriculados'))el('inf-matriculados').textContent=S.matriculas.length;
