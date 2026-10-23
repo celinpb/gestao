@@ -146,7 +146,7 @@
 // =========================================================
 // ESTADO GLOBAL
 // =========================================================
-var App = { usuario: null, semestre: null, modulo: null, config: null };
+var App = { usuario: null, semestre: null, modulo: null, config: null, ciclo: null };
 
 // =========================================================
 // MAPA DE MÓDULOS
@@ -164,6 +164,7 @@ var MODULOS = {
   notas:      'modulos/f7-notas.html',
   relatorios: 'modulos/f8-relatorios.html',
   auditoria:  'modulos/f10-auditoria.html',
+  transicao:  'modulos/f11-transicao.html',
   config:     'modulos/f-config.html',
 };
 
@@ -342,15 +343,21 @@ function carregarShell() {
   Promise.all([
     postApi('config.get', {}),
     postApi('semestres.getAtual', {}),
+    // Transição de semestre (etapa 17). Se a função ainda não existir no
+    // banco, a chamada falha e o sistema segue normal, sem o item no menu.
+    postApi('ciclo.estado', {}).catch(function() { return { sucesso: false }; }),
   ])
     .then(function(resultados) {
       var resConfig = resultados[0];
       var resSem    = resultados[1];
+      var resCiclo  = resultados[2];
       if (resConfig.sucesso) aplicarConfig(resConfig.dados);
       if (resSem.sucesso && resSem.dados) {
         App.semestre = resSem.dados;
         document.getElementById('header-semestre').textContent = resSem.dados.rotulo || '—';
       }
+      App.ciclo = (resCiclo && resCiclo.sucesso) ? resCiclo.dados : null;
+      renderizarMenuFallback();
       navegarPara('dashboard', 'Início');
     })
     .catch(function() {
@@ -412,6 +419,11 @@ function renderizarMenuFallback() {
     // m3_menuPorPapel em M3_Permissoes.gs; 'auditoria' é decisão da etapa 9 —
     // a tabela `auditoria` também só é legível por admin, via RLS).
     // Não mover estes itens para dentro do bloco acima.
+    // Transição de semestre: admin e coordenação, e só enquanto o admin
+    // deixar ativada (Configurações → Transição).
+    if (App.ciclo && App.ciclo.ativo) {
+      itens.push({ id: 'transicao', label: 'Transição de semestre', icone: 'published_with_changes' });
+    }
     if (papel === 'admin') {
       itens.push({ id: 'auditoria', label: 'Auditoria', icone: 'history' });
       itens.push({ id: 'config', label: 'Configurações', icone: 'settings' });
@@ -448,10 +460,24 @@ function renderizarMenu(itens) {
     li.innerHTML =
       '<span class="material-icons-round">' + (item.icone || 'circle') + '</span>' +
       '<span>' + item.label + '</span>';
+    if (App.modulo === item.id) li.classList.add('active');
     li.addEventListener('click', function() { navegarPara(item.id, item.label); });
     nav.appendChild(li);
   });
 }
+
+// Recarrega o estado da transição e redesenha o menu. Chamada pela aba
+// Configurações → Transição depois de criar o semestre, ativar/desativar
+// ou salvar datas. Devolve uma Promise com App.ciclo.
+window.atualizarCiclo = function() {
+  return postApi('ciclo.estado', {})
+    .then(function(res) {
+      App.ciclo = (res && res.sucesso) ? res.dados : null;
+      renderizarMenuFallback();
+      return App.ciclo;
+    })
+    .catch(function() { return App.ciclo; });
+};
 
 // =========================================================
 // NAVEGAÇÃO
@@ -500,6 +526,7 @@ document.getElementById('btn-logout').addEventListener('click', function() {
     .then(function() {
       Auth.limpar();
       App.usuario = null;
+      App.ciclo = null;
       App.modulo  = null;
       window.location.href = window.location.href.split('?')[0] + '?t=' + Date.now();
     });
@@ -562,6 +589,7 @@ function expirarSessaoPorTempo() {
     .then(function() {
       Auth.limpar();
       App.usuario = null;
+      App.ciclo = null;
       App.modulo  = null;
       window.location.href = window.location.href.split('?')[0] + '?t=' + Date.now();
     });
