@@ -24,6 +24,27 @@
   .dash-info-sistema .material-icons-round{font-size:18px;color:var(--c-text-3,#9898B0);flex-shrink:0;}
   .dash-info-sistema strong{color:var(--c-text-1,#1A1A2E);font-weight:500;}
 
+  /* ── Transição de semestre (etapa 17) ── */
+  .dash-ciclo{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-left:4px solid #D4A843;border-radius:12px;padding:18px 20px;margin-bottom:28px;}
+  .dash-ciclo-topo{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .dash-ciclo-titulo{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--c-text-1,#1A1A2E);}
+  .dash-ciclo-titulo .material-icons-round{font-size:20px;color:#B8860B;}
+  .dash-ciclo-destaque{font-size:12.5px;color:var(--c-text-2,#5C5C7A);}
+  .dash-ciclo-destaque strong{color:var(--c-text-1,#1A1A2E);}
+  .dash-ciclo-lista{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;}
+  .dash-ciclo-item{display:flex;align-items:baseline;gap:12px;padding:7px 0;border-top:1px solid var(--c-border,#E8E7E2);font-size:13px;}
+  .dash-ciclo-item:first-child{border-top:none;}
+  .dash-ciclo-nome{flex:1;min-width:0;color:var(--c-text-1,#1A1A2E);}
+  .dash-ciclo-nome small{display:block;color:var(--c-text-3,#9898B0);font-size:11.5px;}
+  .dash-ciclo-datas{font-family:var(--font-mono,monospace);font-size:12px;color:var(--c-text-2,#5C5C7A);white-space:nowrap;}
+  .dash-ciclo-selo{flex-shrink:0;display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:99px;font-size:11px;font-weight:600;}
+  .dash-ciclo-selo.agora{background:rgba(42,157,143,0.14);color:#1A6E65;}
+  .dash-ciclo-selo.proxima{background:rgba(212,168,67,0.18);color:#8A6412;}
+  .dash-ciclo-selo.passou{background:#F5F4F0;color:var(--c-text-3,#9898B0);}
+  .dash-ciclo-item.passou .dash-ciclo-nome,.dash-ciclo-item.passou .dash-ciclo-datas{color:var(--c-text-3,#9898B0);}
+  .dash-ciclo-vazio{font-size:13px;color:var(--c-text-3,#9898B0);}
+  @media(max-width:560px){.dash-ciclo-item{flex-wrap:wrap;}.dash-ciclo-datas{white-space:normal;}}
+
   /* ── Ocorrências pendentes ── */
   .dash-oco-wrap{display:flex;gap:20px;align-items:flex-start;margin-bottom:32px;}
   .dash-oco-lista-wrap{flex:1;min-width:0;}
@@ -106,6 +127,9 @@
     <span>Ativo</span>
   </div>
 </div>
+
+<!-- Transição de semestre: datas do ciclo (só aparece com a transição ativada) -->
+<div class="dash-ciclo" id="dash-ciclo" style="display:none;"></div>
 
 <!-- Atalhos -->
 <div class="dash-atalhos-titulo">Acesso rápido</div>
@@ -442,6 +466,61 @@
       .catch(function() { if(typeof toast==='function') toast('Erro de comunicacao.','error'); });
   }
 
+  // ── Transição de semestre (etapa 17) ─────────────────────────────────────────
+  // App.ciclo vem de index.html (ciclo.estado). Mostra as fases do ciclo que
+  // já têm data, para todos os papéis, só enquanto a transição está ativada.
+  function escD(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function fmtCiclo(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d)) return '';
+    var dia = d.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit' });
+    var hora = d.toLocaleTimeString('pt-BR', { timeZone: 'America/Fortaleza', hour: '2-digit', minute: '2-digit' });
+    return hora === '00:00' ? dia : dia + ' ' + hora;
+  }
+  function renderCiclo() {
+    var box = el('dash-ciclo');
+    var c = (typeof App !== 'undefined') ? App.ciclo : null;
+    if (!box) return;
+    if (!c || !c.ativo || !c.proximo) { box.style.display = 'none'; return; }
+    var agora = c.agora ? new Date(c.agora).getTime() : Date.now();
+    var fases = (c.fases || []).filter(function(f) { return f.inicio || f.fim; });
+    var atuais = [], proxima = null;
+    fases.forEach(function(f) {
+      var ini = f.inicio ? new Date(f.inicio).getTime() : null;
+      var fim = f.fim ? new Date(f.fim).getTime() : null;
+      if (fim !== null && fim < agora) f._st = 'passou';
+      else if (ini !== null && ini > agora) f._st = 'futura';
+      else f._st = 'agora';
+      if (f._st === 'agora') atuais.push(f);
+    });
+    fases.forEach(function(f) {
+      if (f._st === 'futura' && (!proxima || new Date(f.inicio) < new Date(proxima.inicio))) proxima = f;
+    });
+    var destaque = '';
+    if (atuais.length) destaque = 'Agora: <strong>' + atuais.map(function(f) { return escD(f.nome); }).join(', ') + '</strong>';
+    else if (proxima) destaque = 'Próxima: <strong>' + escD(proxima.nome) + '</strong> em ' + fmtCiclo(proxima.inicio);
+    var itens = fases.map(function(f) {
+      var datas = f.inicio && f.fim ? fmtCiclo(f.inicio) + ' a ' + fmtCiclo(f.fim)
+                : f.inicio ? 'a partir de ' + fmtCiclo(f.inicio)
+                : 'até ' + fmtCiclo(f.fim);
+      var selo = f._st === 'agora' ? '<span class="dash-ciclo-selo agora">Agora</span>'
+               : f === proxima ? '<span class="dash-ciclo-selo proxima">Próxima</span>'
+               : f._st === 'passou' ? '<span class="dash-ciclo-selo passou">Encerrada</span>' : '';
+      return '<li class="dash-ciclo-item' + (f._st === 'passou' ? ' passou' : '') + '">' +
+        '<span class="dash-ciclo-nome">' + escD(f.nome) + (f.observacao ? '<small>' + escD(f.observacao) + '</small>' : '') + '</span>' +
+        '<span class="dash-ciclo-datas">' + datas + '</span>' + selo + '</li>';
+    }).join('');
+    box.innerHTML =
+      '<div class="dash-ciclo-topo">' +
+        '<span class="dash-ciclo-titulo"><span class="material-icons-round">published_with_changes</span>Transição para ' + escD(c.proximo.rotulo) + '</span>' +
+        (destaque ? '<span class="dash-ciclo-destaque">' + destaque + '</span>' : '') +
+      '</div>' +
+      (itens ? '<ul class="dash-ciclo-lista">' + itens + '</ul>'
+             : '<p class="dash-ciclo-vazio">As datas do ciclo ainda serão divulgadas.</p>');
+    box.style.display = '';
+  }
+
   // ── Init ──────────────────────────────────────────────────────────────────────
   function init() {
     // App.usuario/App.semestre vêm de index.html (onLoginSucesso/carregarShell)
@@ -473,6 +552,7 @@
       semestreEl.textContent = 'Nenhum semestre ativo';
     }
 
+    renderCiclo();
     renderAtalhos(state.papel);
     carregarOcorrencias();
 
