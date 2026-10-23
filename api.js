@@ -162,7 +162,7 @@ async function postApi(acao, dados) {
     if (acao === 'avaliacoes.atualizar') return await _avaliacoesAtualizar(sb, dados);
 
     // ── SEMESTRES ─────────────────────────────────────────────────────────────
-    if (acao === 'semestres.listar')     return await _semestresListar(sb);
+    if (acao === 'semestres.listar')     return await _semestresListar(sb, dados);
     if (acao === 'semestres.registrar')  return await _semestresRegistrar(sb, dados);
     if (acao === 'semestres.atualizar')  return await _semestresAtualizar(sb, dados);
     if (acao === 'semestres.getAtual')   return await _semestresGetAtual(sb);
@@ -210,6 +210,13 @@ async function postApi(acao, dados) {
 
     // ── AUDITORIA (leitura — só admin, pelo RLS) ──────────────────────────────
     if (acao === 'auditoria.listar') return await _auditoriaListar(sb, dados);
+
+    // ── TRANSIÇÃO DE SEMESTRE (etapa 17) ─────────────────────────────────────
+    if (acao === 'ciclo.estado')               return await _cicloEstado(sb);
+    if (acao === 'ciclo.criarProximo')         return await _cicloCriarProximo(sb);
+    if (acao === 'ciclo.salvarFases')          return await _cicloSalvarFases(sb, dados);
+    if (acao === 'ciclo.salvarConfig')         return await _cicloSalvarConfig(sb, dados);
+    if (acao === 'ciclo.alterarFaseSemestre')  return await _cicloAlterarFaseSemestre(sb, dados);
 
     // ── RELATÓRIOS ────────────────────────────────────────────────────────────
     // ── COMENTÁRIOS ───────────────────────────────────────────────────────────
@@ -794,8 +801,13 @@ async function _avaliacoesAtualizar(sb, dados) {
 // SEMESTRES
 // =============================================================================
 
-async function _semestresListar(sb) {
-  var res = await sb.from('semestres').select('*').order('criado_em', { ascending: false });
+// Semestre OCULTO (visualizacao_ativa = false) — ex.: o próximo semestre em
+// preparação na transição (D-50) — não aparece nas listas das telas comuns
+// (relatórios etc.). Só a tela de Configurações pede { incluirOcultos: true }.
+async function _semestresListar(sb, dados) {
+  var query = sb.from('semestres').select('*').order('criado_em', { ascending: false });
+  if (!(dados && dados.incluirOcultos)) query = query.or('visualizacao_ativa.is.null,visualizacao_ativa.eq.true');
+  var res = await query;
   if (res.error) return _err(res.error.message);
   return _ok(res.data);
 }
@@ -825,6 +837,72 @@ async function _semestresAtualizar(sb, dados) {
   var res = await sb.from('semestres').update(dados).eq('id', dados.id);
   if (res.error) return _err(res.error.message);
   return _ok(null, 'Semestre atualizado.');
+}
+
+// =============================================================================
+// TRANSIÇÃO DE SEMESTRE (etapa 17 — claude/etapa17-transicao-calendario.sql)
+// =============================================================================
+// ciclo_estado() devolve, para qualquer usuário logado:
+//   { agora, ativo, atual:{id,external_id,rotulo}, proximo:{id,external_id,
+//     rotulo,fase,edicao_ativa,visualizacao_ativa} | null, config:{...} | null,
+//     fases:[{tipo,ordem,nome,descricao,inicio,fim,observacao}] }
+// Criar o próximo semestre e gravar as datas são funções do banco que só
+// aceitam admin; opções e fase do semestre são gravadas direto nas tabelas
+// (o RLS só deixa o admin alterar ciclo_config).
+// -----------------------------------------------------------------------------
+
+async function _cicloEstado(sb) {
+  var res = await sb.rpc('ciclo_estado');
+  if (res.error) return _err(res.error.message);
+  return _ok(res.data);
+}
+
+async function _cicloCriarProximo(sb) {
+  var res = await sb.rpc('ciclo_criar_proximo_semestre');
+  if (res.error) return _err(res.error.message);
+  return _ok(res.data, 'Próximo semestre criado.');
+}
+
+// dados = { semestre_id, fases: [{ tipo, inicio, fim, observacao }] }
+// inicio/fim em ISO (com fuso) ou vazio.
+async function _cicloSalvarFases(sb, dados) {
+  if (!dados || !dados.semestre_id) return _err('Semestre não informado.', 400);
+  var res = await sb.rpc('ciclo_salvar_fases', { p_semestre_id: dados.semestre_id, p_fases: dados.fases || [] });
+  if (res.error) return _err(res.error.message);
+  return _ok(res.data, 'Datas do ciclo salvas.');
+}
+
+var CAMPOS_CICLO_CONFIG = ['transicao_ativa', 'manter_modalidade', 'aplicar_decreto_46371',
+  'freq_baixa_desistente', 'autoinscricao_nivelamento', 'limite_lembrete_documentos', 'cota_prioritaria_pct'];
+
+// dados = { semestre_id, ...campos de CAMPOS_CICLO_CONFIG }
+async function _cicloSalvarConfig(sb, dados) {
+  if (!dados || !dados.semestre_id) return _err('Semestre não informado.', 400);
+  var campos = {};
+  CAMPOS_CICLO_CONFIG.forEach(function(k) { if (k in dados) campos[k] = dados[k]; });
+  if (!Object.keys(campos).length) return _err('Nada para salvar.', 400);
+  // .select(): quando o RLS barra o UPDATE, o Supabase não dá erro — só
+  // devolve zero linhas.
+  var res = await sb.from('ciclo_config').update(campos).eq('semestre_id', dados.semestre_id).select('id');
+  if (res.error) return _err(res.error.message);
+  if (!res.data || !res.data.length) return _err('Nada foi gravado. Somente o admin pode alterar as opções do ciclo.', 403);
+  return _ok(null, 'Opções do ciclo salvas.');
+}
+
+var FASES_SEMESTRE = ['planejamento', 'inscricoes', 'em_andamento', 'encerrado'];
+
+// dados = { semestre_id, fase } — só para o próximo semestre (planejamento ↔ inscrições).
+// A passagem para 'em_andamento' é a virada do semestre (Fase 8), não esta ação.
+async function _cicloAlterarFaseSemestre(sb, dados) {
+  if (!dados || !dados.semestre_id || FASES_SEMESTRE.indexOf(dados.fase) === -1) return _err('Dados inválidos.', 400);
+  if (dados.fase !== 'planejamento' && dados.fase !== 'inscricoes') {
+    return _err('Por aqui, o próximo semestre só pode ficar em "Planejamento" ou "Inscrições".', 400);
+  }
+  var res = await sb.from('semestres').update({ fase: dados.fase })
+    .eq('id', dados.semestre_id).eq('semestre_atual', false).select('id');
+  if (res.error) return _err(res.error.message);
+  if (!res.data || !res.data.length) return _err('Nada foi gravado.', 403);
+  return _ok(null, 'Fase do semestre atualizada.');
 }
 
 // =============================================================================
