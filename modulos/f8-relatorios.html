@@ -242,7 +242,7 @@
   <div class="r8-tipo-card" data-tipo="resultados-turma">
     <div class="r8-tipo-icone"><span class="material-icons-round">grade</span></div>
     <div class="r8-tipo-nome">Resultados por turma</div>
-    <div class="r8-tipo-desc">Médias, aprovados, retidos e retidos por falta</div>
+    <div class="r8-tipo-desc">Médias, aprovados, retidos e retidos por faltas</div>
   </div>
   <div class="r8-tipo-card" data-tipo="alunos-turma-campos">
     <div class="r8-tipo-icone"><span class="material-icons-round">table_chart</span></div>
@@ -439,7 +439,7 @@
     <label class="r8c-check"><input type="checkbox" value="sit_concluida"> Concluídas</label>
     <label class="r8c-check"><input type="checkbox" value="sit_cancelada"> Canceladas</label>
     <label class="r8c-check"><input type="checkbox" value="aprovados"> Aprovados</label>
-    <label class="r8c-check"><input type="checkbox" value="reprovados"> Reprovados</label>
+    <label class="r8c-check"><input type="checkbox" value="reprovados"> Retidos</label>
     <label class="r8c-check"><input type="checkbox" value="pendentes"> Pendentes</label>
     <label class="r8c-check"><input type="checkbox" value="freq_media"> Freq. média (%)</label>
   </div>
@@ -667,6 +667,13 @@
   function compararNomes(x,y){ return (x||'').localeCompare(y||'','pt-BR',{sensitivity:'base'}); }
   function porNome(a,b){ return compararNomes(a.NomeExibicao, b.NomeExibicao); }
   function postApi(a,d){ return window.postApi(a,d); }
+  // Matrícula "do semestre": ATIVA ou CONCLUIDA. CONCLUIDA = turma concluída
+  // pela coordenação no fim do semestre (etapa 20) — o aluno cursou a turma
+  // inteira e continua nos relatórios como antes.
+  // Nomenclatura da escola (23/10): nota abaixo da média = RETIDO; frequência
+  // abaixo de 75% = RETIDO POR FALTAS. Os códigos internos desta tela
+  // continuam REPROVADO/RETIDO; só os textos mostrados mudaram.
+  function ehMatriculaCorrente(m){ return m.SituacaoMatricula==='ATIVA'||m.SituacaoMatricula==='CONCLUIDA'; }
   function el(id){ return document.getElementById(id); }
   function val(id){ return el(id) ? el(id).value.trim() : ''; }
   function esc(s){ return (s===null||s===undefined) ? '' : String(s).replace(/[&<>"]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
@@ -1185,7 +1192,7 @@
     var turma=S.turmas.find(function(t){return t.id===turmaId;});
     return postApi('matriculas.listar',{turma_id:turmaId}).then(function(r){
       var matriculas=(r.sucesso&&r.dados)?r.dados.map(normM).sort(porNome):[];
-      if(!incluirOutras) matriculas=matriculas.filter(function(m){return m.SituacaoMatricula==='ATIVA';});
+      if(!incluirOutras) matriculas=matriculas.filter(ehMatriculaCorrente);
       if(alunoFiltro){
         var f=alunoFiltro.toLowerCase();
         matriculas=matriculas.filter(function(m){ return (m.MatriculaID||'').toLowerCase()===f || (m.AlunoID||'').toLowerCase()===f; });
@@ -1199,7 +1206,7 @@
           postApi('comentarios.listar',{matricula_id:m.id}),
         ]);
       })).then(function(dados){
-        var resultadoLabel={APROVADO:'Aprovado', REPROVADO:'Reprovado', RETIDO:'Retido por frequência', PENDENTE:'Pendente'};
+        var resultadoLabel={APROVADO:'Aprovado', REPROVADO:'Retido', RETIDO:'Retido por faltas', PENDENTE:'Pendente'};
         var html='';
         matriculas.forEach(function(m,idx){
           var notas=(dados[idx][0].sucesso&&dados[idx][0].dados)?dados[idx][0].dados.map(normNota):[];
@@ -1249,7 +1256,7 @@
           html+='<div class="r8-freq-item">Faltas: <strong>'+freq.faltas+'</strong></div>';
           html+='<div class="r8-freq-item">Justificadas: <strong>'+freq.justificadas+'</strong></div>';
           html+='<div class="r8-freq-item">Frequência: <strong style="color:'+(retidoFalta?'#E63946':'#2A9D8F')+'">'+(freq.pct!==null?freq.pct+'%':'—')+'</strong>'+
-            (retidoFalta?' ⚠ Retido por falta':'')+'</div>';
+            (retidoFalta?' ⚠ Retido por faltas':'')+'</div>';
           html+='</div>';
 
           if(comentarios.length){
@@ -1274,7 +1281,7 @@
     var turma=S.turmas.find(function(t){return t.id===turmaId;});
     return postApi('matriculas.listar',{turma_id:turmaId}).then(function(r){
       var matriculas=(r.sucesso&&r.dados)?r.dados.map(normM).sort(porNome):[];
-      if(!incluirOutras) matriculas=matriculas.filter(function(m){return m.SituacaoMatricula==='ATIVA';});
+      if(!incluirOutras) matriculas=matriculas.filter(ehMatriculaCorrente);
       matriculas.sort(porNome);
 
       var html='<div class="r8-folha">'+headerInstitucional('Alunos matriculados');
@@ -1322,7 +1329,7 @@
       postApi('frequencias.listar',{turma_id:turmaId}),
     ]).then(function(r){
       var matriculas=(r[0].sucesso&&r[0].dados)?r[0].dados.map(normM).sort(porNome):[];
-      if(!incluirOutras) matriculas=matriculas.filter(function(m){return m.SituacaoMatricula==='ATIVA';});
+      if(!incluirOutras) matriculas=matriculas.filter(ehMatriculaCorrente);
       var freqAll=(r[1].sucesso&&r[1].dados)?r[1].dados:[];
       if(!matriculas.length){ mostrarEstadoVazio('Nenhum aluno encontrado nesta turma.'); return; }
       var datasUnicas={};
@@ -1340,10 +1347,10 @@
         html+='<tr><td class="c">'+(i+1)+'</td><td>'+esc(m.NomeExibicao||m.AlunoID)+'</td>';
         html+='<td class="c">'+resumo.presencas+'</td><td class="c">'+resumo.faltas+'</td><td class="c">'+resumo.justificadas+'</td>';
         html+='<td class="c"><strong style="color:'+cor+'">'+(pct!==null?pct+'%':'—')+'</strong></td>';
-        html+='<td class="c">'+(pct!==null&&pct<75?'⚠ Retido':'—')+'</td></tr>';
+        html+='<td class="c">'+(pct!==null&&pct<75?'⚠ Retido por faltas':'—')+'</td></tr>';
       });
       html+='</tbody></table>';
-      html+='<p style="font-size:7.5pt;color:#9898B0;">⚠ Frequência abaixo de 75% = retido por falta. Faltas justificadas contam como presença neste cálculo.</p>';
+      html+='<p style="font-size:7.5pt;color:#9898B0;">⚠ Frequência abaixo de 75% = retido por faltas. Faltas justificadas contam como presença neste cálculo.</p>';
       html+='</div>';
       mostrarPreview('Frequência — '+(turma?turma.TurmaID:''), html);
     });
@@ -1354,7 +1361,7 @@
     var turma=S.turmas.find(function(t){return t.id===turmaId;});
     return postApi('matriculas.listar',{turma_id:turmaId}).then(function(r){
       var matriculas=(r.sucesso&&r.dados)?r.dados.map(normM).sort(porNome):[];
-      if(!incluirOutras) matriculas=matriculas.filter(function(m){return m.SituacaoMatricula==='ATIVA';});
+      if(!incluirOutras) matriculas=matriculas.filter(ehMatriculaCorrente);
       if(!matriculas.length){ mostrarEstadoVazio('Nenhum aluno encontrado nesta turma.'); return; }
       var avaliacoesTurma=avaliacoesDaTurma(turma);
       return Promise.all(matriculas.map(function(m){
@@ -1381,8 +1388,8 @@
         // desta adição em relação ao layout original).
         var resumo='<div style="display:flex;gap:16px;margin-bottom:10px;font-size:8.5pt;flex-wrap:wrap;">'+
           '<span>Aprovados: <strong style="color:#2A9D8F">'+contagem.aprovados+'</strong></span>'+
-          '<span>Reprovados: <strong style="color:#E63946">'+contagem.reprovados+'</strong></span>'+
-          '<span>Ret. por falta: <strong style="color:#D4A843">'+contagem.retidosFalta+'</strong></span>'+
+          '<span>Retidos: <strong style="color:#E63946">'+contagem.reprovados+'</strong></span>'+
+          '<span>Retidos por faltas: <strong style="color:#D4A843">'+contagem.retidosFalta+'</strong></span>'+
           '<span>Pendentes: <strong style="color:#9898B0">'+contagem.pendentes+'</strong></span>'+
           '<span>Total: <strong>'+linhas.length+'</strong></span>'+
         '</div>';
@@ -1403,7 +1410,7 @@
           });
           var pct=l.pct;
           var corPct = pct===null?'#9898B0':(pct<75?'#E63946':(pct<85?'#D4A843':'#2A9D8F'));
-          var resLabel={APROVADO:'Aprovado',REPROVADO:'Reprovado',RETIDO:'Ret. falta',PENDENTE:'Pendente'}[l.situacao];
+          var resLabel={APROVADO:'Aprovado',REPROVADO:'Retido',RETIDO:'Ret. faltas',PENDENTE:'Pendente'}[l.situacao];
           var resCor={APROVADO:'#2A9D8F',REPROVADO:'#E63946',RETIDO:'#D4A843',PENDENTE:'#9898B0'}[l.situacao];
           html+='<td class="c" style="color:'+corPct+';font-weight:600;">'+(pct!==null?pct+'%':'—')+'</td>';
           html+='<td class="c"><strong style="color:'+resCor+'">'+resLabel+'</strong></td></tr>';
@@ -1443,7 +1450,7 @@
     var precisaSensiveis=colunas.some(function(c){return c.sensivel;});
     return Promise.all([ postApi('matriculas.listar',{turma_id:turmaId}), carregarAlunosTodos() ]).then(function(r){
       var matriculas=(r[0].sucesso&&r[0].dados)?r[0].dados.map(normM).sort(porNome):[];
-      if(!incluirOutras) matriculas=matriculas.filter(function(m){return m.SituacaoMatricula==='ATIVA';});
+      if(!incluirOutras) matriculas=matriculas.filter(ehMatriculaCorrente);
       if(!matriculas.length){ mostrarEstadoVazio('Nenhum aluno encontrado nesta turma.'); return; }
       var mapaAlunos=r[1];
       matriculas.sort(porNome);
@@ -1624,7 +1631,7 @@
       postApi('frequencias.listar',{turma_id:turmaId}),
     ]).then(function(r){
       var matriculas=(r[0].sucesso&&r[0].dados)?r[0].dados.map(normM).sort(porNome):[];
-      if(!incluirOutras) matriculas=matriculas.filter(function(m){return m.SituacaoMatricula==='ATIVA';});
+      if(!incluirOutras) matriculas=matriculas.filter(ehMatriculaCorrente);
       var freqAll=(r[1].sucesso&&r[1].dados)?r[1].dados:[];
       if(!matriculas.length){ mostrarEstadoVazio('Nenhum aluno encontrado nesta turma.'); return; }
       matriculas.sort(porNome);
@@ -1692,7 +1699,7 @@
       };
 
       var linhas=matriculas.map(function(m){
-        var badgeSituacao=(incluirOutras && m.SituacaoMatricula!=='ATIVA')
+        var badgeSituacao=(incluirOutras && !ehMatriculaCorrente(m))
           ? ' <span style="font-size:6.5pt;font-weight:700;padding:1px 6px;border-radius:8px;background:#F0EEE8;color:#5C5C7A;white-space:nowrap;">'+esc(m.SituacaoMatricula)+'</span>'
           : '';
         var tdNome='<td style="white-space:nowrap;">'+esc(m.NomeExibicao||m.AlunoID)+badgeSituacao+'</td>';
@@ -1733,7 +1740,7 @@
   };
   var LABEL_METRICA={
     total_matriculas:'Total', sit_ativa:'Ativas', sit_trancada:'Trancadas', sit_concluida:'Concluídas',
-    sit_cancelada:'Canceladas', aprovados:'Aprovados', reprovados:'Reprovados', pendentes:'Pendentes',
+    sit_cancelada:'Canceladas', aprovados:'Aprovados', reprovados:'Retidos', pendentes:'Pendentes',
     freq_media:'Freq. média (%)'
   };
 
@@ -1981,7 +1988,7 @@
       var matriculas=(r[0].dados||[]).filter(function(m){ return !!mapaTurmas[m.turma_id]; }).map(function(m){
         var n=normM(m); n.AlunoID=(m.alunos&&m.alunos.external_id)||'—'; return n;
       });
-      if(!incluirOutras) matriculas=matriculas.filter(function(m){ return m.SituacaoMatricula==='ATIVA'; });
+      if(!incluirOutras) matriculas=matriculas.filter(ehMatriculaCorrente);
 
       // Frequências agrupadas por matrícula (só das matrículas do filtro)
       var porMatricula={};
@@ -2055,7 +2062,7 @@
         linhasXlsx.push(linhaX);
       });
       html+='</tbody></table>';
-      html+='<p style="font-size:7.5pt;color:#9898B0;">Frequência = (presenças + justificadas) ÷ aulas registradas, a mesma regra do relatório de frequência por turma. Abaixo de 75% = retido por falta.</p>';
+      html+='<p style="font-size:7.5pt;color:#9898B0;">Frequência = (presenças + justificadas) ÷ aulas registradas, a mesma regra do relatório de frequência por turma. Abaixo de 75% = retido por faltas.</p>';
       html+='</div>';
 
       var cab=['ID do aluno','Aluno','Turma','Estágio','Idioma','Dia(s)','Horário','Professor','Faltas (F)','Justificadas (J)','Frequência (%)','Datas das faltas'];
