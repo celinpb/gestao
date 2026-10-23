@@ -1,0 +1,733 @@
+<!--
+  f12-nivelamento.html — Nivelamento (etapa 22 — claude/transicao-semestre.md, Fase 6)
+  Aparece no menu enquanto a transição de semestre estiver ativa.
+    · Inscrições: secretaria (no período), coordenação e admin
+    · Provas (prova oral): professor (no período das provas), coordenação e admin
+    · Resultado: coordenação e admin lançam; secretaria só vê e baixa
+    · Vagas: coordenação e admin
+  Todas as regras e permissões são conferidas no banco (funções nivel_*).
+-->
+<style>
+  .nv-topo{background:#1A1A2E;border-radius:12px;padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:20px;}
+  .nv-rot{font-size:10.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);margin-bottom:4px;}
+  .nv-tit{font-size:20px;font-weight:600;color:#fff;}
+  .nv-chips{display:flex;gap:6px;flex-wrap:wrap;}
+  .nv-chip{display:inline-flex;align-items:center;border-radius:20px;padding:4px 12px;font-size:11.5px;font-weight:500;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.15);}
+  .nv-chip.ok{background:rgba(42,157,143,0.20);color:#5DCAA5;border-color:rgba(42,157,143,0.30);}
+  .nv-abas{display:flex;gap:2px;border-bottom:1px solid var(--c-border,#E8E7E2);margin-bottom:18px;overflow-x:auto;}
+  .nv-aba{flex-shrink:0;display:inline-flex;align-items:center;gap:7px;height:42px;padding:0 14px;border:none;border-bottom:2.5px solid transparent;background:none;cursor:pointer;font-family:var(--font-sans,sans-serif);font-size:13.5px;font-weight:500;color:var(--c-text-2,#5C5C7A);margin-bottom:-1px;white-space:nowrap;}
+  .nv-aba .material-icons-round{font-size:18px;}
+  .nv-aba.ativa{color:#E63946;border-bottom-color:#E63946;font-weight:600;}
+  .nv-painel{display:none;}
+  .nv-painel.ativo{display:block;}
+  .nv-resumo{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .nv-ri{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:8px;padding:9px 14px;font-size:12px;color:var(--c-text-2,#5C5C7A);display:flex;flex-direction:column;gap:2px;min-width:96px;}
+  .nv-ri b{font-size:19px;font-weight:700;color:var(--c-text-1,#1A1A2E);line-height:1.1;}
+  .nv-barra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+  .nv-barra .nv-esp{flex:1;}
+  .nv-in,.nv-sel{height:36px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:7px;padding:0 10px;font-family:var(--font-sans,sans-serif);font-size:13px;color:var(--c-text-1,#1A1A2E);background:#fff;outline:none;}
+  .nv-in:focus,.nv-sel:focus{border-color:#E63946;}
+  .nv-busca{min-width:200px;flex:1;max-width:300px;}
+  .nv-btn{height:36px;padding:0 14px;border-radius:7px;font-family:var(--font-sans,sans-serif);font-size:13px;font-weight:500;cursor:pointer;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;color:var(--c-text-1,#1A1A2E);display:inline-flex;align-items:center;gap:6px;}
+  .nv-btn:hover{background:#F5F4F0;}
+  .nv-btn:disabled{opacity:0.55;cursor:not-allowed;}
+  .nv-btn .material-icons-round{font-size:17px;}
+  .nv-btn.prim{background:#E63946;border-color:#E63946;color:#fff;}
+  .nv-btn.prim:hover{background:#C1121F;}
+  .nv-card{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:10px;overflow:hidden;margin-bottom:16px;}
+  .nv-card-h{padding:11px 14px;border-bottom:1px solid var(--c-border,#E8E7E2);font-size:13.5px;font-weight:600;color:var(--c-text-1,#1A1A2E);display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#FAFAF8;}
+  .nv-card-h .nv-sub{font-weight:400;color:var(--c-text-3,#9898B0);font-size:12px;}
+  .nv-wrap{overflow-x:auto;}
+  table.nv-t{width:100%;border-collapse:collapse;font-size:13px;}
+  table.nv-t th,table.nv-t td{padding:9px 12px;border-bottom:1px solid var(--c-border,#E8E7E2);text-align:left;vertical-align:middle;}
+  table.nv-t tr:last-child td{border-bottom:none;}
+  table.nv-t th{font-size:11px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;color:var(--c-text-3,#9898B0);background:#FAFAF8;white-space:nowrap;}
+  .nv-cod{font-family:var(--font-mono,monospace);font-size:12px;white-space:nowrap;}
+  .nv-s{display:block;font-size:11px;color:var(--c-text-3,#9898B0);}
+  .nv-ac{display:flex;gap:4px;justify-content:flex-end;}
+  .nv-ico{width:30px;height:30px;border-radius:6px;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:var(--c-text-2,#5C5C7A);}
+  .nv-ico:hover{background:#F5F4F0;}
+  .nv-ico .material-icons-round{font-size:16px;}
+  .nv-ico.perigo:hover{color:#A32D2D;}
+  .nv-vazio{padding:32px 16px;text-align:center;color:var(--c-text-3,#9898B0);font-size:13px;}
+  .nv-st{display:inline-flex;padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:600;white-space:nowrap;background:#F5F4F0;color:var(--c-text-2,#5C5C7A);}
+  .nv-st.aguardando_escrita{background:rgba(69,123,157,0.12);color:#185FA5;}
+  .nv-st.deferida{background:rgba(42,157,143,0.12);color:#1A6E65;}
+  .nv-st.iniciante{background:rgba(212,168,67,0.18);color:#8A6412;}
+  .nv-st.nao_compareceu,.nv-st.nao_fez_escrita{background:rgba(230,57,70,0.10);color:#A32D2D;}
+  .nv-st.cancelada{color:var(--c-text-3,#9898B0);text-decoration:line-through;}
+  .nv-selo{display:inline-flex;padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:600;margin-left:4px;background:rgba(69,123,157,0.12);color:#185FA5;}
+  .nv-ov{position:fixed;inset:0;background:rgba(26,26,46,0.45);z-index:200;display:none;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;}
+  .nv-ov.show{display:flex;}
+  .nv-m{background:#fff;border-radius:14px;width:100%;max-width:600px;box-shadow:0 12px 48px rgba(26,26,46,0.18);overflow:hidden;}
+  .nv-m-h{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--c-border,#E8E7E2);font-size:15px;font-weight:600;}
+  .nv-m-c{padding:16px 18px;}
+  .nv-m-f{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--c-border,#E8E7E2);background:#FAFAF8;flex-wrap:wrap;}
+  .nv-g{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .nv-g .s2{grid-column:1/-1;}
+  @media(max-width:560px){.nv-g{grid-template-columns:1fr;}}
+  .nv-c label{display:block;font-size:11px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;color:var(--c-text-3,#9898B0);margin-bottom:5px;}
+  .nv-c .nv-in,.nv-c .nv-sel{width:100%;}
+  .nv-chk{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--c-text-1,#1A1A2E);cursor:pointer;margin:6px 0;}
+  .nv-chk input{accent-color:#E63946;margin-top:2px;}
+  .nv-al{display:none;border-radius:8px;padding:9px 12px;font-size:13px;margin-bottom:12px;background:rgba(230,57,70,0.08);border:1px solid rgba(230,57,70,0.2);color:#B01020;}
+  .nv-al.show{display:block;}
+  .nv-al.ok{background:rgba(42,157,143,0.08);border-color:rgba(42,157,143,0.2);color:#1A6E65;}
+  .nv-av{font-size:12.5px;color:var(--c-text-2,#5C5C7A);line-height:1.5;margin-bottom:12px;}
+  .nv-ops{display:flex;flex-direction:column;gap:6px;margin:6px 0 10px;}
+  .nv-estado{padding:48px 24px;text-align:center;color:var(--c-text-3,#9898B0);}
+  .nv-estado .material-icons-round{font-size:36px;display:block;margin:0 auto 10px;}
+</style>
+
+<div id="nv-raiz">
+  <div class="nv-estado"><div class="spinner" style="margin:0 auto 10px;"></div><p>Carregando…</p></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  function el(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function api(a, d) { return window.postApi(a, d); }
+  function aviso(msg, tipo) { if (typeof toast === 'function') toast(msg, tipo || 'success'); }
+  function papel() { var u = (typeof App !== 'undefined') ? App.usuario : null; return u ? (u.papel || u.Papel || '') : ''; }
+  function coord() { return papel() === 'admin' || papel() === 'coordenacao'; }
+
+  var SIT = { agendada: 'Agendada', aguardando_escrita: 'Aguardando prova escrita', iniciante: 'Inscrição como aluno iniciante',
+              nao_compareceu: 'Indeferida – não compareceu', deferida: 'Deferida', nao_fez_escrita: 'Indeferida – não realizou a prova escrita',
+              cancelada: 'Cancelada' };
+  var JANELA = { 'MANHÃ': ['08:00', '10:00'], 'TARDE': ['14:00', '16:00'], 'NOITE': ['18:00', '19:30'] };   // N-05
+  var DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  var N = { ciclo: null, dados: null, cursos: [], idiomas: [], aba: null,
+            fIdi: '', fSit: '', busca: '', rIdi: '', rSit: '', provaData: '', provaIdi: '', provas: null, atual: null };
+
+  function dataBR(iso) { if (!iso) return ''; var p = String(iso).slice(0, 10).split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+  function diaSem(iso) { var p = String(iso).slice(0, 10).split('-'); return DIAS[new Date(Date.UTC(+p[0], +p[1] - 1, +p[2], 12)).getUTCDay()]; }
+  function fmtD(iso) {
+    if (!iso) return ''; var d = new Date(iso); if (isNaN(d)) return '';
+    return d.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit' }) + ' ' +
+           d.toLocaleTimeString('pt-BR', { timeZone: 'America/Fortaleza', hour: '2-digit', minute: '2-digit' });
+  }
+  function idade(nasc, ref) {
+    if (!nasc) return '';
+    var n = String(nasc).slice(0, 10).split('-').map(Number), r = ref ? String(ref).slice(0, 10).split('-').map(Number) : null;
+    var h = r ? { y: r[0], m: r[1], d: r[2] } : (function() { var x = new Date(); return { y: x.getFullYear(), m: x.getMonth() + 1, d: x.getDate() }; }());
+    var a = h.y - n[0]; if (h.m < n[1] || (h.m === n[1] && h.d < n[2])) a--;
+    return a + ' anos';
+  }
+  function vagaTxt(v) {
+    if (!v) return '—';
+    return dataBR(v.data) + ' (' + diaSem(v.data) + ') · ' + (v.modalidade === 'ONLINE' ? 'online ' + v.inicio + '–' + v.fim : 'presencial, ' + String(v.turno || '').toLowerCase() + ' (' + v.inicio + '–' + v.fim + ')');
+  }
+  function cursosDo(idi) {
+    return N.cursos.filter(function(c) { return (c.idioma_id || (c.idiomas && c.idiomas.id)) === idi && c.ativo !== false; })
+      .sort(function(a, b) { return String(a.external_id || a.sigla).localeCompare(String(b.external_id || b.sigla), 'pt-BR', { numeric: true }); });
+  }
+  function opcoesCursos(idi, sel) {
+    return '<option value="">—</option>' + cursosDo(idi).map(function(c) {
+      return '<option value="' + c.id + '"' + (c.id === sel ? ' selected' : '') + '>' + esc(c.sigla + ' — ' + c.nome) + '</option>'; }).join('');
+  }
+  function oralTxt(i) {
+    if (!i.oral) return '—';
+    if (i.situacao === 'nao_compareceu' || (!i.oral.curso1 && !i.oral.dados_confirmados)) return 'Não compareceu';
+    if (!i.oral.curso1) return 'Iniciante';
+    return [i.oral.curso1, i.oral.curso2].filter(Boolean).map(function(c) { return c.sigla; }).join(' ou ');
+  }
+  function estadoVazio(icone, texto) { el('nv-raiz').innerHTML = '<div class="nv-estado"><span class="material-icons-round">' + icone + '</span><p>' + texto + '</p></div>'; }
+  function alerta(id, msg, ok) { var a = el(id); a.textContent = msg; a.className = 'nv-al show' + (ok ? ' ok' : ''); }
+  function fechar(id) { el(id).classList.remove('show'); }
+
+  // ── Montagem ────────────────────────────────────────────────────────────
+  function abasDoPapel() {
+    var p = papel();
+    if (p === 'professor') return [['provas', 'record_voice_over', 'Provas']];
+    if (p === 'secretaria') return [['insc', 'how_to_reg', 'Inscrições'], ['res', 'fact_check', 'Resultado']];
+    return [['insc', 'how_to_reg', 'Inscrições'], ['provas', 'record_voice_over', 'Provas'], ['res', 'fact_check', 'Resultado'], ['vagas', 'event_seat', 'Vagas']];
+  }
+  function montar() {
+    var prox = N.ciclo.proximo || {};
+    var abas = abasDoPapel();
+    el('nv-raiz').innerHTML =
+      '<div class="nv-topo"><div><div class="nv-rot">Transição de semestre</div><div class="nv-tit">Nivelamento ' + esc(prox.rotulo || '') + '</div></div>' +
+        '<div class="nv-chips" id="nv-chips"></div></div>' +
+      '<div class="nv-abas" id="nv-abas">' + abas.map(function(a) {
+        return '<button class="nv-aba" data-aba="' + a[0] + '"><span class="material-icons-round">' + a[1] + '</span>' + a[2] + '</button>'; }).join('') + '</div>' +
+      '<div class="nv-painel" data-painel="insc" id="nv-insc"></div>' +
+      '<div class="nv-painel" data-painel="provas" id="nv-provas"></div>' +
+      '<div class="nv-painel" data-painel="res" id="nv-res"></div>' +
+      '<div class="nv-painel" data-painel="vagas" id="nv-vagas"></div>' +
+      modais();
+    document.querySelectorAll('#nv-abas .nv-aba').forEach(function(b) { b.addEventListener('click', function() { mostrarAba(b.dataset.aba); }); });
+    document.querySelectorAll('#nv-raiz [data-nfechar]').forEach(function(b) { b.addEventListener('click', function() { fechar(b.dataset.nfechar); }); });
+    ligarModais();
+    var salva = null; try { salva = sessionStorage.getItem('sge.nivelamento.aba'); } catch (e) {}
+    mostrarAba(abas.some(function(a) { return a[0] === salva; }) ? salva : abas[0][0]);
+  }
+  function mostrarAba(nome) {
+    N.aba = nome;
+    document.querySelectorAll('#nv-abas .nv-aba').forEach(function(b) { b.classList.toggle('ativa', b.dataset.aba === nome); });
+    document.querySelectorAll('#nv-raiz .nv-painel').forEach(function(p) { p.classList.toggle('ativo', p.dataset.painel === nome); });
+    try { sessionStorage.setItem('sge.nivelamento.aba', nome); } catch (e) {}
+    if (nome === 'provas') carregarProvas(); else renderAba();
+  }
+  function renderAba() {
+    if (!N.dados) return;
+    if (N.aba === 'insc') renderInsc();
+    else if (N.aba === 'res') renderRes();
+    else if (N.aba === 'vagas') renderVagas();
+  }
+  function renderChips() {
+    var p = (N.dados && N.dados.periodos) || {};
+    el('nv-chips').innerHTML = papel() === 'professor' ? '' :
+      '<span class="nv-chip' + (p.inscricao ? ' ok' : '') + '">Inscrição ' + (p.inscricao ? 'aberta' : 'fechada') + '</span>' +
+      '<span class="nv-chip' + (p.provas ? ' ok' : '') + '">Provas ' + (p.provas ? 'em andamento' : 'fora do período') + '</span>' +
+      '<span class="nv-chip' + (p.resultado_publicado ? ' ok' : '') + '">Resultado ' + (p.resultado_publicado ? 'divulgado' : 'não divulgado') + '</span>';
+  }
+  function carregar() {
+    if (papel() === 'professor') { renderChips(); return Promise.resolve(); }
+    return api('niv.painel', {}).then(function(res) {
+      if (!res.sucesso) { estadoVazio('error_outline', esc(res.mensagem) + '<br>Confira se o arquivo <strong>etapa22-transicao-nivelamento.sql</strong> já foi rodado.'); return; }
+      N.dados = res.dados || {};
+      renderChips(); renderAba();
+    });
+  }
+  function inscricao(id) { return ((N.dados && N.dados.inscricoes) || []).filter(function(i) { return i.id === id; })[0]; }
+
+  // ── Modais ──────────────────────────────────────────────────────────────
+  function modais() {
+    return '' +
+    // nova inscrição
+    '<div class="nv-ov" id="nv-m-insc"><div class="nv-m">' +
+      '<div class="nv-m-h"><span>Nova inscrição no nivelamento</span><button class="nv-ico" data-nfechar="nv-m-insc"><span class="material-icons-round">close</span></button></div>' +
+      '<div class="nv-m-c"><div class="nv-al" id="nv-i-al"></div>' +
+        '<p class="nv-av">Os dados informados não podem ser alterados depois da inscrição (N-03): confira com o candidato. Quem tem matrícula neste semestre no mesmo idioma não faz nivelamento (a promoção vem do boletim).</p>' +
+        '<div class="nv-g">' +
+          '<div class="nv-c s2"><label for="nv-i-nome">Nome completo</label><input class="nv-in" id="nv-i-nome" maxlength="150"></div>' +
+          '<div class="nv-c"><label for="nv-i-cpf">CPF</label><input class="nv-in" id="nv-i-cpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00"></div>' +
+          '<div class="nv-c"><label for="nv-i-nasc">Data de nascimento</label><input class="nv-in" id="nv-i-nasc" type="date"></div>' +
+          '<div class="nv-c"><label for="nv-i-email">E-mail (recebe a prova escrita)</label><input class="nv-in" id="nv-i-email" type="email" maxlength="150"></div>' +
+          '<div class="nv-c"><label for="nv-i-tel">Telefone</label><input class="nv-in" id="nv-i-tel" maxlength="30"></div>' +
+          '<div class="nv-c"><label for="nv-i-idi">Idioma</label><select class="nv-sel" id="nv-i-idi"></select></div>' +
+          '<div class="nv-c"><label for="nv-i-mod">Prova oral</label><select class="nv-sel" id="nv-i-mod"><option value="PRESENCIAL">Presencial (mora na Grande João Pessoa)</option><option value="ONLINE">Online (mora fora da Grande João Pessoa)</option></select></div>' +
+          '<div class="nv-c s2"><label for="nv-i-vaga">Dia e horário</label><select class="nv-sel" id="nv-i-vaga"></select></div>' +
+        '</div></div>' +
+      '<div class="nv-m-f"><button class="nv-btn" data-nfechar="nv-m-insc">Fechar</button><button class="nv-btn prim" id="nv-i-ok"><span class="material-icons-round">save</span>Inscrever</button></div>' +
+    '</div></div>' +
+    // remarcar / cancelar
+    '<div class="nv-ov" id="nv-m-acao"><div class="nv-m">' +
+      '<div class="nv-m-h"><span id="nv-a-tit"></span><button class="nv-ico" data-nfechar="nv-m-acao"><span class="material-icons-round">close</span></button></div>' +
+      '<div class="nv-m-c"><div class="nv-al" id="nv-a-al"></div><p class="nv-av" id="nv-a-info"></p><div id="nv-a-corpo"></div></div>' +
+      '<div class="nv-m-f"><button class="nv-btn" data-nfechar="nv-m-acao">Fechar</button><button class="nv-btn prim" id="nv-a-ok">Confirmar</button></div>' +
+    '</div></div>' +
+    // prova oral
+    '<div class="nv-ov" id="nv-m-oral"><div class="nv-m">' +
+      '<div class="nv-m-h"><span id="nv-o-tit">Prova oral</span><button class="nv-ico" data-nfechar="nv-m-oral"><span class="material-icons-round">close</span></button></div>' +
+      '<div class="nv-m-c"><div class="nv-al" id="nv-o-al"></div><p class="nv-av" id="nv-o-info"></p>' +
+        '<div class="nv-ops">' +
+          '<label class="nv-chk"><input type="radio" name="nv-o-res" value="nao_compareceu"> Não compareceu</label>' +
+          '<label class="nv-chk"><input type="radio" name="nv-o-res" value="iniciante"> Iniciante (estágio 1) — não recebe prova escrita</label>' +
+          '<label class="nv-chk"><input type="radio" name="nv-o-res" value="estagios"> Indicar estágio(s) para a prova escrita</label>' +
+        '</div>' +
+        '<div class="nv-g" id="nv-o-est" style="margin-bottom:10px;">' +
+          '<div class="nv-c"><label for="nv-o-c1">1º estágio indicado</label><select class="nv-sel" id="nv-o-c1"></select></div>' +
+          '<div class="nv-c"><label for="nv-o-c2">2º estágio (opcional)</label><select class="nv-sel" id="nv-o-c2"></select></div>' +
+        '</div>' +
+        '<div id="nv-o-dados"><p class="nv-av" style="margin:8px 0 6px;"><b>Dados do candidato</b> — confira com o documento original com foto e corrija se preciso (D-18).</p>' +
+          '<div class="nv-g">' +
+            '<div class="nv-c s2"><label for="nv-o-nome">Nome completo</label><input class="nv-in" id="nv-o-nome"></div>' +
+            '<div class="nv-c"><label for="nv-o-nasc">Nascimento</label><input class="nv-in" id="nv-o-nasc" type="date"></div>' +
+            '<div class="nv-c"><label for="nv-o-email">E-mail</label><input class="nv-in" id="nv-o-email" type="email"></div>' +
+            '<div class="nv-c"><label for="nv-o-tel">Telefone</label><input class="nv-in" id="nv-o-tel"></div>' +
+          '</div>' +
+          '<label class="nv-chk"><input type="checkbox" id="nv-o-conf"> Conferi os dados com o documento com foto do candidato.</label></div>' +
+        '<div class="nv-c" style="margin-top:8px;"><label for="nv-o-obs">Observação (opcional)</label><input class="nv-in" id="nv-o-obs" maxlength="300"></div>' +
+      '</div>' +
+      '<div class="nv-m-f"><button class="nv-btn" data-nfechar="nv-m-oral">Fechar</button><button class="nv-btn prim" id="nv-o-ok"><span class="material-icons-round">save</span>Salvar</button></div>' +
+    '</div></div>' +
+    // resultado final
+    '<div class="nv-ov" id="nv-m-final"><div class="nv-m">' +
+      '<div class="nv-m-h"><span id="nv-f-tit">Resultado final</span><button class="nv-ico" data-nfechar="nv-m-final"><span class="material-icons-round">close</span></button></div>' +
+      '<div class="nv-m-c"><div class="nv-al" id="nv-f-al"></div><p class="nv-av" id="nv-f-info"></p>' +
+        '<div class="nv-ops">' +
+          '<label class="nv-chk"><input type="radio" name="nv-f-tipo" value="estagio"> Estágio final</label>' +
+          '<div class="nv-c" style="margin-left:24px;"><select class="nv-sel" id="nv-f-curso"></select></div>' +
+          '<label class="nv-chk"><input type="radio" name="nv-f-tipo" value="nao"> Não realizou a prova escrita (indeferido; não pode se matricular como nivelado)</label>' +
+        '</div>' +
+        '<div class="nv-c"><label for="nv-f-mot" id="nv-f-mot-rot">Observação</label><input class="nv-in" id="nv-f-mot" maxlength="300"></div>' +
+      '</div>' +
+      '<div class="nv-m-f"><button class="nv-btn" id="nv-f-limpar" style="margin-right:auto;">Retirar resultado</button><button class="nv-btn" data-nfechar="nv-m-final">Fechar</button><button class="nv-btn prim" id="nv-f-ok"><span class="material-icons-round">save</span>Salvar</button></div>' +
+    '</div></div>';
+  }
+  function ligarModais() {
+    el('nv-i-cpf').addEventListener('input', function(e) {
+      var d = e.target.value.replace(/\D/g, '').slice(0, 11);
+      e.target.value = d.length > 9 ? d.slice(0, 3) + '.' + d.slice(3, 6) + '.' + d.slice(6, 9) + '-' + d.slice(9)
+                     : d.length > 6 ? d.slice(0, 3) + '.' + d.slice(3, 6) + '.' + d.slice(6)
+                     : d.length > 3 ? d.slice(0, 3) + '.' + d.slice(3) : d;
+    });
+    el('nv-i-idi').addEventListener('change', preencherVagasInsc);
+    el('nv-i-mod').addEventListener('change', preencherVagasInsc);
+    el('nv-i-ok').addEventListener('click', salvarInsc);
+    el('nv-a-ok').addEventListener('click', function() { if (N.acaoOk) N.acaoOk(); });
+    document.querySelectorAll('input[name="nv-o-res"]').forEach(function(r) { r.addEventListener('change', ajustarOral); });
+    el('nv-o-ok').addEventListener('click', salvarOral);
+    el('nv-f-ok').addEventListener('click', function() { salvarFinal(false); });
+    el('nv-f-limpar').addEventListener('click', limparFinal);
+    document.querySelectorAll('input[name="nv-f-tipo"]').forEach(function(r) { r.addEventListener('change', function() { el('nv-f-curso').disabled = r.value === 'nao' && r.checked; }); });
+  }
+
+  // ── Inscrições ──────────────────────────────────────────────────────────
+  function renderInsc() {
+    var box = el('nv-insc'), d = N.dados, ins = d.inscricoes || [];
+    if (!box.dataset.montado) {
+      box.dataset.montado = '1';
+      box.innerHTML =
+        '<div class="nv-resumo" id="nv-i-resumo"></div>' +
+        '<div class="nv-barra">' +
+          '<select class="nv-sel" id="nv-fi-idi"><option value="">Todos os idiomas</option>' + N.idiomas.map(function(i) { return '<option value="' + i.id + '">' + esc(i.nome) + '</option>'; }).join('') + '</select>' +
+          '<select class="nv-sel" id="nv-fi-sit"><option value="">Todas as situações</option>' + Object.keys(SIT).map(function(k) { return '<option value="' + k + '">' + SIT[k] + '</option>'; }).join('') + '</select>' +
+          '<input type="search" class="nv-in nv-busca" id="nv-fi-busca" placeholder="Buscar nome, protocolo ou CPF…">' +
+          '<span class="nv-esp"></span>' +
+          '<button class="nv-btn" id="nv-fi-atual"><span class="material-icons-round">refresh</span>Atualizar</button>' +
+          '<button class="nv-btn prim" id="nv-fi-nova"><span class="material-icons-round">person_add</span>Nova inscrição</button>' +
+        '</div>' +
+        '<div class="nv-card"><div class="nv-wrap"><table class="nv-t"><thead><tr><th>Protocolo</th><th>Candidato</th><th>Idioma</th><th>Prova oral</th><th>Situação</th><th></th></tr></thead><tbody id="nv-i-corpo"></tbody></table></div></div>';
+      el('nv-fi-idi').addEventListener('change', function() { N.fIdi = this.value; renderInsc(); });
+      el('nv-fi-sit').addEventListener('change', function() { N.fSit = this.value; renderInsc(); });
+      el('nv-fi-busca').addEventListener('input', function() { N.busca = this.value.trim().toLowerCase(); renderInsc(); });
+      el('nv-fi-atual').addEventListener('click', carregar);
+      el('nv-fi-nova').addEventListener('click', abrirInsc);
+      el('nv-i-corpo').addEventListener('click', function(e) {
+        var b = e.target.closest('[data-iacao]'); if (!b) return;
+        var i = inscricao(b.dataset.id); if (!i) return;
+        if (b.dataset.iacao === 'comp') comprovante(i);
+        else if (b.dataset.iacao === 'remarcar') abrirRemarcar(i);
+        else if (b.dataset.iacao === 'cancelar') abrirCancelar(i);
+      });
+    }
+    var ativas = ins.filter(function(i) { return i.situacao !== 'cancelada'; });
+    function cont(s) { return ativas.filter(function(i) { return i.situacao === s; }).length; }
+    var livres = (d.vagas || []).reduce(function(t, v) { return t + Math.max(0, v.capacidade - v.ocupadas); }, 0);
+    el('nv-i-resumo').innerHTML =
+      '<div class="nv-ri"><b>' + ativas.length + '</b>inscrições</div>' +
+      '<div class="nv-ri"><b>' + livres + '</b>vagas livres</div>' +
+      '<div class="nv-ri"><b>' + cont('agendada') + '</b>agendadas</div>' +
+      '<div class="nv-ri"><b>' + cont('aguardando_escrita') + '</b>aguardando escrita</div>' +
+      '<div class="nv-ri"><b>' + cont('deferida') + '</b>deferidas</div>' +
+      '<div class="nv-ri"><b>' + cont('iniciante') + '</b>iniciantes</div>' +
+      '<div class="nv-ri"><b>' + (cont('nao_compareceu') + cont('nao_fez_escrita')) + '</b>indeferidas</div>';
+    var q = N.busca;
+    var lista = ins.filter(function(i) {
+      if (N.fIdi && i.idioma_id !== N.fIdi) return false;
+      if (N.fSit && i.situacao !== N.fSit) return false;
+      if (!N.fSit && i.situacao === 'cancelada' && !q) return false;
+      if (q && [i.protocolo, i.candidato.nome, i.candidato.cpf].join(' ').toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    }).slice().reverse();
+    el('nv-i-corpo').innerHTML = lista.length ? lista.map(function(i) {
+      var c = i.candidato, ac = ['<button class="nv-ico" title="Comprovante" data-iacao="comp" data-id="' + i.id + '"><span class="material-icons-round">print</span></button>'];
+      if (i.situacao === 'agendada') ac.push('<button class="nv-ico" title="Trocar dia/horário" data-iacao="remarcar" data-id="' + i.id + '"><span class="material-icons-round">event_repeat</span></button>');
+      if (i.situacao !== 'cancelada' && (i.situacao === 'agendada' || coord())) ac.push('<button class="nv-ico perigo" title="Cancelar inscrição" data-iacao="cancelar" data-id="' + i.id + '"><span class="material-icons-round">block</span></button>');
+      return '<tr><td class="nv-cod">' + esc(i.protocolo) + '<span class="nv-s">' + fmtD(i.inscrito_em) + '</span></td>' +
+        '<td>' + esc(c.nome) + (c.ex_aluno ? '<span class="nv-selo" title="Ex-aluno: mantém o código ' + esc(c.ex_aluno) + '">ex-aluno</span>' : '') +
+          '<span class="nv-s">' + esc(c.cpf || '') + ' · ' + dataBR(c.nascimento) + ' (' + idade(c.nascimento) + ')</span></td>' +
+        '<td>' + esc(i.idioma) + '</td><td>' + esc(vagaTxt(i.vaga)) + '</td>' +
+        '<td><span class="nv-st ' + i.situacao + '">' + esc(SIT[i.situacao] || i.situacao) + '</span>' +
+          (i.final && i.final.curso ? '<span class="nv-s">' + esc(i.final.curso.nome) + '</span>' : '') +
+          (i.cancelado ? '<span class="nv-s">' + esc(i.cancelado.motivo) + '</span>' : '') + '</td>' +
+        '<td><div class="nv-ac">' + ac.join('') + '</div></td></tr>';
+    }).join('') : '<tr><td colspan="6" class="nv-vazio">Nenhuma inscrição com estes filtros.</td></tr>';
+  }
+
+  function vagasLivres(idi, mod, atualId) {
+    return ((N.dados && N.dados.vagas) || []).filter(function(v) {
+      return v.idioma_id === idi && (!mod || v.modalidade === mod) && (v.ocupadas < v.capacidade || v.id === atualId);
+    });
+  }
+  function opcoesVagas(lista, atualId) {
+    if (!lista.length) return '<option value="">Nenhum dia e horário com vaga</option>';
+    return '<option value="">Escolha…</option>' + lista.map(function(v) {
+      return '<option value="' + v.id + '"' + (v.id === atualId ? ' selected' : '') + '>' + esc(vagaTxt(v) + ' — ' + (v.capacidade - v.ocupadas) + ' vaga(s)') + '</option>'; }).join('');
+  }
+  function abrirInsc() {
+    ['nv-i-nome', 'nv-i-cpf', 'nv-i-nasc', 'nv-i-email', 'nv-i-tel'].forEach(function(id) { el(id).value = ''; });
+    el('nv-i-idi').innerHTML = N.idiomas.map(function(i) { return '<option value="' + i.id + '">' + esc(i.nome) + '</option>'; }).join('');
+    if (N.fIdi) el('nv-i-idi').value = N.fIdi;
+    el('nv-i-al').className = 'nv-al';
+    preencherVagasInsc();
+    el('nv-i-ok').disabled = false;
+    el('nv-m-insc').classList.add('show'); el('nv-i-nome').focus();
+  }
+  function preencherVagasInsc() { el('nv-i-vaga').innerHTML = opcoesVagas(vagasLivres(el('nv-i-idi').value, el('nv-i-mod').value)); }
+  function salvarInsc() {
+    var dados = { nome: el('nv-i-nome').value, cpf: el('nv-i-cpf').value, nascimento: el('nv-i-nasc').value,
+                  email: el('nv-i-email').value, telefone: el('nv-i-tel').value, idioma_id: el('nv-i-idi').value, vaga_id: el('nv-i-vaga').value };
+    if (!dados.vaga_id) { alerta('nv-i-al', 'Escolha o dia e horário da prova.'); return; }
+    var b = el('nv-i-ok'); b.disabled = true;
+    api('niv.inscrever', dados).then(function(res) {
+      b.disabled = false;
+      if (!res.sucesso) { alerta('nv-i-al', res.mensagem); return; }
+      fechar('nv-m-insc');
+      aviso('Inscrição ' + res.dados.protocolo + ' feita.');
+      comprovante(res.dados);
+      carregar();
+    });
+  }
+  function abrirAcao(titulo, info, corpo, ok) {
+    el('nv-a-tit').textContent = titulo; el('nv-a-info').innerHTML = info; el('nv-a-corpo').innerHTML = corpo;
+    el('nv-a-al').className = 'nv-al'; N.acaoOk = ok; el('nv-m-acao').classList.add('show');
+  }
+  function abrirRemarcar(i) {
+    abrirAcao('Trocar dia/horário — ' + i.protocolo, esc(i.candidato.nome) + ' · ' + esc(i.idioma) + '<br>Atual: ' + esc(vagaTxt(i.vaga)),
+      '<div class="nv-c"><label for="nv-a-vaga">Novo dia e horário</label><select class="nv-sel" id="nv-a-vaga">' + opcoesVagas(vagasLivres(i.idioma_id, null, i.vaga && i.vaga.id), i.vaga && i.vaga.id) + '</select></div>',
+      function() {
+        api('niv.remarcar', { id: i.id, vaga_id: el('nv-a-vaga').value }).then(function(res) {
+          if (!res.sucesso) { alerta('nv-a-al', res.mensagem); return; }
+          fechar('nv-m-acao'); aviso(res.mensagem); carregar();
+          if (confirm('Imprimir o comprovante com o novo horário?')) comprovante(res.dados);
+        });
+      });
+  }
+  function abrirCancelar(i) {
+    abrirAcao('Cancelar inscrição — ' + i.protocolo, esc(i.candidato.nome) + ' · ' + esc(i.idioma) + ' · ' + esc(vagaTxt(i.vaga)),
+      '<div class="nv-c"><label for="nv-a-mot">Motivo</label><input class="nv-in" id="nv-a-mot" maxlength="300"></div>',
+      function() {
+        api('niv.cancelar', { id: i.id, motivo: el('nv-a-mot').value }).then(function(res) {
+          if (!res.sucesso) { alerta('nv-a-al', res.mensagem); return; }
+          fechar('nv-m-acao'); aviso(res.mensagem); carregar();
+        });
+      });
+  }
+
+  // Comprovante em janela própria (para imprimir ou salvar em PDF)
+  function comprovante(i) {
+    var c = i.candidato, v = i.vaga || {}, esc2 = esc;
+    var escola = (typeof App !== 'undefined' && App.config && (App.config.nome_escola || App.config.NomeEscola)) || 'CELINPB';
+    var onde = v.modalidade === 'ONLINE'
+      ? 'Prova oral <b>online</b> em ' + dataBR(v.data) + ' (' + diaSem(v.data) + '), das ' + v.inicio + ' às ' + v.fim + '. O link da chamada é enviado pela escola.'
+      : 'Prova oral <b>presencial</b> em ' + dataBR(v.data) + ' (' + diaSem(v.data) + '), turno da ' + String(v.turno || '').toLowerCase() +
+        ': chegue entre ' + v.inicio + ' e ' + v.fim + '. O atendimento é por ordem de chegada.';
+    var html = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Comprovante ' + esc2(i.protocolo) + '</title>' +
+      '<style>body{font-family:Arial,Helvetica,sans-serif;color:#1A1A2E;max-width:700px;margin:24px auto;padding:0 20px;}h1{font-size:20px;margin:0 0 4px;}' +
+      '.s{color:#5C5C7A;font-size:13px;margin:0 0 18px;}dl{display:grid;grid-template-columns:12em 1fr;gap:6px 12px;margin:0 0 16px;}dt{color:#5C5C7A;font-size:13px;}dd{margin:0;font-weight:600;}' +
+      'ul{font-size:13px;line-height:1.5;padding-left:18px;}.prot{font-size:22px;font-weight:700;letter-spacing:.04em;}button{margin-top:16px;padding:8px 16px;font-size:14px;}@media print{button{display:none;}}</style></head><body>' +
+      '<h1>Comprovante de inscrição no nivelamento</h1><p class="s">' + esc2(escola) + ' · Semestre ' + esc2((N.ciclo.proximo || {}).rotulo || '') + '</p>' +
+      '<p>Protocolo <span class="prot">' + esc2(i.protocolo) + '</span></p>' +
+      '<dl><dt>Candidato(a)</dt><dd>' + esc2(c.nome) + '</dd><dt>CPF</dt><dd>' + esc2(c.cpf || '') + '</dd>' +
+      '<dt>Nascimento</dt><dd>' + dataBR(c.nascimento) + '</dd><dt>E-mail</dt><dd>' + esc2(c.email || '') + '</dd>' +
+      '<dt>Idioma</dt><dd>' + esc2(i.idioma || '') + '</dd><dt>Inscrito em</dt><dd>' + fmtD(i.inscrito_em) + '</dd></dl>' +
+      '<p>' + onde + '</p>' +
+      '<ul><li>Leve documento <b>original com foto</b>. Menor sem documento: documento do responsável e certidão de nascimento.</li>' +
+      '<li>Quem for indicado(a) para o estágio 2 em diante recebe a <b>prova escrita por e-mail</b> em até 24 horas depois da prova oral e precisa respondê-la no prazo.</li>' +
+      '<li>Faltar à prova oral ou não responder a prova escrita desclassifica.</li>' +
+      '<li>O nivelamento <b>não garante vaga</b>: a matrícula segue o período e as regras da matrícula de novatos.</li>' +
+      '<li>Os dados da inscrição não podem ser alterados depois de feita.</li></ul>' +
+      '<button onclick="window.print()">Imprimir ou salvar em PDF</button></body></html>';
+    var w = window.open('', '_blank');
+    if (!w) { aviso('O navegador bloqueou a janela do comprovante. Permita pop-ups para o SGE.', 'error'); return; }
+    w.document.open(); w.document.write(html); w.document.close();
+  }
+
+  // ── Provas (oral) ───────────────────────────────────────────────────────
+  function hojeISO() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Fortaleza' }).format(new Date()); }
+  function carregarProvas() {
+    var box = el('nv-provas');
+    if (!box.dataset.montado) {
+      box.dataset.montado = '1';
+      box.innerHTML =
+        '<div class="nv-barra"><select class="nv-sel" id="nv-p-data"></select>' +
+          '<select class="nv-sel" id="nv-p-idi"><option value="">Todos os idiomas</option>' + N.idiomas.map(function(i) { return '<option value="' + i.id + '">' + esc(i.nome) + '</option>'; }).join('') + '</select>' +
+          '<span class="nv-esp"></span><button class="nv-btn" id="nv-p-atual"><span class="material-icons-round">refresh</span>Atualizar</button></div>' +
+        '<p class="nv-av" id="nv-p-aviso"></p><div id="nv-p-corpo"></div>';
+      el('nv-p-data').addEventListener('change', function() { N.provaData = this.value; carregarProvas(); });
+      el('nv-p-idi').addEventListener('change', function() { N.provaIdi = this.value; renderProvas(); });
+      el('nv-p-atual').addEventListener('click', carregarProvas);
+      el('nv-p-corpo').addEventListener('click', function(e) {
+        var b = e.target.closest('[data-oral]'); if (!b) return;
+        var i = null;
+        (N.provas.vagas || []).forEach(function(v) { (v.inscricoes || []).forEach(function(x) { if (x.id === b.dataset.oral) i = x; }); });
+        if (i) abrirOral(i);
+      });
+    }
+    el('nv-p-corpo').innerHTML = '<div class="nv-vazio">Carregando…</div>';
+    return api('niv.provas', { data: N.provaData || hojeISO() }).then(function(res) {
+      if (!res.sucesso) { el('nv-p-corpo').innerHTML = '<div class="nv-vazio">' + esc(res.mensagem) + '</div>'; return; }
+      N.provas = res.dados || {};
+      var datas = N.provas.datas || [];
+      if (!N.provaData) {
+        var hoje = hojeISO();
+        N.provaData = datas.indexOf(hoje) !== -1 ? hoje : (datas.filter(function(d) { return d >= hoje; })[0] || datas[datas.length - 1] || hoje);
+        if (N.provaData !== hoje) return carregarProvas();
+      }
+      el('nv-p-data').innerHTML = (datas.length ? datas : [N.provaData]).map(function(d) {
+        return '<option value="' + d + '"' + (d === N.provaData ? ' selected' : '') + '>' + dataBR(d) + ' (' + diaSem(d) + ')' + (d === hojeISO() ? ' — hoje' : '') + '</option>'; }).join('');
+      el('nv-p-aviso').textContent = N.provas.pode_registrar ? 'Registre cada candidato logo depois da prova oral. Quem for indicado para o estágio 2 em diante recebe a prova escrita por e-mail (coordenação).'
+        : 'Fora do período das provas: só consulta.';
+      renderProvas();
+    });
+  }
+  function renderProvas() {
+    var vagas = (N.provas.vagas || []).filter(function(v) { return !N.provaIdi || v.idioma_id === N.provaIdi; });
+    if (!vagas.length) { el('nv-p-corpo').innerHTML = '<div class="nv-card"><div class="nv-vazio">Nenhuma prova neste dia.</div></div>'; return; }
+    el('nv-p-corpo').innerHTML = vagas.map(function(v) {
+      var ins = v.inscricoes || [];
+      return '<div class="nv-card"><div class="nv-card-h">' + esc(v.idioma) + ' · ' + (v.modalidade === 'ONLINE' ? 'Online ' + v.inicio + '–' + v.fim : 'Presencial, ' + String(v.turno || '').toLowerCase() + ' (' + v.inicio + '–' + v.fim + ')') +
+        '<span class="nv-sub">' + ins.length + ' candidato(s)</span></div>' +
+        (ins.length ? '<div class="nv-wrap"><table class="nv-t"><tbody>' + ins.map(function(i) {
+          var c = i.candidato;
+          return '<tr><td>' + esc(c.nome) + '<span class="nv-s">' + dataBR(c.nascimento) + ' (' + idade(c.nascimento) + ') · ' + esc(c.cpf || '') + '</span></td>' +
+            '<td>' + esc(c.email || '') + '<span class="nv-s">' + esc(c.telefone || '') + '</span></td>' +
+            '<td><span class="nv-st ' + i.situacao + '">' + esc(i.situacao === 'aguardando_escrita' ? 'Oral: ' + oralTxt(i) : SIT[i.situacao]) + '</span>' +
+              (i.oral && i.oral.por ? '<span class="nv-s">por ' + esc(i.oral.por) + '</span>' : '') + '</td>' +
+            '<td><div class="nv-ac">' + (N.provas.pode_registrar && !i.final ? '<button class="nv-btn" data-oral="' + i.id + '"><span class="material-icons-round">edit_note</span>' + (i.oral ? 'Corrigir' : 'Registrar') + '</button>' : '') + '</div></td></tr>';
+        }).join('') + '</tbody></table></div>' : '<div class="nv-vazio">Ninguém inscrito neste horário.</div>') + '</div>';
+    }).join('');
+  }
+  function abrirOral(i) {
+    N.atual = i;
+    var c = i.candidato;
+    el('nv-o-tit').textContent = 'Prova oral — ' + c.nome;
+    el('nv-o-info').innerHTML = esc(i.protocolo) + ' · ' + esc(i.idioma) + ' · ' + esc(vagaTxt(i.vaga));
+    el('nv-o-c1').innerHTML = opcoesCursos(i.idioma_id, i.oral && i.oral.curso1 && i.oral.curso1.id);
+    el('nv-o-c2').innerHTML = opcoesCursos(i.idioma_id, i.oral && i.oral.curso2 && i.oral.curso2.id);
+    el('nv-o-nome').value = c.nome || ''; el('nv-o-nasc').value = String(c.nascimento || '').slice(0, 10);
+    el('nv-o-email').value = c.email || ''; el('nv-o-tel').value = c.telefone || '';
+    el('nv-o-conf').checked = !!(i.oral && i.oral.dados_confirmados);
+    el('nv-o-obs').value = (i.oral && i.oral.obs) || '';
+    var atual = !i.oral ? '' : i.situacao === 'nao_compareceu' ? 'nao_compareceu' : (i.oral.curso1 ? 'estagios' : 'iniciante');
+    document.querySelectorAll('input[name="nv-o-res"]').forEach(function(r) { r.checked = r.value === atual; });
+    el('nv-o-al').className = 'nv-al';
+    ajustarOral();
+    el('nv-m-oral').classList.add('show');
+  }
+  function resOral() { var r = document.querySelector('input[name="nv-o-res"]:checked'); return r ? r.value : ''; }
+  function ajustarOral() {
+    var r = resOral();
+    el('nv-o-est').style.display = r === 'estagios' ? '' : 'none';
+    el('nv-o-dados').style.display = r && r !== 'nao_compareceu' ? '' : 'none';
+  }
+  function salvarOral() {
+    var i = N.atual, r = resOral(); if (!i) return;
+    if (!r) { alerta('nv-o-al', 'Escolha o resultado da prova oral.'); return; }
+    var c = i.candidato, dados = {};
+    if (el('nv-o-nome').value.trim().toUpperCase() !== String(c.nome || '').toUpperCase()) dados.nome = el('nv-o-nome').value;
+    if (el('nv-o-nasc').value && el('nv-o-nasc').value !== String(c.nascimento || '').slice(0, 10)) dados.nascimento = el('nv-o-nasc').value;
+    if (el('nv-o-email').value.trim().toLowerCase() !== String(c.email || '').toLowerCase()) dados.email = el('nv-o-email').value;
+    if (el('nv-o-tel').value.trim() !== String(c.telefone || '')) dados.telefone = el('nv-o-tel').value;
+    var b = el('nv-o-ok'); b.disabled = true;
+    api('niv.oral', { id: i.id, resultado: r, curso1_id: el('nv-o-c1').value || null, curso2_id: el('nv-o-c2').value || null,
+                      obs: el('nv-o-obs').value, dados_confirmados: el('nv-o-conf').checked, dados: dados }).then(function(res) {
+      b.disabled = false;
+      if (!res.sucesso) { alerta('nv-o-al', res.mensagem); return; }
+      fechar('nv-m-oral'); aviso(res.mensagem);
+      carregarProvas(); if (papel() !== 'professor') carregar();
+    });
+  }
+
+  // ── Resultado ───────────────────────────────────────────────────────────
+  function renderRes() {
+    var box = el('nv-res'), ins = (N.dados.inscricoes || []).filter(function(i) { return i.situacao !== 'cancelada'; });
+    if (!box.dataset.montado) {
+      box.dataset.montado = '1';
+      box.innerHTML =
+        '<div class="nv-barra">' +
+          '<select class="nv-sel" id="nv-r-idi"><option value="">Todos os idiomas</option>' + N.idiomas.map(function(i) { return '<option value="' + i.id + '">' + esc(i.nome) + '</option>'; }).join('') + '</select>' +
+          '<select class="nv-sel" id="nv-r-sit"><option value="">Todas as situações</option>' + Object.keys(SIT).filter(function(k) { return k !== 'cancelada'; }).map(function(k) { return '<option value="' + k + '">' + SIT[k] + '</option>'; }).join('') + '</select>' +
+          '<input type="search" class="nv-in nv-busca" id="nv-r-busca" placeholder="Buscar nome ou protocolo…">' +
+          '<span class="nv-esp"></span>' +
+          '<button class="nv-btn" id="nv-r-escrita"><span class="material-icons-round">mail</span>Lista para a prova escrita (.xlsx)</button>' +
+          '<button class="nv-btn" id="nv-r-xlsx"><span class="material-icons-round">download</span>Resultado para publicar (.xlsx)</button>' +
+        '</div>' +
+        '<p class="nv-av">' + (coord() ? 'Lance o resultado final de cada candidato depois de corrigir a prova escrita: o estágio final ou "não realizou a prova escrita". Depois da divulgação, qualquer mudança pede justificativa (retificação).'
+                                       : 'Só a coordenação e o admin lançam o resultado final.') + '</p>' +
+        '<div class="nv-card"><div class="nv-wrap"><table class="nv-t"><thead><tr><th>Candidato</th><th>Idioma</th><th>Oral</th><th>Resultado</th><th></th></tr></thead><tbody id="nv-r-corpo"></tbody></table></div></div>';
+      el('nv-r-idi').addEventListener('change', function() { N.rIdi = this.value; renderRes(); });
+      el('nv-r-sit').addEventListener('change', function() { N.rSit = this.value; renderRes(); });
+      el('nv-r-busca').addEventListener('input', function() { N.rBusca = this.value.trim().toLowerCase(); renderRes(); });
+      el('nv-r-xlsx').addEventListener('click', baixarResultado);
+      el('nv-r-escrita').addEventListener('click', baixarEscrita);
+      el('nv-r-corpo').addEventListener('click', function(e) {
+        var b = e.target.closest('[data-final]'); if (!b) return;
+        var i = inscricao(b.dataset.final); if (i) abrirFinal(i);
+      });
+    }
+    var q = N.rBusca || '';
+    var lista = ins.filter(function(i) {
+      return (!N.rIdi || i.idioma_id === N.rIdi) && (!N.rSit || i.situacao === N.rSit) &&
+             (!q || [i.protocolo, i.candidato.nome].join(' ').toLowerCase().indexOf(q) !== -1);
+    }).sort(function(a, b) { return a.idioma.localeCompare(b.idioma, 'pt-BR') || a.candidato.nome.localeCompare(b.candidato.nome, 'pt-BR'); });
+    el('nv-r-corpo').innerHTML = lista.length ? lista.map(function(i) {
+      return '<tr><td>' + esc(i.candidato.nome) + '<span class="nv-s">' + esc(i.protocolo) + ' · ' + esc(i.candidato.email || '') + '</span></td>' +
+        '<td>' + esc(i.idioma) + '</td><td>' + esc(oralTxt(i)) + (i.oral && i.oral.obs ? '<span class="nv-s">' + esc(i.oral.obs) + '</span>' : '') + '</td>' +
+        '<td><span class="nv-st ' + i.situacao + '">' + esc(SIT[i.situacao]) + '</span>' +
+          (i.final && i.final.curso ? '<span class="nv-s"><b>' + esc(i.final.curso.nome) + '</b></span>' : '') +
+          (i.final && i.final.retificado ? '<span class="nv-s">retificado</span>' : '') +
+          (i.final && i.final.obs ? '<span class="nv-s">' + esc(i.final.obs) + '</span>' : '') + '</td>' +
+        '<td><div class="nv-ac">' + (coord() ? '<button class="nv-btn" data-final="' + i.id + '"><span class="material-icons-round">fact_check</span>' + (i.final ? 'Alterar' : 'Lançar') + '</button>' : '') + '</div></td></tr>';
+    }).join('') : '<tr><td colspan="5" class="nv-vazio">Nenhum candidato com estes filtros.</td></tr>';
+  }
+  function abrirFinal(i) {
+    N.atual = i;
+    var pub = N.dados.periodos && N.dados.periodos.resultado_publicado;
+    el('nv-f-tit').textContent = 'Resultado final — ' + i.candidato.nome;
+    el('nv-f-info').innerHTML = esc(i.protocolo) + ' · ' + esc(i.idioma) + ' · nascimento ' + dataBR(i.candidato.nascimento) +
+      ' (' + idade(i.candidato.nascimento, N.dados.data_corte) + ' na data de corte)<br>Prova oral: <b>' + esc(oralTxt(i)) + '</b>' +
+      (i.final ? '<br>Resultado atual: <b>' + esc(SIT[i.situacao]) + (i.final.curso ? ' — ' + esc(i.final.curso.nome) : '') + '</b>' : '');
+    var sugest = i.final && i.final.curso ? i.final.curso.id : (i.oral && i.oral.curso1 ? i.oral.curso1.id : '');
+    el('nv-f-curso').innerHTML = opcoesCursos(i.idioma_id, sugest);
+    var nao = i.situacao === 'nao_fez_escrita';
+    document.querySelectorAll('input[name="nv-f-tipo"]').forEach(function(r) { r.checked = (r.value === 'nao') === nao; });
+    el('nv-f-curso').disabled = nao;
+    var excecao = ['agendada', 'nao_compareceu', 'iniciante'].indexOf(i.situacao) !== -1;
+    el('nv-f-mot-rot').textContent = (i.final && pub) ? 'Justificativa da retificação (obrigatória)' : excecao ? 'Justificativa da exceção (obrigatória)' : 'Observação (opcional)';
+    el('nv-f-mot').value = '';
+    el('nv-f-limpar').style.display = i.final ? '' : 'none';
+    el('nv-f-al').className = 'nv-al';
+    el('nv-m-final').classList.add('show');
+  }
+  function salvarFinal(forcar) {
+    var i = N.atual; if (!i) return;
+    var tipo = document.querySelector('input[name="nv-f-tipo"]:checked');
+    if (!tipo) { alerta('nv-f-al', 'Escolha o estágio final ou "não realizou a prova escrita".'); return; }
+    api('niv.final', { id: i.id, nao_fez_escrita: tipo.value === 'nao', curso_id: tipo.value === 'nao' ? null : el('nv-f-curso').value || null,
+                       motivo: el('nv-f-mot').value, forcar: forcar === true }).then(function(res) {
+      if (!res.sucesso && res.dados && res.dados.confirmacaoNecessaria) { if (confirm(res.mensagem)) salvarFinal(true); return; }
+      if (!res.sucesso) { alerta('nv-f-al', res.mensagem); return; }
+      fechar('nv-m-final'); aviso(res.mensagem); carregar();
+    });
+  }
+  function limparFinal() {
+    var i = N.atual; if (!i) return;
+    if (!confirm('Retirar o resultado final de ' + i.candidato.nome + '? Ele volta para a situação da prova oral.')) return;
+    api('niv.finalLimpar', { id: i.id, motivo: el('nv-f-mot').value }).then(function(res) {
+      if (!res.sucesso) { alerta('nv-f-al', res.mensagem); return; }
+      fechar('nv-m-final'); aviso(res.mensagem); carregar();
+    });
+  }
+
+  // Planilhas
+  function carregarLib() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    if (window.__xlsxCarregando) return window.__xlsxCarregando;
+    window.__xlsxCarregando = new Promise(function(resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      sc.onload = function() { resolve(window.XLSX); };
+      sc.onerror = function() { window.__xlsxCarregando = null; reject(new Error('Não foi possível carregar a biblioteca da planilha. Verifique a conexão e tente novamente.')); };
+      document.head.appendChild(sc);
+    });
+    return window.__xlsxCarregando;
+  }
+  function nomeAba(s) { return String(s || 'Aba').replace(/[\\\/\?\*\[\]:]/g, ' ').slice(0, 31); }
+  function baixarResultado() {
+    carregarLib().then(function(XLSX) {
+      var ins = (N.dados.inscricoes || []).filter(function(i) { return i.situacao !== 'cancelada'; });
+      var pend = ins.filter(function(i) { return i.situacao === 'agendada' || i.situacao === 'aguardando_escrita'; }).length;
+      if (pend && !confirm(pend + ' candidato(s) ainda sem resultado final (agendados ou aguardando a prova escrita) ficam fora da lista. Baixar mesmo assim?')) return;
+      var wb = XLSX.utils.book_new();
+      N.idiomas.forEach(function(idi) {
+        var linhas = ins.filter(function(i) { return i.idioma_id === idi.id && ['deferida', 'iniciante', 'nao_compareceu', 'nao_fez_escrita'].indexOf(i.situacao) !== -1; })
+          .sort(function(a, b) { return a.candidato.nome.localeCompare(b.candidato.nome, 'pt-BR'); })
+          .map(function(i) { return { 'Nome': i.candidato.nome, 'Idioma': i.idioma, 'Estágio': i.final && i.final.curso ? i.final.curso.nome : '', 'Situação': SIT[i.situacao] }; });
+        if (linhas.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(linhas), nomeAba(idi.nome));
+      });
+      if (!wb.SheetNames.length) { aviso('Ainda não há resultado final para publicar.', 'error'); return; }
+      XLSX.writeFile(wb, 'resultado-nivelamento-' + ((N.ciclo.proximo || {}).external_id || '') + '.xlsx');
+    }).catch(function(e) { aviso(e.message, 'error'); });
+  }
+  function baixarEscrita() {
+    carregarLib().then(function(XLSX) {
+      var linhas = (N.dados.inscricoes || []).filter(function(i) { return i.situacao === 'aguardando_escrita'; })
+        .sort(function(a, b) { return a.idioma.localeCompare(b.idioma, 'pt-BR') || a.candidato.nome.localeCompare(b.candidato.nome, 'pt-BR'); })
+        .map(function(i) { return { 'Protocolo': i.protocolo, 'Idioma': i.idioma, 'Nome': i.candidato.nome, 'E-mail': i.candidato.email || '', 'Telefone': i.candidato.telefone || '',
+                                    'Estágio(s) da oral': oralTxt(i), 'Prova oral em': i.oral ? fmtD(i.oral.em) : '', 'Avaliador': i.oral ? i.oral.por || '' : '' }; });
+      if (!linhas.length) { aviso('Ninguém aguardando a prova escrita.', 'error'); return; }
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(linhas), 'Prova escrita');
+      XLSX.writeFile(wb, 'nivelamento-prova-escrita-' + hojeISO() + '.xlsx');
+    }).catch(function(e) { aviso(e.message, 'error'); });
+  }
+
+  // ── Vagas ───────────────────────────────────────────────────────────────
+  function renderVagas() {
+    var box = el('nv-vagas');
+    if (!box.dataset.montado) {
+      box.dataset.montado = '1';
+      box.innerHTML =
+        '<div class="nv-card"><div class="nv-card-h">Criar vagas</div><div style="padding:14px;">' +
+          '<div class="nv-al" id="nv-v-al"></div>' +
+          '<div class="nv-g" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">' +
+            '<div class="nv-c"><label for="nv-v-idi">Idioma</label><select class="nv-sel" id="nv-v-idi">' + N.idiomas.map(function(i) { return '<option value="' + i.id + '">' + esc(i.nome) + '</option>'; }).join('') + '</select></div>' +
+            '<div class="nv-c"><label for="nv-v-mod">Modalidade</label><select class="nv-sel" id="nv-v-mod"><option value="PRESENCIAL">Presencial</option><option value="ONLINE">Online</option></select></div>' +
+            '<div class="nv-c"><label for="nv-v-data">Data</label><input class="nv-in" type="date" id="nv-v-data"></div>' +
+            '<div class="nv-c" id="nv-v-turno-w"><label for="nv-v-turno">Turno</label><select class="nv-sel" id="nv-v-turno"><option value="MANHÃ">Manhã</option><option value="TARDE">Tarde</option><option value="NOITE">Noite</option></select></div>' +
+            '<div class="nv-c"><label for="nv-v-ini">Início</label><input class="nv-in" type="time" id="nv-v-ini" value="08:00"></div>' +
+            '<div class="nv-c"><label for="nv-v-fim">Fim</label><input class="nv-in" type="time" id="nv-v-fim" value="10:00"></div>' +
+            '<div class="nv-c"><label for="nv-v-cap" id="nv-v-cap-rot">Vagas</label><input class="nv-in" type="number" min="1" id="nv-v-cap" value="20"></div>' +
+          '</div>' +
+          '<p class="nv-av" id="nv-v-dica" style="margin:10px 0;"></p>' +
+          '<button class="nv-btn prim" id="nv-v-ok"><span class="material-icons-round">add</span>Criar</button>' +
+        '</div></div>' +
+        '<div class="nv-card"><div class="nv-wrap"><table class="nv-t"><thead><tr><th>Idioma</th><th>Data</th><th>Prova</th><th>Vagas</th><th>Inscritos</th><th></th></tr></thead><tbody id="nv-v-corpo"></tbody></table></div></div>';
+      function ajustar() {
+        var on = el('nv-v-mod').value === 'ONLINE';
+        el('nv-v-turno-w').style.display = on ? 'none' : '';
+        el('nv-v-cap-rot').textContent = on ? 'Avaliadores ao mesmo tempo' : 'Vagas';
+        el('nv-v-dica').textContent = on ? 'Online: o sistema cria um horário a cada 30 minutos entre o início e o fim, cada um com tantas vagas quantos avaliadores. Horário que já existe só tem as vagas atualizadas.'
+          : 'Presencial: uma vaga por dia e turno, com atendimento por ordem de chegada dentro do horário (N-05).';
+      }
+      el('nv-v-mod').addEventListener('change', ajustar);
+      el('nv-v-turno').addEventListener('change', function() { var j = JANELA[this.value]; if (j) { el('nv-v-ini').value = j[0]; el('nv-v-fim').value = j[1]; } });
+      el('nv-v-ok').addEventListener('click', criarVagas);
+      el('nv-v-corpo').addEventListener('click', function(e) {
+        var b = e.target.closest('[data-vacao]'); if (!b) return;
+        var id = b.dataset.id;
+        if (b.dataset.vacao === 'salvar') {
+          api('niv.vagaSalvar', { id: id, capacidade: el('nv-vc-' + id).value }).then(function(res) { aviso(res.mensagem, res.sucesso ? 'success' : 'error'); if (res.sucesso) carregar(); });
+        } else if (b.dataset.vacao === 'excluir') {
+          if (!confirm('Excluir esta vaga?')) return;
+          api('niv.vagaExcluir', { id: id }).then(function(res) { aviso(res.mensagem, res.sucesso ? 'success' : 'error'); if (res.sucesso) carregar(); });
+        }
+      });
+      ajustar();
+    }
+    var vagas = N.dados.vagas || [];
+    el('nv-v-corpo').innerHTML = vagas.length ? vagas.map(function(v) {
+      return '<tr><td>' + esc(v.idioma) + '</td><td>' + dataBR(v.data) + ' (' + diaSem(v.data) + ')</td>' +
+        '<td>' + (v.modalidade === 'ONLINE' ? 'Online ' + v.inicio + '–' + v.fim : 'Presencial, ' + String(v.turno || '').toLowerCase() + ' (' + v.inicio + '–' + v.fim + ')') + '</td>' +
+        '<td><input class="nv-in" type="number" min="' + v.ocupadas + '" id="nv-vc-' + v.id + '" value="' + v.capacidade + '" style="width:80px;"></td>' +
+        '<td>' + v.ocupadas + '</td>' +
+        '<td><div class="nv-ac"><button class="nv-ico" title="Salvar vagas" data-vacao="salvar" data-id="' + v.id + '"><span class="material-icons-round">save</span></button>' +
+          '<button class="nv-ico perigo" title="Excluir" data-vacao="excluir" data-id="' + v.id + '"><span class="material-icons-round">delete</span></button></div></td></tr>';
+    }).join('') : '<tr><td colspan="6" class="nv-vazio">Nenhuma vaga criada.</td></tr>';
+  }
+  function criarVagas() {
+    var on = el('nv-v-mod').value === 'ONLINE';
+    var p = { idioma_id: el('nv-v-idi').value, modalidade: el('nv-v-mod').value, data: el('nv-v-data').value,
+              inicio: el('nv-v-ini').value, fim: el('nv-v-fim').value, turno: on ? null : el('nv-v-turno').value };
+    p[on ? 'avaliadores' : 'capacidade'] = el('nv-v-cap').value;
+    api('niv.vagasGerar', p).then(function(res) {
+      if (!res.sucesso) { alerta('nv-v-al', res.mensagem); return; }
+      alerta('nv-v-al', res.dados + ' horário(s) criado(s) ou atualizado(s).', true);
+      carregar();
+    });
+  }
+
+  // ── Início ──────────────────────────────────────────────────────────────
+  function init() {
+    if (['admin', 'coordenacao', 'secretaria', 'professor'].indexOf(papel()) === -1) { estadoVazio('lock', 'Sem acesso a esta área.'); return; }
+    Promise.all([window.postApi('ciclo.estado', {}), window.postApi('cursos.listar', {})]).then(function(r) {
+      if (!r[0].sucesso || !r[0].dados || !r[0].dados.ativo || !r[0].dados.proximo) { estadoVazio('toggle_off', 'A transição de semestre não está ativada.'); return; }
+      N.ciclo = r[0].dados;
+      N.cursos = (r[1] && r[1].sucesso && r[1].dados) || [];
+      var mapa = {};
+      N.cursos.forEach(function(c) { var id = c.idioma_id || (c.idiomas && c.idiomas.id); if (id) mapa[id] = (c.idiomas && c.idiomas.nome) || mapa[id] || ''; });
+      N.idiomas = Object.keys(mapa).map(function(id) { return { id: id, nome: mapa[id] }; }).sort(function(a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
+      montar();
+      carregar();
+    }).catch(function() { estadoVazio('wifi_off', 'Erro de comunicação.'); });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+}());
+</script>
