@@ -127,6 +127,36 @@
   .btn-n7-modal-primario:hover{background:#C1121F;}
   .btn-n7-modal-sec{background:#fff;color:var(--c-text-1,#1A1A2E);border:1.5px solid var(--c-border,#E8E7E2);}
   .btn-n7-modal-sec:hover{background:#F5F4F0;}
+
+  /* =========================================================
+     ENCERRAMENTO DA TURMA (etapa 20 — D-57 a D-61)
+  ========================================================= */
+  .n7-enc{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .n7-enc-st{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:600;}
+  .n7-enc-st .material-icons-round{font-size:15px;}
+  .n7-enc-st.aberta{background:#F5F4F0;color:var(--c-text-2,#5C5C7A);}
+  .n7-enc-st.entregue{background:rgba(69,123,157,0.12);color:#185FA5;}
+  .n7-enc-st.concluida{background:rgba(42,157,143,0.12);color:#1A6E65;}
+  .n7-enc-txt{flex:1;min-width:200px;font-size:12.5px;color:var(--c-text-2,#5C5C7A);line-height:1.45;}
+  .n7-enc-txt b{color:var(--c-text-1,#1A1A2E);}
+  .n7-enc-txt .falta{color:#A32D2D;}
+  .btn-n7-entregar{height:36px;padding:0 14px;border-radius:8px;border:1.5px solid #185FA5;background:#fff;color:#185FA5;font-family:var(--font-sans,sans-serif);font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+  .btn-n7-entregar:hover:not(:disabled){background:rgba(69,123,157,0.08);}
+  .btn-n7-entregar:disabled{opacity:0.5;cursor:not-allowed;}
+  .btn-n7-entregar .material-icons-round{font-size:17px;}
+  .btn-n7-sug{height:28px;padding:0 8px;border-radius:6px;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;cursor:pointer;font-size:11.5px;font-family:var(--font-sans,sans-serif);color:var(--c-text-2,#5C5C7A);white-space:nowrap;display:inline-flex;align-items:center;gap:3px;}
+  .btn-n7-sug:hover{background:#F5F4F0;}
+  .btn-n7-sug .material-icons-round{font-size:14px;}
+  .btn-n7-sug.pendente{border-color:#D4A843;color:#8A6412;background:rgba(212,168,67,0.10);}
+  .btn-n7-sug.aprovada{border-color:#2A9D8F;color:#1A6E65;background:rgba(42,157,143,0.08);}
+  .btn-n7-sug.recusada{border-color:rgba(230,57,70,0.35);color:#A32D2D;background:rgba(230,57,70,0.05);}
+  .n7-campo{margin-bottom:12px;}
+  .n7-campo label{display:block;font-size:11px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;color:var(--c-text-3,#9898B0);margin-bottom:5px;}
+  .n7-campo select,.n7-campo textarea{width:100%;border:1.5px solid var(--c-border,#E8E7E2);border-radius:7px;padding:8px 10px;font-family:var(--font-sans,sans-serif);font-size:13px;background:#FAFAF8;color:var(--c-text-1,#1A1A2E);}
+  .n7-campo select{height:38px;padding:0 10px;}
+  .n7-pend-lista{margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--c-text-1,#1A1A2E);line-height:1.6;}
+  .n7-aviso-box{font-size:12.5px;color:var(--c-text-2,#5C5C7A);line-height:1.5;margin-bottom:12px;}
+  .n7-aviso-box.erro{color:#A32D2D;}
 </style>
 
 <!-- PASSO 1: SELEÇÃO DE TURMA -->
@@ -150,6 +180,7 @@
     </button>
   </div>
 
+  <div class="n7-enc" id="n7-enc" style="display:none;"></div>
   <div class="n7-escala" id="n7-escala" style="display:none;"></div>
   <div class="n7-legenda" id="n7-legenda"></div>
 
@@ -199,10 +230,53 @@
   </div>
 </div>
 
+<!-- MODAL: ENTREGAR TURMA -->
+<div class="n7-modal-overlay" id="n7-modal-entrega" style="display:none;">
+  <div class="n7-modal">
+    <div class="n7-modal-header">
+      <span class="n7-modal-titulo">Entregar turma</span>
+      <button class="btn-fechar-n7" data-fechar="n7-modal-entrega"><span class="material-icons-round">close</span></button>
+    </div>
+    <div class="n7-modal-corpo" id="n7-entrega-corpo"></div>
+    <div class="n7-modal-footer">
+      <button class="btn-n7-modal btn-n7-modal-sec" data-fechar="n7-modal-entrega">Fechar</button>
+      <button class="btn-n7-modal btn-n7-modal-primario" id="btn-n7-entrega-ok">
+        <div class="spinner-btn"></div><span class="btn-txt">Entregar</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: SUGERIR PROMOÇÃO/DEMOÇÃO (D-59) -->
+<div class="n7-modal-overlay" id="n7-modal-sug" style="display:none;">
+  <div class="n7-modal">
+    <div class="n7-modal-header">
+      <span class="n7-modal-titulo">Sugerir promoção ou demoção</span>
+      <button class="btn-fechar-n7" data-fechar="n7-modal-sug"><span class="material-icons-round">close</span></button>
+    </div>
+    <div class="n7-modal-corpo">
+      <p id="n7-sug-aluno"></p>
+      <div class="n7-aviso-box" id="n7-sug-info"></div>
+      <div class="n7-campo"><label for="n7-sug-tipo">Sugestão</label>
+        <select id="n7-sug-tipo"><option value="promocao">Promoção (avançar além do estágio seguinte)</option><option value="democao">Demoção (voltar de estágio)</option></select></div>
+      <div class="n7-campo"><label for="n7-sug-curso">Curso de destino no próximo semestre</label><select id="n7-sug-curso"></select></div>
+      <div class="n7-campo"><label for="n7-sug-motivo">Motivo</label><textarea id="n7-sug-motivo" rows="3" maxlength="500" placeholder="Ex.: domina o conteúdo do estágio seguinte; fez a prova de nivelamento…"></textarea></div>
+      <div class="n7-aviso-box erro" id="n7-sug-erro" style="display:none;"></div>
+    </div>
+    <div class="n7-modal-footer" style="justify-content:space-between;">
+      <button class="btn-n7-modal btn-n7-modal-sec" id="btn-n7-sug-retirar">Retirar sugestão</button>
+      <span style="display:flex;gap:8px;">
+        <button class="btn-n7-modal btn-n7-modal-sec" data-fechar="n7-modal-sug">Cancelar</button>
+        <button class="btn-n7-modal btn-n7-modal-primario" id="btn-n7-sug-ok"><div class="spinner-btn"></div><span class="btn-txt">Enviar à coordenação</span></button>
+      </span>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   'use strict';
-  var S={turmas:[],turmaSel:null,matriculas:[],avaliacoes:[],notas:{},notasSalvas:{},comentarios:{},medias:{},papel:'',usuarioId:'',matComentario:null,etapaAtual:'1'};
+  var S={turmas:[],turmaSel:null,matriculas:[],avaliacoes:[],notas:{},notasSalvas:{},comentarios:{},medias:{},papel:'',usuarioId:'',matComentario:null,etapaAtual:'1',enc:null,cursos:[],matSug:null};
   // Escala oficial de notas (10/2026): 0 a 100, aprovação com média 70 em
   // CADA componente. Os valores vêm da tabela `avaliacoes` (já cadastrados
   // assim); estes números só valem se algum campo estiver vazio no banco.
@@ -289,14 +363,20 @@
 
   function carregarDadosTurma(t){
     Promise.all([
-      postApi('matriculas.listar',{turma_id:t.id,situacao:'ATIVA'}),
+      postApi('matriculas.listar',{turma_id:t.id}),
       postApi('cursos.listar',{}),
       postApi('avaliacoes.listar',{}),
+      carregarEncerramento(t),
     ]).then(function(results){
       if(!results[0].sucesso){mostrarEstado('erro');return;}
-      S.matriculas=(results[0].dados||[]).map(normM);
+      // Ativas; e, com a turma concluída pela coordenação, as concluídas (só leitura).
+      var concluida=turmaConcluida();
+      S.matriculas=(results[0].dados||[]).filter(function(m){
+        return m.situacao==='ATIVA'||(concluida&&m.situacao==='CONCLUIDA');
+      }).map(normM);
       S.matriculas.sort(function(a,b){return (a.NomeExibicao||'').localeCompare(b.NomeExibicao||'','pt-BR',{sensitivity:'base'});}); // ordem alfabética
       var cursos=(results[1].sucesso&&results[1].dados)?results[1].dados:[];
+      S.cursos=cursos;
       var todasAv=(results[2].sucesso&&results[2].dados)?results[2].dados.map(normAv):[];
       var cursoRaw=cursos.find(function(c){return c.id===t.curso_id;});
       var idsAvCurso=cursoRaw&&cursoRaw.curso_avaliacoes?(cursoRaw.curso_avaliacoes.map(function(ca){return ca.avaliacao_id;})):[];
@@ -321,6 +401,7 @@
         });
         renderizarGrid();
         mostrarEstado('ok');
+        aplicarSomenteLeitura();
       }).catch(function(){ mostrarEstado('erro'); });
     }).catch(function(){ mostrarEstado('erro'); });
   }
@@ -393,7 +474,7 @@
         colunas.push({componente:av.ComponenteNota,subcomponente:sub,chave:av.ComponenteNota+'|'+sub,av:av,avIdx:avIdx});
       }
     });
-    ['Média','Situação','Obs.'].forEach(function(txt){var th=document.createElement('th');th.textContent=txt;trHead.appendChild(th);});
+    ['Média','Situação','Obs.','Encaminhamento'].forEach(function(txt){var th=document.createElement('th');th.textContent=txt;trHead.appendChild(th);});
     thead.innerHTML='';thead.appendChild(trHead);
 
     tbody.innerHTML='';
@@ -440,6 +521,9 @@
       btnCom.innerHTML='<span class="material-icons-round">comment</span>';
       btnCom.addEventListener('click',function(){abrirModalComentario(m);});
       tdCom.appendChild(btnCom);tr.appendChild(tdCom);
+      var tdSug=document.createElement('td');
+      tdSug.appendChild(botaoSugestao(m));
+      tr.appendChild(tdSug);
       tbody.appendChild(tr);
     });
   }
@@ -457,7 +541,8 @@
     var sit= temPendente ? 'PENDENTE' : (media.aprovado?'APROVADO':'REPROVADO');
     var classeMedia = temPendente?'pend':(media.aprovado?'ap':'rep');
     tdM.innerHTML='<span class="n7-media '+classeMedia+'">'+medias+'</span>';
-    tdS.innerHTML='<span class="badge-n7 '+sit+'">'+sit+'</span>';
+    // Nomenclatura da escola: nota abaixo da média = RETIDO (a frequência é vista no Diário/encerramento).
+    tdS.innerHTML='<span class="badge-n7 '+sit+'">'+(sit==='REPROVADO'?'RETIDO':sit)+'</span>';
   }
 
   function salvarNotas(){
@@ -485,6 +570,7 @@
         document.querySelectorAll('.n7-nota-input.modificado').forEach(function(i){i.classList.remove('modificado');});
         S.matriculas.forEach(function(m){S.medias[m.id]=calcularMedia(m.id);});
         renderizarGrid();
+        if(S.turmaSel) carregarEncerramento(S.turmaSel).then(function(){ renderizarGrid(); aplicarSomenteLeitura(); });
       }
     }).catch(function(){
       if(btn){btn.disabled=false;btn.classList.remove('loading');}
@@ -566,7 +652,158 @@
     });
   }
 
+  // =========================================================================
+  // ENCERRAMENTO (etapa 20): situação da turma, entrega, sugestões
+  // =========================================================================
+  function fmtDataHora(iso){
+    if(!iso)return '';
+    var d=new Date(iso); if(isNaN(d))return '';
+    return d.toLocaleDateString('pt-BR',{timeZone:'America/Fortaleza'})+' às '+d.toLocaleTimeString('pt-BR',{timeZone:'America/Fortaleza',hour:'2-digit',minute:'2-digit'});
+  }
+  function escN(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+  function turmaConcluida(){ return !!(S.enc&&S.enc.turma&&S.enc.turma.concluida_em); }
+  function podeEntregar(){ return ['professor','coordenacao','admin'].indexOf(S.papel)!==-1; }
+
+  // Dados de encerramento da turma. Se a etapa 20 ainda não estiver no banco,
+  // a tela continua funcionando como antes (sem a barra de encerramento).
+  function carregarEncerramento(t){
+    return postApi('enc.turma',{turma_id:t.id}).then(function(res){
+      S.enc=(res&&res.sucesso)?res.dados:null;
+      renderEncerramento();
+      return S.enc;
+    }).catch(function(){ S.enc=null; renderEncerramento(); return null; });
+  }
+  function encAluno(matId){
+    if(!S.enc||!S.enc.alunos)return null;
+    return S.enc.alunos.filter(function(a){return a.matricula_id===matId;})[0]||null;
+  }
+
+  function renderEncerramento(){
+    var box=el('n7-enc'); if(!box)return;
+    if(!S.enc){ box.style.display='none'; return; }
+    var t=S.enc.turma||{}, pend=S.enc.pendencias||{};
+    var aulas=(pend.aulas_sem_frequencia||[]);
+    var faltas=[];
+    if(pend.alunos_sem_nota) faltas.push(pend.alunos_sem_nota+' aluno(s) com nota faltando');
+    if(aulas.length) faltas.push(aulas.length+' aula(s) sem frequência completa');
+    var st, txt;
+    if(t.concluida_em){
+      st='<span class="n7-enc-st concluida"><span class="material-icons-round">verified</span>Concluída</span>';
+      txt='Concluída pela coordenação em <b>'+fmtDataHora(t.concluida_em)+'</b>'+(t.concluida_por?' ('+escN(t.concluida_por)+')':'')+'. Notas e frequência estão travadas; para corrigir, peça à coordenação para reabrir.';
+    } else if(t.entregue_em){
+      st='<span class="n7-enc-st entregue"><span class="material-icons-round">outbox</span>Entregue</span>';
+      txt='Entregue em <b>'+fmtDataHora(t.entregue_em)+'</b>'+(t.entregue_por?' ('+escN(t.entregue_por)+')':'')+'. Ainda é possível corrigir até a coordenação concluir a turma.'+
+        (faltas.length?' <span class="falta">Atenção: '+faltas.join('; ')+'.</span>':'');
+    } else {
+      st='<span class="n7-enc-st aberta"><span class="material-icons-round">edit_note</span>Em aberto</span>';
+      txt=faltas.length?'Para entregar: <span class="falta">'+faltas.join('; ')+'</span>.':'Notas e frequência completas: a turma já pode ser entregue.';
+    }
+    var btn=(!t.concluida_em&&podeEntregar())
+      ? '<button class="btn-n7-entregar" id="btn-n7-entregar"><span class="material-icons-round">outbox</span>'+(t.entregue_em?'Entregar de novo':'Entregar turma')+'</button>' : '';
+    box.innerHTML=st+'<div class="n7-enc-txt">'+txt+'</div>'+btn;
+    box.style.display='flex';
+    if(el('btn-n7-entregar'))el('btn-n7-entregar').addEventListener('click',abrirEntrega);
+  }
+
+  function aplicarSomenteLeitura(){
+    var ro=turmaConcluida();
+    document.querySelectorAll('#n7-tbody .n7-nota-input').forEach(function(i){i.disabled=ro;});
+    if(el('btn-n7-salvar'))el('btn-n7-salvar').style.display=ro?'none':'';
+  }
+
+  function abrirEntrega(){
+    var pend=(S.enc&&S.enc.pendencias)||{}, aulas=pend.aulas_sem_frequencia||[];
+    var corpo=el('n7-entrega-corpo'), ok=el('btn-n7-entrega-ok');
+    if(pend.alunos_sem_nota||aulas.length){
+      var semNota=(S.enc.alunos||[]).filter(function(a){return a.situacao==='ATIVA'&&a.falta_nota;}).map(function(a){return escN(a.aluno);});
+      corpo.innerHTML='<p class="n7-aviso-box erro">A turma só pode ser entregue com <b>notas e frequência completas</b>. Falta:</p><ul class="n7-pend-lista">'+
+        (semNota.length?'<li><b>Notas</b> de: '+semNota.join(', ')+'</li>':'')+
+        (aulas.length?'<li><b>Frequência</b> nas aulas de: '+aulas.map(function(a){return a.data.split('-').reverse().slice(0,2).join('/')+(a.alunos>1?' ('+a.alunos+' alunos)':' (1 aluno)');}).join(', ')+'</li>':'')+
+        '</ul><p class="n7-aviso-box" style="margin-top:10px;">Lance o que falta (Diário de aula e Notas) e tente de novo.</p>';
+      ok.style.display='none';
+    } else {
+      corpo.innerHTML='<p class="n7-aviso-box">Notas e frequência estão completas. Ao entregar, a coordenação é avisada de que a turma está pronta para ser concluída. Você ainda poderá corrigir algo até a conclusão.</p>';
+      ok.style.display='';
+    }
+    el('n7-modal-entrega').style.display='flex';
+  }
+  function confirmarEntrega(){
+    var btn=el('btn-n7-entrega-ok'); btn.disabled=true; btn.classList.add('loading');
+    postApi('enc.entregar',{turma_id:S.turmaSel.id}).then(function(res){
+      btn.disabled=false; btn.classList.remove('loading');
+      if(!res.sucesso){ if(typeof toast==='function')toast(res.mensagem||'Erro.','error'); return; }
+      S.enc=res.dados; renderEncerramento();
+      el('n7-modal-entrega').style.display='none';
+      if(typeof toast==='function')toast('Turma entregue à coordenação.','success');
+    });
+  }
+
+  var NOME_SUG={promocao:'Promoção',democao:'Demoção'};
+  function botaoSugestao(m){
+    var b=document.createElement('button'); b.type='button';
+    var a=encAluno(m.id), sg=a&&a.sugestao, dest=a&&a.destino;
+    if(!S.enc){ b.style.display='none'; return b; }
+    if(sg){
+      b.className='btn-n7-sug '+sg.status;
+      b.innerHTML='<span class="material-icons-round">'+(sg.status==='aprovada'?'check_circle':sg.status==='recusada'?'cancel':'schedule')+'</span>'+
+        escN(NOME_SUG[sg.tipo]||'')+' → '+escN(sg.curso?sg.curso.sigla:'')+(sg.status==='pendente'?' (aguardando)':sg.status==='aprovada'?' (aprovada)':' (recusada)');
+      b.title=(sg.motivo||'')+(sg.decisao_motivo?'\nCoordenação: '+sg.decisao_motivo:'');
+    } else if(dest){
+      b.className='btn-n7-sug aprovada';
+      b.innerHTML='<span class="material-icons-round">flag</span>'+escN(dest.curso?dest.curso.sigla:'sem destino')+' (coordenação)';
+      b.title=dest.motivo||'';
+    } else {
+      b.className='btn-n7-sug';
+      var padrao=a&&a.destino_padrao?a.destino_padrao.sigla:(a&&a.desistente?'desistente':'—');
+      b.innerHTML='<span class="material-icons-round">north_east</span>Sugerir';
+      b.title='Destino pelo resultado: '+padrao;
+    }
+    var bloqueado=turmaConcluida()||(sg&&sg.status!=='pendente')||(!sg&&dest);
+    if(bloqueado||!podeEntregar()) b.disabled=true;
+    b.addEventListener('click',function(){ abrirSugestao(m); });
+    return b;
+  }
+
+  function abrirSugestao(m){
+    S.matSug=m;
+    var a=encAluno(m.id)||{}, sg=a.sugestao;
+    var t=S.enc.turma||{}, idioma=t.curso&&t.curso.idioma_id;
+    el('n7-sug-aluno').textContent='Aluno: '+(m.NomeExibicao||m.AlunoID);
+    var NOME_RES={APROVADO:'Aprovado',RETIDO:'Retido',RETIDO_FALTAS:'Retido por faltas',PENDENTE:'Pendente'};
+    el('n7-sug-info').innerHTML='Resultado atual: <b>'+escN(NOME_RES[a.resultado]||a.resultado||'—')+'</b>. Destino pelo resultado: <b>'+
+      escN(a.destino_padrao?a.destino_padrao.sigla+' · '+a.destino_padrao.nome:(a.desistente?'desistente (retido por faltas)':'—'))+'</b>. A coordenação aprova ou recusa a sugestão.';
+    var cursos=S.cursos.filter(function(c){return c.idioma_id===idioma&&c.ativo!==false;})
+      .sort(function(x,y){return String(x.external_id).localeCompare(String(y.external_id),'pt-BR',{numeric:true});});
+    el('n7-sug-curso').innerHTML='<option value="">Escolha o curso…</option>'+cursos.map(function(c){return '<option value="'+escN(c.id)+'">'+escN(c.sigla)+' · '+escN(c.nome)+'</option>';}).join('');
+    el('n7-sug-tipo').value=sg?sg.tipo:'promocao';
+    el('n7-sug-curso').value=sg&&sg.curso?sg.curso.id:'';
+    el('n7-sug-motivo').value=sg?(sg.motivo||''):'';
+    el('btn-n7-sug-retirar').style.display=sg?'':'none';
+    el('n7-sug-erro').style.display='none';
+    el('n7-modal-sug').style.display='flex';
+  }
+  function enviarSugestao(retirar){
+    var m=S.matSug; if(!m)return;
+    var dados={matricula_id:m.id};
+    if(!retirar){
+      dados.curso_id=el('n7-sug-curso').value; dados.tipo=el('n7-sug-tipo').value; dados.motivo=el('n7-sug-motivo').value.trim();
+      if(!dados.curso_id||!dados.motivo){ var e=el('n7-sug-erro'); e.textContent='Escolha o curso e informe o motivo.'; e.style.display='block'; return; }
+    }
+    var btn=el('btn-n7-sug-ok'); btn.disabled=true; btn.classList.add('loading');
+    postApi('enc.sugerir',dados).then(function(res){
+      btn.disabled=false; btn.classList.remove('loading');
+      if(!res.sucesso){ var e=el('n7-sug-erro'); e.textContent=res.mensagem||'Erro.'; e.style.display='block'; return; }
+      S.enc=res.dados; renderEncerramento(); renderizarGrid(); aplicarSomenteLeitura();
+      el('n7-modal-sug').style.display='none';
+      if(typeof toast==='function')toast(retirar?'Sugestão retirada.':'Sugestão enviada à coordenação.','success');
+    });
+  }
+
   function registrarEventos(){
+    el('btn-n7-entrega-ok')&&el('btn-n7-entrega-ok').addEventListener('click',confirmarEntrega);
+    el('btn-n7-sug-ok')&&el('btn-n7-sug-ok').addEventListener('click',function(){enviarSugestao(false);});
+    el('btn-n7-sug-retirar')&&el('btn-n7-sug-retirar').addEventListener('click',function(){ if(confirm('Retirar a sugestão?'))enviarSugestao(true); });
+    document.querySelectorAll('[data-fechar]').forEach(function(b){ b.addEventListener('click',function(){ el(b.dataset.fechar).style.display='none'; }); });
     el('btn-n7-salvar')&&el('btn-n7-salvar').addEventListener('click',salvarNotas);
     el('btn-n7-trocar')&&el('btn-n7-trocar').addEventListener('click',function(){
       S.turmaSel=null;
