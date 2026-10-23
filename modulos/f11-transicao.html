@@ -1,0 +1,198 @@
+<!--
+  f11-transicao.html — Transição de semestre (etapa 17 — claude/transicao-semestre.md, Fase 2)
+  Admin e coordenação, e só enquanto o admin deixar a transição ativada
+  (Configurações → Transição). Nesta fase a tela só mostra a situação do
+  ciclo; as ferramentas (virada de turmas, rematrícula, nivelamento…) entram
+  nas fases seguintes, cada uma no seu bloco.
+-->
+<style>
+  .tr11-topo{background:#1A1A2E;border-radius:12px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px;}
+  .tr11-rot{font-size:10.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);margin-bottom:4px;}
+  .tr11-sem{font-size:20px;font-weight:600;color:#fff;font-family:var(--font-mono,monospace);letter-spacing:0.5px;display:flex;align-items:center;gap:10px;}
+  .tr11-sem .material-icons-round{font-size:20px;color:rgba(255,255,255,0.45);}
+  .tr11-chips{display:flex;gap:6px;flex-wrap:wrap;}
+  .tr11-chip{display:inline-flex;align-items:center;gap:5px;border-radius:20px;padding:4px 12px;font-size:11.5px;font-weight:500;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.15);}
+  .tr11-chip.ok{background:rgba(42,157,143,0.20);color:#5DCAA5;border-color:rgba(42,157,143,0.30);}
+  .tr11-chip.aviso{background:rgba(212,168,67,0.20);color:#F0C96A;border-color:rgba(212,168,67,0.35);}
+
+  .tr11-grade{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:20px;align-items:start;}
+  @media(max-width:900px){.tr11-grade{grid-template-columns:1fr;}}
+  .tr11-card{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:10px;overflow:hidden;margin-bottom:20px;}
+  .tr11-card-h{padding:14px 18px;border-bottom:1px solid var(--c-border,#E8E7E2);display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--c-text-1,#1A1A2E);}
+  .tr11-card-h .material-icons-round{font-size:18px;color:#E63946;}
+  .tr11-card-c{padding:6px 18px 14px;}
+
+  /* Linha do tempo */
+  .tr11-tl{list-style:none;margin:0;padding:0;}
+  .tr11-tl li{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:10px;align-items:start;padding:10px 0;border-top:1px solid var(--c-border,#E8E7E2);}
+  .tr11-tl li:first-child{border-top:none;}
+  .tr11-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:#F5F4F0;color:var(--c-text-3,#9898B0);font-family:var(--font-mono,monospace);}
+  .tr11-tl li.agora .tr11-num{background:#2A9D8F;color:#fff;}
+  .tr11-tl li.proxima .tr11-num{background:#D4A843;color:#fff;}
+  .tr11-tl li.passou .tr11-num{background:#E8E7E2;color:#fff;}
+  .tr11-nome{font-size:13.5px;font-weight:500;color:var(--c-text-1,#1A1A2E);}
+  .tr11-desc{font-size:12px;color:var(--c-text-3,#9898B0);margin-top:2px;line-height:1.4;}
+  .tr11-obs{font-size:12px;color:var(--c-text-2,#5C5C7A);margin-top:3px;font-style:italic;}
+  .tr11-tl li.passou .tr11-nome{color:var(--c-text-3,#9898B0);}
+  .tr11-quando{text-align:right;font-size:12px;font-family:var(--font-mono,monospace);color:var(--c-text-2,#5C5C7A);white-space:nowrap;}
+  .tr11-quando.vazio{font-family:var(--font-sans,sans-serif);color:var(--c-text-3,#9898B0);font-style:italic;}
+  .tr11-selo{display:inline-block;margin-top:4px;padding:1px 8px;border-radius:99px;font-size:10.5px;font-weight:600;font-family:var(--font-sans,sans-serif);}
+  .tr11-selo.agora{background:rgba(42,157,143,0.14);color:#1A6E65;}
+  .tr11-selo.proxima{background:rgba(212,168,67,0.18);color:#8A6412;}
+
+  /* Opções */
+  .tr11-op{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--c-border,#E8E7E2);font-size:13px;color:var(--c-text-1,#1A1A2E);}
+  .tr11-op:first-child{border-top:none;}
+  .tr11-val{flex-shrink:0;font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:4px;}
+  .tr11-val.sim{background:rgba(42,157,143,0.12);color:#1A6E65;}
+  .tr11-val.nao{background:#F5F4F0;color:var(--c-text-3,#9898B0);}
+  .tr11-val.num{background:rgba(69,123,157,0.10);color:#185FA5;font-family:var(--font-mono,monospace);}
+  .tr11-nota{font-size:11.5px;color:var(--c-text-3,#9898B0);padding-top:8px;}
+
+  /* Próximas ferramentas */
+  .tr11-ferr{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--c-border,#E8E7E2);}
+  .tr11-ferr:first-child{border-top:none;}
+  .tr11-ferr .material-icons-round{font-size:18px;color:var(--c-text-3,#9898B0);margin-top:1px;}
+  .tr11-ferr b{display:block;font-size:13px;font-weight:500;color:var(--c-text-1,#1A1A2E);}
+  .tr11-ferr span.d{font-size:12px;color:var(--c-text-3,#9898B0);}
+
+  .tr11-estado{padding:48px 24px;text-align:center;color:var(--c-text-3,#9898B0);}
+  .tr11-estado .material-icons-round{font-size:36px;display:block;margin:0 auto 10px;}
+</style>
+
+<div id="tr11-raiz">
+  <div class="tr11-estado"><div class="spinner" style="margin:0 auto 10px;"></div><p>Carregando…</p></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  function el(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+
+  var NOMES_FASE_SEM = { planejamento: 'Planejamento', inscricoes: 'Inscrições', em_andamento: 'Em andamento', encerrado: 'Encerrado' };
+
+  // O que cada fase do roteiro vai trazer para esta tela (claude/transicao-semestre.md, seção 10).
+  var FERRAMENTAS = [
+    { icone: 'autorenew',        nome: 'Planejamento de turmas',  desc: 'Virada de turmas por idioma, turmas novas, professores e disponibilidade.' },
+    { icone: 'task_alt',         nome: 'Encerramento do semestre', desc: 'Entrega das turmas pelos professores e conclusão pela coordenação.' },
+    { icone: 'how_to_reg',       nome: 'Rematrícula',              desc: 'Intenções dos alunos, cruzamento com o resultado final e análise das exceções.' },
+    { icone: 'quiz',             nome: 'Nivelamento',              desc: 'Vagas, agendamento, provas e resultado.' },
+    { icone: 'person_add',       nome: 'Matrícula de novatos',     desc: 'Solicitações, documentos, classificação e lista de espera.' },
+    { icone: 'flag',             nome: 'Virada do semestre',       desc: 'O próximo semestre passa a ser o atual.' },
+  ];
+
+  function fmt(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d)) return '';
+    return d.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
+           d.toLocaleTimeString('pt-BR', { timeZone: 'America/Fortaleza', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function estadoVazio(icone, texto) {
+    el('tr11-raiz').innerHTML = '<div class="tr11-estado"><span class="material-icons-round">' + icone + '</span><p>' + texto + '</p></div>';
+  }
+
+  function render(c) {
+    var agora = c.agora ? new Date(c.agora).getTime() : Date.now();
+    var p = c.proximo, cfg = c.config || {};
+    var fases = c.fases || [];
+    var proxima = null;
+    fases.forEach(function(f) {
+      var ini = f.inicio ? new Date(f.inicio).getTime() : null;
+      var fim = f.fim ? new Date(f.fim).getTime() : null;
+      if (ini === null && fim === null) f._st = 'sem';
+      else if (fim !== null && fim < agora) f._st = 'passou';
+      else if (ini !== null && ini > agora) f._st = 'futura';
+      else f._st = 'agora';
+      if (f._st === 'futura' && (!proxima || ini < new Date(proxima.inicio).getTime())) proxima = f;
+    });
+    var definidas = fases.filter(function(f) { return f._st !== 'sem'; }).length;
+
+    var tl = fases.map(function(f) {
+      var cls = f._st === 'agora' ? 'agora' : f === proxima ? 'proxima' : f._st === 'passou' ? 'passou' : '';
+      var quando;
+      if (f._st === 'sem') quando = '<div class="tr11-quando vazio">a definir</div>';
+      else {
+        quando = '<div class="tr11-quando">' +
+          (f.inicio ? fmt(f.inicio) : '—') + '<br>' + (f.fim ? fmt(f.fim) : '—') +
+          (f._st === 'agora' ? '<br><span class="tr11-selo agora">Agora</span>' : f === proxima ? '<br><span class="tr11-selo proxima">Próxima</span>' : '') +
+          '</div>';
+      }
+      return '<li class="' + cls + '">' +
+        '<span class="tr11-num">' + f.ordem + '</span>' +
+        '<div><div class="tr11-nome">' + esc(f.nome) + '</div>' +
+          (f.descricao ? '<div class="tr11-desc">' + esc(f.descricao) + '</div>' : '') +
+          (f.observacao ? '<div class="tr11-obs">' + esc(f.observacao) + '</div>' : '') +
+        '</div>' + quando + '</li>';
+    }).join('');
+
+    function op(nome, v) {
+      return '<div class="tr11-op"><span>' + nome + '</span><span class="tr11-val ' + (v ? 'sim' : 'nao') + '">' + (v ? 'Ligada' : 'Desligada') + '</span></div>';
+    }
+    function opNum(nome, v) {
+      return '<div class="tr11-op"><span>' + nome + '</span><span class="tr11-val num">' + esc(v == null ? '—' : v) + '</span></div>';
+    }
+    var opcoes =
+      op('Manter a modalidade na rematrícula', cfg.manter_modalidade) +
+      op('Impedimento do Decreto 46.371', cfg.aplicar_decreto_46371) +
+      op('Frequência abaixo de 75% = desistente', cfg.freq_baixa_desistente) +
+      op('Autoinscrição online no nivelamento', cfg.autoinscricao_nivelamento) +
+      opNum('Teto da cota prioritária', cfg.cota_prioritaria_pct == null ? null : cfg.cota_prioritaria_pct + '%') +
+      opNum('Lembrete de importação a cada', cfg.limite_lembrete_documentos);
+
+    var ferr = FERRAMENTAS.map(function(f) {
+      return '<div class="tr11-ferr"><span class="material-icons-round">' + f.icone + '</span><div><b>' + esc(f.nome) + '</b><span class="d">' + esc(f.desc) + '</span></div></div>';
+    }).join('');
+
+    var atual = c.atual ? (c.atual.rotulo || c.atual.external_id) : '—';
+    el('tr11-raiz').innerHTML =
+      '<div class="tr11-topo">' +
+        '<div><div class="tr11-rot">Transição de semestre</div>' +
+          '<div class="tr11-sem">' + esc(atual) + '<span class="material-icons-round">arrow_forward</span>' + esc(p.rotulo) + '</div></div>' +
+        '<div class="tr11-chips">' +
+          '<span class="tr11-chip aviso">' + esc(NOMES_FASE_SEM[p.fase] || p.fase) + '</span>' +
+          (p.visualizacao_ativa === false ? '<span class="tr11-chip">Semestre oculto</span>' : '<span class="tr11-chip ok">Semestre visível</span>') +
+          '<span class="tr11-chip">' + definidas + ' de ' + fases.length + ' fases com data</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="tr11-grade">' +
+        '<div class="tr11-card"><div class="tr11-card-h"><span class="material-icons-round">timeline</span>Calendário do ciclo</div>' +
+          '<div class="tr11-card-c"><ul class="tr11-tl">' + tl + '</ul>' +
+          '<div class="tr11-nota">Horários de Brasília. As datas são definidas pelo admin em Configurações → Transição.</div></div></div>' +
+        '<div>' +
+          '<div class="tr11-card"><div class="tr11-card-h"><span class="material-icons-round">tune</span>Opções do ciclo</div>' +
+            '<div class="tr11-card-c">' + opcoes + '<div class="tr11-nota">Somente o admin altera (Configurações → Transição).</div></div></div>' +
+          '<div class="tr11-card"><div class="tr11-card-h"><span class="material-icons-round">construction</span>Ferramentas da transição</div>' +
+            '<div class="tr11-card-c">' + ferr + '<div class="tr11-nota">Entram nesta tela à medida que cada etapa for liberada.</div></div></div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function init() {
+    var u = (typeof App !== 'undefined') ? App.usuario : null;
+    var papel = u ? (u.papel || u.Papel || '') : '';
+    if (papel !== 'admin' && papel !== 'coordenacao') {
+      estadoVazio('lock', 'Esta área é restrita a admin e coordenação.');
+      return;
+    }
+    // Sempre busca de novo: as datas podem ter mudado desde o login.
+    window.postApi('ciclo.estado', {})
+      .then(function(res) {
+        if (!res.sucesso) { estadoVazio('error_outline', esc(res.mensagem || 'Não foi possível carregar a transição.')); return; }
+        var c = res.dados;
+        if (typeof App !== 'undefined') App.ciclo = c;
+        if (!c || !c.ativo || !c.proximo) {
+          estadoVazio('toggle_off', 'A transição de semestre não está ativada.');
+          return;
+        }
+        render(c);
+      })
+      .catch(function() { estadoVazio('wifi_off', 'Erro de comunicação.'); });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+}());
+</script>
