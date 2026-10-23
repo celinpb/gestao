@@ -226,6 +226,17 @@ async function postApi(acao, dados) {
     if (acao === 'transicao.turmaExcluir')     return await _rpcTransicao(sb, 'turmas_proximo_excluir', { p_turma_id: dados && dados.turma_id }, 'Turma excluída.');
     if (acao === 'transicao.renumerar')        return await _rpcTransicao(sb, 'turmas_renumerar', { p_semestre_id: dados && dados.semestre_id }, 'Turmas renumeradas.');
 
+    // ── TRANSIÇÃO: ENCERRAMENTO DAS TURMAS (etapa 20) ───────────────────────
+    if (acao === 'enc.turma')     return await _rpcTransicao(sb, 'encerramento_turma', { p_turma_id: dados && dados.turma_id });
+    if (acao === 'enc.painel')    return await _rpcTransicao(sb, 'encerramento_painel', {});
+    if (acao === 'enc.entregar')  return await _rpcTransicao(sb, 'turma_entregar', { p_turma_id: dados && dados.turma_id }, 'Turma entregue.');
+    if (acao === 'enc.devolver')  return await _rpcTransicao(sb, 'turma_devolver', { p_turma_id: dados && dados.turma_id }, 'Turma devolvida ao professor.');
+    if (acao === 'enc.concluir')  return await _rpcTransicao(sb, 'turma_concluir', { p_turma_id: dados && dados.turma_id, p_forcar: !!(dados && dados.forcar) }, 'Turma concluída.');
+    if (acao === 'enc.reabrir')   return await _rpcTransicao(sb, 'turma_reabrir', { p_turma_id: dados && dados.turma_id }, 'Turma reaberta.');
+    if (acao === 'enc.sugerir')   return await _rpcTransicao(sb, 'encaminhamento_sugerir', { p_matricula_id: dados && dados.matricula_id, p_curso_id: (dados && dados.curso_id) || null, p_tipo: (dados && dados.tipo) || null, p_motivo: (dados && dados.motivo) || null }, 'Sugestão registrada.');
+    if (acao === 'enc.definir')   return await _rpcTransicao(sb, 'encaminhamento_definir', { p_matricula_id: dados && dados.matricula_id, p_curso_id: (dados && dados.curso_id) || null, p_tipo: dados && dados.tipo, p_motivo: (dados && dados.motivo) || null, p_bypass_idade: !!(dados && dados.bypass_idade) }, 'Destino salvo.');
+    if (acao === 'enc.recusar')   return await _rpcTransicao(sb, 'encaminhamento_recusar', { p_matricula_id: dados && dados.matricula_id, p_motivo: (dados && dados.motivo) || null }, 'Sugestão recusada.');
+
     // ── TRANSIÇÃO: DISPONIBILIDADE DOS PROFESSORES (etapa 19) ───────────────
     if (acao === 'disp.painel')              return await _rpcTransicao(sb, 'disp_painel', {});
     if (acao === 'disp.slotsGerar')          return await _rpcTransicao(sb, 'disp_slots_gerar', {}, 'Slots gerados.');
@@ -917,9 +928,13 @@ async function _rpcTransicao(sb, funcao, params, msgOk) {
   var res = await sb.rpc(funcao, params);
   if (res.error) {
     var msg = res.error.message || '';
-    if (msg.indexOf('DISPONIBILIDADE:') === 0) {
-      var aviso = msg.slice('DISPONIBILIDADE:'.length).trim();
-      return { sucesso: false, dados: { confirmacaoNecessaria: true }, mensagem: aviso.charAt(0).toUpperCase() + aviso.slice(1), codigo: 409 };
+    // Avisos que a tela confirma e reenviam forçando: disponibilidade (etapa
+    // 19), conclusão de turma não entregue (etapa 20) e idade fora da faixa
+    // do curso de destino (etapa 20).
+    var prefixo = ['DISPONIBILIDADE:', 'CONFIRMAR:', 'IDADE:'].filter(function(p) { return msg.indexOf(p) === 0; })[0];
+    if (prefixo) {
+      var aviso = msg.slice(prefixo.length).trim();
+      return { sucesso: false, dados: { confirmacaoNecessaria: true, tipo: prefixo.slice(0, -1) }, mensagem: aviso.charAt(0).toUpperCase() + aviso.slice(1), codigo: 409 };
     }
     return _err(msg);
   }
