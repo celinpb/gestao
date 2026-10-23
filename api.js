@@ -222,9 +222,21 @@ async function postApi(acao, dados) {
     if (acao === 'transicao.viradaCandidatas') return await _rpcTransicao(sb, 'turmas_virada_candidatas', { p_idioma_id: dados && dados.idioma_id });
     if (acao === 'transicao.virar')            return await _rpcTransicao(sb, 'turmas_virar', { p_turma_ids: (dados && dados.turma_ids) || [] }, 'Virada concluída.');
     if (acao === 'transicao.turmaSalvar')      return await _rpcTransicao(sb, 'turmas_proximo_salvar', { p: dados || {} }, 'Turma salva.');
-    if (acao === 'transicao.turmaAtribuir')    return await _rpcTransicao(sb, 'turmas_proximo_atribuir', { p_turma_id: dados && dados.turma_id, p_professor_id: (dados && dados.professor_id) || null }, 'Professor atualizado.');
+    if (acao === 'transicao.turmaAtribuir')    return await _rpcTransicao(sb, 'turmas_proximo_atribuir', { p_turma_id: dados && dados.turma_id, p_professor_id: (dados && dados.professor_id) || null, p_forcar: !!(dados && dados.forcar) }, 'Professor atualizado.');
     if (acao === 'transicao.turmaExcluir')     return await _rpcTransicao(sb, 'turmas_proximo_excluir', { p_turma_id: dados && dados.turma_id }, 'Turma excluída.');
     if (acao === 'transicao.renumerar')        return await _rpcTransicao(sb, 'turmas_renumerar', { p_semestre_id: dados && dados.semestre_id }, 'Turmas renumeradas.');
+
+    // ── TRANSIÇÃO: DISPONIBILIDADE DOS PROFESSORES (etapa 19) ───────────────
+    if (acao === 'disp.painel')              return await _rpcTransicao(sb, 'disp_painel', {});
+    if (acao === 'disp.slotsGerar')          return await _rpcTransicao(sb, 'disp_slots_gerar', {}, 'Slots gerados.');
+    if (acao === 'disp.slotSalvar')          return await _rpcTransicao(sb, 'disp_slot_salvar', { p: dados || {} }, 'Slot salvo.');
+    if (acao === 'disp.slotExcluir')         return await _rpcTransicao(sb, 'disp_slot_excluir', { p_slot_id: dados && dados.slot_id }, 'Slot excluído.');
+    if (acao === 'disp.minimoPadrao')        return await _rpcTransicao(sb, 'disp_minimo_padrao_salvar', { p_minimo: dados && dados.minimo }, 'Mínimo padrão salvo.');
+    if (acao === 'disp.minimoProfessor')     return await _rpcTransicao(sb, 'disp_minimo_professor_salvar', { p_professor_id: dados && dados.professor_id, p_minimo: (dados && dados.minimo != null && dados.minimo !== '') ? Number(dados.minimo) : null }, 'Mínimo salvo.');
+    if (acao === 'disp.minimoSabado')        return await _rpcTransicao(sb, 'disp_minimo_sabado_salvar', { p_professor_id: dados && dados.professor_id, p_minimo: (dados && dados.minimo != null && dados.minimo !== '') ? Number(dados.minimo) : null }, 'Sábado salvo.');
+    if (acao === 'disp.professoresTurma')    return await _rpcTransicao(sb, 'disp_professores_turma', { p_turma_id: dados && dados.turma_id });
+    if (acao === 'disp.minha')               return await _rpcTransicao(sb, 'disp_minha', {});
+    if (acao === 'disp.marcar')              return await _rpcTransicao(sb, 'disp_marcar', { p_slot_ids: (dados && dados.slot_ids) || [], p_professor_id: (dados && dados.professor_id) || null }, 'Disponibilidade salva.');
 
     // ── RELATÓRIOS ────────────────────────────────────────────────────────────
     // ── COMENTÁRIOS ───────────────────────────────────────────────────────────
@@ -899,9 +911,18 @@ async function _cicloSalvarConfig(sb, dados) {
 
 // Funções do banco da transição (etapa 18): todas conferem o papel
 // (admin/coordenação) e o semestre lá dentro; aqui só repassa.
+// Erro que começa com "DISPONIBILIDADE:" (etapa 19, D-55) é um AVISO: a tela
+// pergunta e, se a coordenação confirmar, chama de novo com forcar.
 async function _rpcTransicao(sb, funcao, params, msgOk) {
   var res = await sb.rpc(funcao, params);
-  if (res.error) return _err(res.error.message);
+  if (res.error) {
+    var msg = res.error.message || '';
+    if (msg.indexOf('DISPONIBILIDADE:') === 0) {
+      var aviso = msg.slice('DISPONIBILIDADE:'.length).trim();
+      return { sucesso: false, dados: { confirmacaoNecessaria: true }, mensagem: aviso.charAt(0).toUpperCase() + aviso.slice(1), codigo: 409 };
+    }
+    return _err(msg);
+  }
   return _ok(res.data, msgOk);
 }
 
