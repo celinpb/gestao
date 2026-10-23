@@ -45,6 +45,26 @@
   .dash-ciclo-vazio{font-size:13px;color:var(--c-text-3,#9898B0);}
   @media(max-width:560px){.dash-ciclo-item{flex-wrap:wrap;}.dash-ciclo-datas{white-space:normal;}}
 
+  /* ── Disponibilidade do professor (etapa 19) ── */
+  .dash-disp{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-left:4px solid #457B9D;border-radius:12px;padding:18px 20px;margin-bottom:28px;}
+  .dash-disp-topo{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+  .dash-disp-titulo{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--c-text-1,#1A1A2E);}
+  .dash-disp-titulo .material-icons-round{font-size:20px;color:#457B9D;}
+  .dash-disp-texto{font-size:13px;color:var(--c-text-2,#5C5C7A);line-height:1.5;margin-bottom:12px;}
+  .dash-disp-texto strong{color:var(--c-text-1,#1A1A2E);}
+  .dash-disp-dias{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:14px;}
+  .dash-disp-dia b{display:block;font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:var(--c-text-3,#9898B0);margin-bottom:6px;}
+  .dash-disp-slot{display:flex;align-items:center;gap:7px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:7px;padding:6px 9px;margin-bottom:6px;font-size:13px;cursor:pointer;color:var(--c-text-1,#1A1A2E);}
+  .dash-disp-slot input{accent-color:#457B9D;width:15px;height:15px;}
+  .dash-disp-slot.on{border-color:#457B9D;background:rgba(69,123,157,0.07);}
+  .dash-disp-slot.ro{cursor:default;}
+  .dash-disp-slot small{color:var(--c-text-3,#9898B0);font-size:11px;margin-left:auto;}
+  .dash-disp-rodape{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .dash-disp-cont{font-size:13px;color:var(--c-text-2,#5C5C7A);}
+  .dash-disp-cont.falta{color:#A32D2D;font-weight:600;}
+  .dash-disp-btn{height:38px;padding:0 18px;border-radius:8px;border:none;background:#457B9D;color:#fff;font-family:var(--font-sans,sans-serif);font-size:13.5px;font-weight:500;cursor:pointer;}
+  .dash-disp-btn:disabled{opacity:0.5;cursor:not-allowed;}
+
   /* ── Ocorrências pendentes ── */
   .dash-oco-wrap{display:flex;gap:20px;align-items:flex-start;margin-bottom:32px;}
   .dash-oco-lista-wrap{flex:1;min-width:0;}
@@ -130,6 +150,9 @@
 
 <!-- Transição de semestre: datas do ciclo (só aparece com a transição ativada) -->
 <div class="dash-ciclo" id="dash-ciclo" style="display:none;"></div>
+
+<!-- Disponibilidade do professor para o próximo semestre (só professor, com a transição ativada) -->
+<div class="dash-disp" id="dash-disp" style="display:none;"></div>
 
 <!-- Atalhos -->
 <div class="dash-atalhos-titulo">Acesso rápido</div>
@@ -521,6 +544,97 @@
     box.style.display = '';
   }
 
+  // ── Disponibilidade do professor (etapa 19 — D-54) ──────────────────────────
+  var DISP_DIAS = ['', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+  var disp = { dados: null, orig: '' };
+  function fmtDispData(iso) {
+    if (!iso) return '';
+    var d = new Date(iso); if (isNaN(d)) return '';
+    return d.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit' }) + ' às ' +
+           d.toLocaleTimeString('pt-BR', { timeZone: 'America/Fortaleza', hour: '2-digit', minute: '2-digit' });
+  }
+  function carregarDisp() {
+    var c = (typeof App !== 'undefined') ? App.ciclo : null;
+    if (state.papel !== 'professor' || !c || !c.ativo || !c.proximo) return;
+    postApi('disp.minha', {}).then(function(res) {
+      if (!res.sucesso || !res.dados) return;
+      disp.dados = res.dados;
+      renderDisp();
+    }).catch(function() {});
+  }
+  function dispMarcados() {
+    var ids = [];
+    document.querySelectorAll('#dash-disp input[type=checkbox]:checked').forEach(function(c) { ids.push(c.value); });
+    return ids;
+  }
+  function renderDisp() {
+    var d = disp.dados, box = el('dash-disp'); if (!box || !d) return;
+    var slots = d.slots || [], per = d.periodo || {};
+    var agora = Date.now();
+    var abre = per.inicio ? new Date(per.inicio).getTime() : null;
+    var marcados = slots.filter(function(s) { return s.marcado; });
+    var texto;
+    if (d.aberto) {
+      texto = slots.length
+        ? 'Marque os horários em que você pode dar aula no <strong>' + escD(d.semestre) + '</strong> — pelo menos <strong>' + d.minimo + '</strong>' +
+          (d.minimo_sabado ? ', sendo pelo menos <strong>' + d.minimo_sabado + ' no sábado</strong>' : '') + '.' +
+          (per.fim ? ' Prazo: até <strong>' + fmtDispData(per.fim) + '</strong>.' : '') + ' Quanto mais horários, mais opções a coordenação tem.'
+        : 'A coordenação ainda não cadastrou os horários. Volte mais tarde.';
+    } else if (abre && abre > agora) {
+      if (!slots.length && !marcados.length) { box.style.display = 'none'; return; }
+      texto = 'O período para informar sua disponibilidade para o <strong>' + escD(d.semestre) + '</strong> abre em <strong>' + fmtDispData(per.inicio) + '</strong>.';
+    } else if (abre) {
+      texto = 'O período para informar a disponibilidade terminou.' + (marcados.length ? ' Você marcou:' : ' Você não marcou nenhum horário; fale com a coordenação.');
+    } else {
+      box.style.display = 'none'; return;
+    }
+    var lista = d.aberto ? slots : marcados;
+    var porDia = {};
+    lista.forEach(function(s) { (porDia[s.dia] = porDia[s.dia] || []).push(s); });
+    var grade = Object.keys(porDia).sort().map(function(dia) {
+      return '<div class="dash-disp-dia"><b>' + DISP_DIAS[dia] + '</b>' + porDia[dia].map(function(s) {
+        return '<label class="dash-disp-slot' + (s.marcado ? ' on' : '') + (d.aberto ? '' : ' ro') + '">' +
+          (d.aberto ? '<input type="checkbox" value="' + escD(s.id) + '"' + (s.marcado ? ' checked' : '') + '>' : '') +
+          escD(s.horario) + '<small>' + escD(s.turno) + '</small></label>';
+      }).join('') + '</div>';
+    }).join('');
+    box.innerHTML =
+      '<div class="dash-disp-topo"><span class="dash-disp-titulo"><span class="material-icons-round">event_available</span>Sua disponibilidade para ' + escD(d.semestre) + '</span></div>' +
+      '<p class="dash-disp-texto">' + texto + '</p>' +
+      (grade ? '<div class="dash-disp-dias">' + grade + '</div>' : '') +
+      (d.aberto && slots.length ? '<div class="dash-disp-rodape"><span class="dash-disp-cont" id="dash-disp-cont"></span>' +
+        '<button class="dash-disp-btn" id="dash-disp-salvar">Salvar disponibilidade</button></div>' : '');
+    box.style.display = '';
+    if (d.aberto && slots.length) {
+      disp.orig = marcados.map(function(s) { return s.id; }).sort().join(',');
+      box.querySelectorAll('input[type=checkbox]').forEach(function(c) {
+        c.addEventListener('change', function() { c.closest('label').classList.toggle('on', c.checked); atualizarContDisp(); });
+      });
+      el('dash-disp-salvar').addEventListener('click', salvarDisp);
+      atualizarContDisp();
+    }
+  }
+  function atualizarContDisp() {
+    var ids = dispMarcados(), n = ids.length, min = disp.dados.minimo, cont = el('dash-disp-cont');
+    var minSab = disp.dados.minimo_sabado || 0;
+    var nSab = (disp.dados.slots || []).filter(function(s) { return s.dia === 6 && ids.indexOf(s.id) !== -1; }).length;
+    var mudou = ids.slice().sort().join(',') !== disp.orig;
+    var falta = n < min || nSab < minSab;
+    cont.textContent = n + ' marcado(s) · mínimo ' + min +
+      (minSab ? ' · sábado: ' + nSab + ' de ' + minSab : '') + (mudou ? ' · alterações não salvas' : '');
+    cont.className = 'dash-disp-cont' + (falta ? ' falta' : '');
+    el('dash-disp-salvar').disabled = !mudou || falta;
+  }
+  function salvarDisp() {
+    var ids = dispMarcados(), btn = el('dash-disp-salvar');
+    btn.disabled = true;
+    postApi('disp.marcar', { slot_ids: ids }).then(function(res) {
+      if (!res.sucesso) { btn.disabled = false; if (typeof toast === 'function') toast(res.mensagem || 'Erro.', 'error'); return; }
+      if (typeof toast === 'function') toast('Disponibilidade salva.', 'success');
+      carregarDisp();
+    }).catch(function() { btn.disabled = false; if (typeof toast === 'function') toast('Erro de comunicação.', 'error'); });
+  }
+
   // ── Init ──────────────────────────────────────────────────────────────────────
   function init() {
     // App.usuario/App.semestre vêm de index.html (onLoginSucesso/carregarShell)
@@ -553,6 +667,7 @@
     }
 
     renderCiclo();
+    carregarDisp();
     renderAtalhos(state.papel);
     carregarOcorrencias();
 
