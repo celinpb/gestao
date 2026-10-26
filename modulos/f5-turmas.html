@@ -781,9 +781,17 @@
     });
   }
 
+  // Maiúsculas e sem acento: "Híbrido", "HÍBRIDO" e "HIBRIDO" contam como o mesmo valor.
+  function semAcento(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();}
+
   function filtradas(){
     var b=S.busca.toLowerCase();
+    var mod=semAcento(val('t5-filtro-modalidade'));
+    var sit=val('t5-filtro-situacao')||'todas';
+    var sitAlvo={ativas:'ATIVA',inativas:'INATIVA',encerradas:'ENCERRADA'}[sit]||'';
     return S.turmas.filter(function(t){
+      if(mod && semAcento(t.Modalidade)!==mod) return false;
+      if(sitAlvo && semAcento(t.SituacaoTurma)!==sitAlvo) return false;
       if(!b)return true;
       return (t.TurmaID||'').toLowerCase().indexOf(b)!==-1||
              (t.Estagio||'').toLowerCase().indexOf(b)!==-1||
@@ -1269,6 +1277,8 @@
   function registrarEventos(){
     // Busca e filtros
     el('t5-busca')&&el('t5-busca').addEventListener('input',function(){S.busca=this.value.trim();renderizarLista();});
+    el('t5-filtro-modalidade')&&el('t5-filtro-modalidade').addEventListener('change',renderizarLista);
+    el('t5-filtro-situacao')&&el('t5-filtro-situacao').addEventListener('change',renderizarLista);
     // Painel
     el('btn-fechar-t5')&&el('btn-fechar-t5').addEventListener('click',fecharPainel); // ID real: btn-fechar-t5
     // Abas do painel
