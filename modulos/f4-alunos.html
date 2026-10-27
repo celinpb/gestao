@@ -1633,7 +1633,7 @@
     var sel=el('oco-dest-prof-sel');
     if(sel){
       sel.innerHTML='<option value="" disabled>Carregando...</option>';
-      postApi('ocorrencias.professoresDasTurmas', { aluno_id: state.ocoAlunoId })
+      postApi('ocorrencias.professoresDasTurmas', { alunoId: state.ocoAlunoId, aluno_id: state.ocoAlunoId }) // api.js lê "alunoId"
         .then(function(res){
           sel.innerHTML='';
           var profs = (res.sucesso&&res.dados) ? res.dados : [];
@@ -1658,7 +1658,7 @@
   function carregarTurmasOco() {
     var sel=el('oco-turma'), hint=el('oco-turma-hint'); if(!sel) return;
     sel.innerHTML='<option value="">Carregando turmas...</option>';
-    postApi('ocorrencias.turmasAtivasDoAluno', { aluno_id: state.ocoAlunoId })
+    postApi('ocorrencias.turmasAtivasDoAluno', { alunoId: state.ocoAlunoId, aluno_id: state.ocoAlunoId }) // api.js lê "alunoId"
       .then(function(res){
         var turmas=(res.sucesso&&res.dados)?res.dados:[];
         sel.innerHTML='';
@@ -1673,7 +1673,8 @@
           var opt=document.createElement('option');
           opt.value=t.id||t.TurmaID;
           opt.textContent=t.external_id||(t.cursos&&t.cursos.sigla)||t.TurmaID||'—';
-          if(t.estagio) opt.textContent+=' — '+t.estagio;
+          var est=t.Estagio||t.estagio; // api.js devolve "Estagio"
+          if(est) opt.textContent+=' — '+est;
           sel.appendChild(opt);
         });
         if(turmas.length===1){ sel.value=turmas[0].id||turmas[0].TurmaID; if(hint) hint.textContent='Turma preenchida automaticamente.'; }
