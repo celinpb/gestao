@@ -1258,7 +1258,9 @@
     set('f-raca', a.Raca); set('f-estado-civil', a.EstadoCivil); set('f-genero', a.Genero);
     set('f-estrangeiro', a.Estrangeiro ? 'true' : 'false');
     if(el('campo-passaporte')) el('campo-passaporte').style.display = a.Estrangeiro ? 'block':'none';
-    set('f-telefone', a.Telefone ? fmtTel(a.Telefone) : ''); // sem telefone: campo vazio (antes ficava "—" e a validação barrava o salvar) set('f-email', a.email);
+    set('f-passaporte', a.Passaporte); // sem isto, editar um aluno estrangeiro apagava o passaporte
+    set('f-telefone', a.Telefone ? fmtTel(a.Telefone) : ''); // sem telefone: campo vazio (antes ficava "—" e a validação barrava o salvar)
+    set('f-email', a.email); // linha própria: antes estava dentro do comentário acima e o e-mail era apagado ao salvar
     setC('f-pcd', a.PcDBoolean); set('f-pcd-tipo', a.PcDTipo); set('f-pcd-laudo', a.PcDLaudoURL);
     if(el('campo-pcd-tipo')) el('campo-pcd-tipo').style.display = a.PcDBoolean ? 'block':'none';
     if(el('campo-pcd-laudo')) el('campo-pcd-laudo').style.display = a.PcDBoolean ? 'block':'none';
