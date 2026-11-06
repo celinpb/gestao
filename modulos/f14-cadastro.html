@@ -308,6 +308,13 @@
               '<span>Cadastro de <strong>' + esc(u.nome) + '</strong> (' + esc(u.codigo || '') + ')' +
               (leitura ? ' — somente leitura: a coordenação não altera o cadastro de administradores.' : '.') + '</span></div>';
     }
+    // Pedido de completar cadastro (etapa 26)
+    if (d.pedido && (d.pendencias || []).length) {
+      html += '<div class="cd-aviso" style="background:#FDECEC;border-color:rgba(230,57,70,0.3);color:#8A1C24;"><span class="material-icons-round">assignment_late</span><span>' +
+              (embutido ? 'Há um pedido para completar este cadastro' + (d.pedido_adiamentos ? ' (adiado ' + d.pedido_adiamentos + ' de 3 vezes)' : '') + '. '
+                        : 'A coordenação pediu que você complete o seu cadastro. ') +
+              '<strong>Falta:</strong> ' + esc(d.pendencias.join(', ')) + '.</span></div>';
+    }
     if (d.nivel === 'proprio' && (!cad.cpf || !cad.data_nascimento || !(d.matriculas || []).length)) {
       html += '<div class="cd-aviso"><span class="material-icons-round">info</span><span>Confira os dados antes de salvar: ' +
               '<strong>data de nascimento, CPF, RG e matrículas funcionais</strong>, depois de salvos, só podem ser alterados pela coordenação.</span></div>';
@@ -607,6 +614,8 @@
       if (!res.sucesso) { aviso(res.mensagem || 'Erro ao salvar.', 'error'); return; }
       aviso(res.dados && res.dados.alterado === false ? 'Nenhuma alteração para salvar.' : 'Cadastro salvo.');
       aplicar(res.dados);
+      // Meu cadastro: libera o sistema se o pedido de completar foi encerrado
+      if (!embutido && typeof window.verificarPedidoCadastro === 'function') window.verificarPedidoCadastro(true);
     }).catch(function() { aviso('Erro de comunicação.', 'error'); })
       .finally(function() { state.salvando = false; if (el('cd-salvar')) el('cd-salvar').disabled = false; });
   }
