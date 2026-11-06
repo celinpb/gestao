@@ -366,6 +366,12 @@
       state.usuarios = (res.dados || []).map(norm);
       renderizar();
       montarSeletorCadastro();
+      // Vindo do Início (pendências de idiomas): abre direto o cadastro
+      if (window.SGE_ABRIR_CADASTRO) {
+        var abrir = window.SGE_ABRIR_CADASTRO;
+        window.SGE_ABRIR_CADASTRO = null;
+        abrirCadastro(abrir);
+      }
     }).catch(function(e){ setEstado('erro', e.message || 'Erro.'); });
   }
 
