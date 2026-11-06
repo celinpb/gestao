@@ -146,6 +146,11 @@ async function postApi(acao, dados) {
     // Idiomas que leciona (etapa 25): validar/recusar e pendências do dashboard
     if (acao === 'idiomas.validar')   return await _rpcTransicao(sb, 'usuario_idioma_validar', { p_usuario_id: dados && dados.usuario_id, p_idioma_id: dados && dados.idioma_id, p_aprovar: !!(dados && dados.aprovar) }, (dados && dados.aprovar) ? 'Idioma validado.' : 'Idioma recusado.');
     if (acao === 'idiomas.pendentes') return await _rpcTransicao(sb, 'usuarios_idiomas_pendentes', {});
+    // Pedido de completar cadastro (etapa 26)
+    if (acao === 'cadastro.pedidoEstado') return await _rpcTransicao(sb, 'cad_pedido_estado', {});
+    if (acao === 'cadastro.pedidoAdiar')  return await _rpcTransicao(sb, 'cad_pedido_adiar', {});
+    if (acao === 'cadastro.pedidoMarcar') return await _rpcTransicao(sb, 'cad_pedidos_marcar', { p_ids: (dados && dados.ids) || [], p_marcar: !!(dados && dados.marcar) });
+    if (acao === 'cadastro.pedidosLista') return await _rpcTransicao(sb, 'cad_pedidos_lista', {});
     // Troca de senha com a senha atual: Edge Function minha-conta
     if (acao === 'conta.trocarSenha') return await _minhaConta(sb, 'trocarSenha', { senha_atual: dados.senhaAtual || '', nova_senha: dados.novaSenha || '' });
 
