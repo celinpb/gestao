@@ -1,6 +1,7 @@
 <!--
-  f3-usuarios.html — versão 2 (etapa 10: acesso por e-mail)
+  f3-usuarios.html — versão 3 (etapa 24: aba Cadastro)
   Gerenciamento de usuários do sistema. Visível para admin e coordenação.
+  Aba Cadastro: o cadastro ampliado do usuário escolhido (modulos/f14-cadastro.html).
 
   Regras (aplicadas também no servidor e no banco):
     - coordenação não edita, inativa nem reenvia acesso de administradores,
@@ -127,6 +128,15 @@
 
   .u3-negado{padding:48px 24px;text-align:center;color:var(--c-text-3,#9898B0);}
 
+  /* Abas Lista / Cadastro (etapa 24) */
+  .u3-abas{display:flex;gap:4px;border-bottom:1px solid var(--c-border,#E8E7E2);margin-bottom:16px;flex-wrap:wrap;}
+  .u3-aba{height:38px;padding:0 14px;border:none;background:none;font-family:var(--font-sans,sans-serif);font-size:13.5px;font-weight:500;color:var(--c-text-2,#5C5C7A);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:inline-flex;align-items:center;gap:6px;max-width:100%;}
+  .u3-aba .material-icons-round{font-size:17px;}
+  .u3-aba.ativa{color:var(--c-text-1,#1A1A2E);border-bottom-color:#E63946;}
+  .u3-aba span.u3-aba-txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .u3-cad-topo{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+  .u3-cad-topo .u3-select{min-width:260px;max-width:100%;}
+
   @media (max-width:560px){
     .u3-form-grid{grid-template-columns:1fr;}
     .u3-field.span2{grid-column:span 1;}
@@ -139,6 +149,22 @@
 </div>
 
 <div id="u3-conteudo" style="display:none;">
+  <div class="u3-abas">
+    <button class="u3-aba ativa" type="button" data-aba="lista"><span class="material-icons-round">people</span><span class="u3-aba-txt">Lista de usuários</span></button>
+    <button class="u3-aba" type="button" data-aba="cadastro"><span class="material-icons-round">badge</span><span class="u3-aba-txt" id="u3-aba-cad-txt">Cadastro</span></button>
+  </div>
+
+  <!-- ABA: CADASTRO (etapa 24) — o conteúdo vem de modulos/f14-cadastro.html -->
+  <div id="u3-aba-cadastro" style="display:none;">
+    <div class="u3-cad-topo">
+      <select class="u3-select" id="u3-cad-usuario"><option value="">Escolha um usuário…</option></select>
+    </div>
+    <div id="u3-cad-container">
+      <div class="u3-estado"><span class="material-icons-round">badge</span><p>Escolha um usuário acima, ou use o botão <strong>Cadastro</strong> na lista.</p></div>
+    </div>
+  </div>
+
+  <div id="u3-aba-lista">
   <div class="u3-toolbar">
     <div class="u3-busca-wrap">
       <span class="material-icons-round">search</span>
@@ -188,6 +214,7 @@
     </table>
   </div>
   <div class="u3-rodape" id="u3-rodape"></div>
+  </div>
 </div>
 
 <!-- MODAL: novo / editar -->
@@ -338,6 +365,7 @@
       if (!res.sucesso){ setEstado('erro', res.mensagem); return; }
       state.usuarios = (res.dados || []).map(norm);
       renderizar();
+      montarSeletorCadastro();
     }).catch(function(e){ setEstado('erro', e.message || 'Erro.'); });
   }
 
@@ -383,7 +411,7 @@
       var st = statusAcesso(u); var info = ACESSO[st] || ACESSO.desconhecido;
       var ultimo = u.acesso && u.acesso.ultimo_acesso ? 'último acesso: ' + dataHora(u.acesso.ultimo_acesso) : '';
       var mexe = podeMexer(u);
-      var acoes = '';
+      var acoes = botao('cadastro', u.id, 'badge', 'Cadastro');
       if (mexe) acoes += botao('editar', u.id, 'edit', 'Editar');
       if (mexe && u.ativo) acoes += botao('reenviar', u.id, 'forward_to_inbox', st === 'sem_conta' ? 'Enviar acesso' : 'Reenviar acesso');
       if (state.isAdmin && u.ativo) acoes += botao('provisoria', u.id, 'key', 'Senha provisória');
@@ -571,8 +599,52 @@
     }));
   }
 
+  // ── Aba Cadastro (etapa 24) ────────────────────────────────────────────
+  // O formulário é o mesmo de "Meu cadastro" (modulos/f14-cadastro.html),
+  // carregado dentro de #u3-cad-container com o id do usuário escolhido.
+  var cadAtual = null;
+
+  function mostrarAba(aba){
+    document.querySelectorAll('.u3-aba').forEach(function(b){ b.classList.toggle('ativa', b.dataset.aba === aba); });
+    el('u3-aba-lista').style.display = aba === 'lista' ? '' : 'none';
+    el('u3-aba-cadastro').style.display = aba === 'cadastro' ? '' : 'none';
+  }
+
+  function montarSeletorCadastro(){
+    var sel = el('u3-cad-usuario'); if (!sel) return;
+    var lista = state.usuarios.slice().sort(function(a, b){ return (a.nome||'').localeCompare(b.nome||'', 'pt-BR'); });
+    sel.innerHTML = '<option value="">Escolha um usuário…</option>' + lista.map(function(u){
+      return '<option value="' + esc(u.id) + '">' + esc(u.nome) + ' — ' + esc(ROTULO_PAPEL[u.papel] || u.papel) +
+             (u.ativo ? '' : ' (inativo)') + '</option>';
+    }).join('');
+    sel.value = cadAtual || '';
+  }
+
+  function abrirCadastro(id){
+    var u = state.usuarios.find(function(x){ return x.id === id; });
+    if (!u) return;
+    cadAtual = id;
+    el('u3-cad-usuario').value = id;
+    el('u3-aba-cad-txt').textContent = 'Cadastro — ' + (u.nome || '');
+    mostrarAba('cadastro');
+    var box = el('u3-cad-container');
+    box.setAttribute('data-usuario-id', id);
+    box.innerHTML = '<div class="u3-estado"><div class="u3-spinner"></div><p>Carregando cadastro…</p></div>';
+    carregarModulo('modulos/f14-cadastro.html').then(function(html){
+      if (cadAtual !== id) return; // trocou de usuário enquanto carregava
+      box.innerHTML = html;
+      executarScripts(box);
+    }).catch(function(){
+      box.innerHTML = '<div class="u3-estado"><span class="material-icons-round">error_outline</span><p>Erro ao carregar o cadastro.</p></div>';
+    });
+  }
+
   // ── Eventos ────────────────────────────────────────────────────────────
   function registrarEventos(){
+    document.querySelectorAll('.u3-aba').forEach(function(b){
+      b.addEventListener('click', function(){ mostrarAba(b.dataset.aba); });
+    });
+    el('u3-cad-usuario').addEventListener('change', function(){ if (this.value) abrirCadastro(this.value); });
     el('u3-busca').addEventListener('input', function(){ state.busca = this.value.trim(); renderizar(); });
     el('u3-filtro-papel').addEventListener('change', function(){ state.filtroPapel = this.value; renderizar(); });
     el('u3-filtro-acesso').addEventListener('change', function(){ state.filtroAcesso = this.value; renderizar(); });
@@ -595,6 +667,7 @@
       var btn = e.target.closest('button[data-acao]'); if (!btn) return;
       var u = state.usuarios.find(function(x){ return x.id === btn.dataset.id; }); if (!u) return;
       var a = btn.dataset.acao;
+      if (a === 'cadastro')   abrirCadastro(u.id);
       if (a === 'editar')     abrirModal('editar', u);
       if (a === 'reenviar')   reenviar(u, btn);
       if (a === 'provisoria') senhaProvisoria(u, btn);
