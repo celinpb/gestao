@@ -1,5 +1,5 @@
 <!--
-  f3-usuarios.html — versão 3 (etapa 24: aba Cadastro)
+  f3-usuarios.html — versão 4 (etapa 24: aba Cadastro; etapa 26: pedido de completar cadastro em lote)
   Gerenciamento de usuários do sistema. Visível para admin e coordenação.
   Aba Cadastro: o cadastro ampliado do usuário escolhido (modulos/f14-cadastro.html).
 
@@ -128,6 +128,17 @@
 
   .u3-negado{padding:48px 24px;text-align:center;color:var(--c-text-3,#9898B0);}
 
+  /* Pedido de completar cadastro (etapa 26) */
+  .badge-cad{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap;}
+  .badge-cad .material-icons-round{font-size:12px;}
+  .badge-cad.completo{background:rgba(42,157,143,0.12);color:#1A6E65;}
+  .badge-cad.incompleto{background:#F0EFEA;color:#5C5C7A;}
+  .badge-cad.pedido{background:rgba(233,196,106,0.25);color:#5C4200;}
+  .u3-lote{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#EEF4F8;border:1px solid rgba(69,123,157,0.3);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:13px;color:#1F4E6B;}
+  .u3-lote strong{margin-right:auto;}
+  .u3-tabela td.u3-sel, .u3-tabela th.u3-sel{width:30px;padding-right:0;}
+  .u3-sel input{width:15px;height:15px;accent-color:#457B9D;cursor:pointer;}
+
   /* Abas Lista / Cadastro (etapa 24) */
   .u3-abas{display:flex;gap:4px;border-bottom:1px solid var(--c-border,#E8E7E2);margin-bottom:16px;flex-wrap:wrap;}
   .u3-aba{height:38px;padding:0 14px;border:none;background:none;font-family:var(--font-sans,sans-serif);font-size:13.5px;font-weight:500;color:var(--c-text-2,#5C5C7A);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:inline-flex;align-items:center;gap:6px;max-width:100%;}
@@ -183,6 +194,12 @@
       <option value="pendente">Pendente (convite ou senha)</option>
       <option value="sem_conta">Sem acesso ainda</option>
     </select>
+    <select class="u3-select" id="u3-filtro-cad">
+      <option value="">Qualquer cadastro</option>
+      <option value="incompleto">Cadastro incompleto</option>
+      <option value="pedido">Com pedido para completar</option>
+      <option value="completo">Cadastro completo</option>
+    </select>
     <button class="btn-u3 btn-u3-secundario" id="btn-u3-inativos" type="button">
       <span class="material-icons-round">visibility</span><span id="u3-inativos-txt">Exibir inativos</span>
     </button>
@@ -194,6 +211,13 @@
     </button>
   </div>
 
+  <div class="u3-lote" id="u3-lote" style="display:none;">
+    <strong id="u3-lote-txt"></strong>
+    <button class="btn-u3 btn-u3-secundario" id="btn-u3-pedir" type="button"><span class="material-icons-round">assignment_ind</span>Pedir para completar o cadastro</button>
+    <button class="btn-u3 btn-u3-secundario" id="btn-u3-retirar" type="button"><span class="material-icons-round">remove_done</span>Retirar pedido</button>
+    <button class="btn-u3 btn-u3-secundario" id="btn-u3-limpar-sel" type="button">Limpar seleção</button>
+  </div>
+
   <div class="u3-card">
     <div id="u3-estado" class="u3-estado">
       <div class="u3-spinner"></div><p>Carregando usuários…</p>
@@ -201,12 +225,14 @@
     <table class="u3-tabela" id="u3-tabela" style="display:none;">
       <thead>
         <tr>
+          <th class="u3-sel"><input type="checkbox" id="u3-sel-todos" title="Selecionar todos da lista"></th>
           <th>Usuário</th>
           <th>Login</th>
           <th>E-mail</th>
           <th>Papel</th>
           <th>Acesso</th>
           <th>Situação</th>
+          <th>Cadastro</th>
           <th></th>
         </tr>
       </thead>
@@ -315,7 +341,7 @@
   var RE_LOGIN = /^[a-z0-9._-]{3,40}$/;
   var RE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  var state = { usuarios:[], usuarioSel:null, busca:'', filtroPapel:'', filtroAcesso:'',
+  var state = { usuarios:[], usuarioSel:null, busca:'', filtroPapel:'', filtroAcesso:'', filtroCad:'', sel:{}, cad:{},
                 exibirInativos:false, papel:'', meuId:null, isAdmin:false, modo:'novo', salvando:false };
 
   function el(id){ return document.getElementById(id); }
@@ -361,9 +387,17 @@
 
   function carregarUsuarios(){
     setEstado('carregando');
-    postApi('usuarios.listar', { comAcesso: true }).then(function(res){
+    Promise.all([
+      postApi('usuarios.listar', { comAcesso: true }),
+      // Situação do cadastro de cada um (etapa 26). Sem ela, a lista segue normal.
+      postApi('cadastro.pedidosLista', {}).catch(function(){ return { sucesso: false }; })
+    ]).then(function(rs){
+      var res = rs[0];
       if (!res.sucesso){ setEstado('erro', res.mensagem); return; }
+      state.cad = (rs[1] && rs[1].sucesso && rs[1].dados) ? rs[1].dados : {};
       state.usuarios = (res.dados || []).map(norm);
+      var ids = {}; state.usuarios.forEach(function(u){ ids[u.id] = true; });
+      Object.keys(state.sel).forEach(function(id){ if (!ids[id]) delete state.sel[id]; });
       renderizar();
       montarSeletorCadastro();
       // Vindo do Início (pendências de idiomas): abre direto o cadastro
@@ -387,6 +421,13 @@
         if (state.filtroAcesso === 'pendente' && st !== 'convite_pendente' && st !== 'senha_pendente') return false;
         if (state.filtroAcesso !== 'pendente' && st !== state.filtroAcesso) return false;
       }
+      if (state.filtroCad){
+        var c = state.cad[u.id];
+        if (!c) return false;
+        if (state.filtroCad === 'completo' && c.faltam > 0) return false;
+        if (state.filtroCad === 'incompleto' && c.faltam === 0) return false;
+        if (state.filtroCad === 'pedido' && !c.pedido) return false;
+      }
       if (!b) return true;
       return [u.nome, u.login, u.email, u.codigo].some(function(x){ return (x||'').toLowerCase().indexOf(b) !== -1; });
     }).sort(function(a, b2){ return (a.nome||'').localeCompare(b2.nome||'', 'pt-BR'); });
@@ -405,6 +446,44 @@
   function botao(acao, id, icone, texto, classe){
     return '<button class="btn-u3-linha' + (classe ? ' ' + classe : '') + '" type="button" data-id="' + esc(id) + '" data-acao="' + acao + '">' +
       '<span class="material-icons-round">' + icone + '</span>' + texto + '</button>';
+  }
+
+  // ── Situação do cadastro e pedidos em lote (etapa 26) ──────────────────
+  function badgeCadastro(u){
+    var c = state.cad[u.id];
+    if (!c) return '<span class="badge-cad incompleto">—</span>';
+    if (c.pedido) return '<span class="badge-cad pedido" title="Pedido em ' + esc(dataHora(c.pedido_em)) + '"><span class="material-icons-round">assignment_late</span>Pedido · adiou ' + (c.adiamentos || 0) + '/3</span>';
+    if (c.faltam > 0) return '<span class="badge-cad incompleto" title="Faltam ' + c.faltam + ' item(ns)">Incompleto (' + c.faltam + ')</span>';
+    return '<span class="badge-cad completo"><span class="material-icons-round">check_circle</span>Completo</span>';
+  }
+
+  function atualizarLote(){
+    var n = Object.keys(state.sel).length;
+    el('u3-lote').style.display = n ? 'flex' : 'none';
+    el('u3-lote-txt').textContent = n + ' usuário(s) selecionado(s)';
+    var visiveis = filtrados().filter(function(u){ return podeMexer(u) && u.ativo; });
+    var todos = el('u3-sel-todos');
+    todos.checked = visiveis.length > 0 && visiveis.every(function(u){ return state.sel[u.id]; });
+  }
+
+  function pedirEmLote(marcar){
+    var ids = Object.keys(state.sel);
+    if (!ids.length) return;
+    var texto = marcar
+      ? 'Pedir para ' + ids.length + ' usuário(s) completar o cadastro?\n\nNo próximo acesso, cada um verá um aviso. Podem adiar até 3 vezes; depois, só conseguem usar o sistema com o cadastro completo. Quem já está com o cadastro completo não recebe o pedido.'
+      : 'Retirar o pedido de completar cadastro de ' + ids.length + ' usuário(s)?';
+    if (!confirm(texto)) return;
+    var btn = el(marcar ? 'btn-u3-pedir' : 'btn-u3-retirar');
+    comBotao(btn, postApi('cadastro.pedidoMarcar', { ids: ids, marcar: marcar }).then(function(res){
+      if (!res.sucesso){ aviso(res.mensagem || 'Erro.', 'error'); return; }
+      var d = res.dados || {};
+      var msg = (marcar ? 'Pedido feito para ' : 'Pedido retirado de ') + (d.alterados || 0) + ' usuário(s).';
+      if (d.ja_completos) msg += ' ' + d.ja_completos + ' já estava(m) com o cadastro completo.';
+      if (d.ignorados) msg += ' ' + d.ignorados + ' ignorado(s) (inativos ou administradores).';
+      aviso(msg);
+      state.sel = {};
+      carregarUsuarios();
+    }));
   }
 
   function renderizar(){
@@ -426,7 +505,9 @@
 
       var tr = document.createElement('tr');
       if (!u.ativo) tr.classList.add('inativo');
+      var podeSel = mexe && u.ativo;
       tr.innerHTML =
+        '<td class="u3-sel">' + (podeSel ? '<input type="checkbox" data-sel="' + esc(u.id) + '"' + (state.sel[u.id] ? ' checked' : '') + '>' : '') + '</td>' +
         '<td><div class="u3-usuario-cel"><span class="u3-avatar" style="background:' + (COR_PAPEL[u.papel]||'#888') + '">' + esc(iniciais(u.nome)) + '</span>' +
           '<div><span class="u3-nome">' + esc(u.nome || '—') + (souEu(u) ? ' <span class="u3-codigo" style="display:inline">(você)</span>' : '') + '</span>' +
           '<span class="u3-codigo">' + esc(u.codigo) + '</span></div></div></td>' +
@@ -436,9 +517,11 @@
         '<td><span class="badge-acesso ' + st + '" title="' + esc(info.dica) + '"><span class="material-icons-round">' + info.ic + '</span>' + info.txt + '</span>' +
           (ultimo ? '<span class="u3-ultimo">' + esc(ultimo) + '</span>' : '') + '</td>' +
         '<td><span class="badge-u3-sit ' + (u.ativo ? 'ativo' : 'inativo') + '">' + (u.ativo ? 'Ativo' : 'Inativo') + '</span></td>' +
+        '<td>' + badgeCadastro(u) + '</td>' +
         '<td class="u3-acoes-td"><div class="u3-acoes">' + acoes + '</div></td>';
       tbody.appendChild(tr);
     });
+    atualizarLote();
   }
 
   function setEstado(estado, msg){
@@ -654,6 +737,23 @@
     el('u3-busca').addEventListener('input', function(){ state.busca = this.value.trim(); renderizar(); });
     el('u3-filtro-papel').addEventListener('change', function(){ state.filtroPapel = this.value; renderizar(); });
     el('u3-filtro-acesso').addEventListener('change', function(){ state.filtroAcesso = this.value; renderizar(); });
+    el('u3-filtro-cad').addEventListener('change', function(){ state.filtroCad = this.value; renderizar(); });
+    el('u3-sel-todos').addEventListener('change', function(){
+      var marcar = this.checked;
+      filtrados().forEach(function(u){
+        if (!(podeMexer(u) && u.ativo)) return;
+        if (marcar) state.sel[u.id] = true; else delete state.sel[u.id];
+      });
+      renderizar();
+    });
+    el('u3-tbody').addEventListener('change', function(e){
+      var c = e.target.closest('input[data-sel]'); if (!c) return;
+      if (c.checked) state.sel[c.getAttribute('data-sel')] = true; else delete state.sel[c.getAttribute('data-sel')];
+      atualizarLote();
+    });
+    el('btn-u3-pedir').addEventListener('click', function(){ pedirEmLote(true); });
+    el('btn-u3-retirar').addEventListener('click', function(){ pedirEmLote(false); });
+    el('btn-u3-limpar-sel').addEventListener('click', function(){ state.sel = {}; renderizar(); });
     el('btn-u3-inativos').addEventListener('click', function(){
       state.exibirInativos = !state.exibirInativos;
       this.classList.toggle('ativo', state.exibirInativos);
