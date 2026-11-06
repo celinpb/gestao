@@ -65,6 +65,21 @@
   .dash-disp-btn{height:38px;padding:0 18px;border-radius:8px;border:none;background:#457B9D;color:#fff;font-family:var(--font-sans,sans-serif);font-size:13.5px;font-weight:500;cursor:pointer;}
   .dash-disp-btn:disabled{opacity:0.5;cursor:not-allowed;}
 
+  /* ── Idiomas para validar (etapa 25) ── */
+  .dash-idi{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-left:4px solid #E9C46A;border-radius:12px;padding:18px 20px;margin-bottom:28px;}
+  .dash-idi-titulo{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--c-text-1,#1A1A2E);margin-bottom:10px;}
+  .dash-idi-titulo .material-icons-round{font-size:20px;color:#B8860B;}
+  .dash-idi-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--c-border,#E8E7E2);font-size:13px;flex-wrap:wrap;}
+  .dash-idi-item:first-of-type{border-top:none;}
+  .dash-idi-nome{flex:1;min-width:180px;color:var(--c-text-1,#1A1A2E);}
+  .dash-idi-nome small{display:block;color:var(--c-text-3,#9898B0);font-size:11.5px;}
+  .dash-idi-idioma{font-weight:600;}
+  .dash-idi-btn{height:28px;padding:0 10px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font-sans,sans-serif);border:1.5px solid var(--c-border,#E8E7E2);background:#fff;color:var(--c-text-2,#5C5C7A);display:inline-flex;align-items:center;gap:4px;}
+  .dash-idi-btn .material-icons-round{font-size:14px;}
+  .dash-idi-btn.ok{border-color:rgba(42,157,143,0.4);color:#1A6E65;}
+  .dash-idi-btn.nao{border-color:rgba(230,57,70,0.3);color:#A32D2D;}
+  .dash-idi-btn:disabled{opacity:0.5;cursor:wait;}
+
   /* ── Ocorrências pendentes ── */
   .dash-oco-wrap{display:flex;gap:20px;align-items:flex-start;margin-bottom:32px;}
   .dash-oco-lista-wrap{flex:1;min-width:0;}
@@ -153,6 +168,9 @@
 
 <!-- Disponibilidade do professor para o próximo semestre (só professor, com a transição ativada) -->
 <div class="dash-disp" id="dash-disp" style="display:none;"></div>
+
+<!-- Idiomas lecionados aguardando validação (só admin e coordenação, quando houver) -->
+<div class="dash-idi" id="dash-idi" style="display:none;"></div>
 
 <!-- Atalhos -->
 <div class="dash-atalhos-titulo">Acesso rápido</div>
@@ -635,6 +653,52 @@
     }).catch(function() { btn.disabled = false; if (typeof toast === 'function') toast('Erro de comunicação.', 'error'); });
   }
 
+  // ── Idiomas para validar (etapa 25) ─────────────────────────────────────────
+  var ROTULO_PAPEL_D = { admin:'Admin', coordenacao:'Coordenação', professor:'Professor', secretaria:'Secretaria' };
+  var idiPend = [];
+  function carregarIdiomasPendentes() {
+    if (state.papel !== 'admin' && state.papel !== 'coordenacao') return;
+    postApi('idiomas.pendentes', {}).then(function(res) {
+      idiPend = (res.sucesso && res.dados) ? res.dados : [];
+      renderIdiomasPendentes();
+    }).catch(function() {});
+  }
+  function renderIdiomasPendentes() {
+    var box = el('dash-idi'); if (!box) return;
+    if (!idiPend.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    box.innerHTML =
+      '<div class="dash-idi-titulo"><span class="material-icons-round">translate</span>Idiomas para validar' +
+        ' <span class="dash-oco-badge">' + idiPend.length + '</span></div>' +
+      idiPend.map(function(p, i) {
+        return '<div class="dash-idi-item">' +
+          '<span class="dash-idi-nome">' + escD(p.nome) + ' — <span class="dash-idi-idioma">' + escD(p.idioma) + '</span>' +
+            '<small>' + escD(ROTULO_PAPEL_D[p.papel] || p.papel) + ' · ' + escD(p.codigo || '') + ' · marcado em ' + escD(fmtData(p.marcado_em)) + '</small></span>' +
+          '<button class="dash-idi-btn ok" type="button" data-i="' + i + '" data-a="sim"><span class="material-icons-round">check</span>Validar</button>' +
+          '<button class="dash-idi-btn nao" type="button" data-i="' + i + '" data-a="nao"><span class="material-icons-round">close</span>Recusar</button>' +
+          '<button class="dash-idi-btn" type="button" data-i="' + i + '" data-a="cad"><span class="material-icons-round">badge</span>Cadastro</button>' +
+          '</div>';
+      }).join('');
+    box.style.display = '';
+    box.querySelectorAll('button[data-a]').forEach(function(b) {
+      b.addEventListener('click', function() {
+        var p = idiPend[Number(b.getAttribute('data-i'))]; if (!p) return;
+        var a = b.getAttribute('data-a');
+        if (a === 'cad') {
+          window.SGE_ABRIR_CADASTRO = p.usuario_id;
+          if (typeof navegarPara === 'function') navegarPara('usuarios', 'Usuários');
+          return;
+        }
+        var aprovar = a === 'sim';
+        if (!aprovar && !confirm('Recusar o idioma ' + p.idioma + ' para ' + p.nome + '?\n\nA marcação será apagada.')) return;
+        b.disabled = true;
+        postApi('idiomas.validar', { usuario_id: p.usuario_id, idioma_id: p.idioma_id, aprovar: aprovar }).then(function(res) {
+          if (typeof toast === 'function') toast(escD(res.mensagem || (res.sucesso ? 'Feito.' : 'Erro.')), res.sucesso ? 'success' : 'error');
+          carregarIdiomasPendentes();
+        }).catch(function() { b.disabled = false; if (typeof toast === 'function') toast('Erro de comunicação.', 'error'); });
+      });
+    });
+  }
+
   // ── Init ──────────────────────────────────────────────────────────────────────
   function init() {
     // App.usuario/App.semestre vêm de index.html (onLoginSucesso/carregarShell)
@@ -668,6 +732,7 @@
 
     renderCiclo();
     carregarDisp();
+    carregarIdiomasPendentes();
     renderAtalhos(state.papel);
     carregarOcorrencias();
 
