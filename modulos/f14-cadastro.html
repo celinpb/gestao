@@ -1,0 +1,583 @@
+<!--
+  f14-cadastro.html — etapa 24 (cadastro ampliado de usuários)
+  Usado de dois jeitos:
+    1. Menu "Meu cadastro" (todos os papéis): os próprios dados, troca de
+       senha e, para secretaria/coordenação/admin, os contatos da equipe.
+    2. Dentro de Usuários → aba Cadastro (admin/coordenação): o cadastro do
+       usuário escolhido. A tela de Usuários põe este arquivo dentro de
+       #u3-cad-container, com o id do usuário em data-usuario-id.
+  Quem pode ver/alterar o quê é conferido no banco (usuario_cadastro_*); a
+  tela só desliga os campos que o banco recusaria.
+-->
+<style>
+  .cd-raiz{max-width:980px;}
+  .cd-abas{display:flex;gap:4px;border-bottom:1px solid var(--c-border,#E8E7E2);margin-bottom:18px;flex-wrap:wrap;}
+  .cd-aba{height:38px;padding:0 14px;border:none;background:none;font-family:var(--font-sans,sans-serif);font-size:13.5px;font-weight:500;color:var(--c-text-2,#5C5C7A);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:inline-flex;align-items:center;gap:6px;}
+  .cd-aba .material-icons-round{font-size:17px;}
+  .cd-aba.ativa{color:var(--c-text-1,#1A1A2E);border-bottom-color:#E63946;}
+  .cd-card{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
+  .cd-card-titulo{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--c-text-1,#1A1A2E);margin-bottom:14px;}
+  .cd-card-titulo .material-icons-round{font-size:19px;color:#457B9D;}
+  .cd-card-titulo small{font-weight:400;font-size:12px;color:var(--c-text-3,#9898B0);margin-left:auto;}
+  .cd-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px 14px;}
+  .cd-campo{display:flex;flex-direction:column;gap:5px;min-width:0;}
+  .cd-campo.s2{grid-column:span 2;}
+  .cd-campo.s4{grid-column:span 4;}
+  .cd-campo label{font-size:11px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;color:var(--c-text-2,#5C5C7A);display:flex;align-items:center;gap:4px;}
+  .cd-campo label .req{color:#E63946;}
+  .cd-campo label .material-icons-round{font-size:13px;color:var(--c-text-3,#9898B0);}
+  .cd-input{height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:7px;padding:0 10px;font-family:var(--font-sans,sans-serif);font-size:13.5px;color:var(--c-text-1,#1A1A2E);background:#FAFAF8;outline:none;width:100%;box-sizing:border-box;}
+  textarea.cd-input{height:64px;padding:8px 10px;resize:vertical;line-height:1.45;}
+  .cd-input:focus{border-color:#E63946;box-shadow:0 0 0 3px rgba(230,57,70,0.09);background:#fff;}
+  .cd-input:disabled{background:#F0EFEA;color:var(--c-text-2,#5C5C7A);cursor:not-allowed;}
+  .cd-check{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--c-text-1,#1A1A2E);height:38px;}
+  .cd-check input{width:16px;height:16px;accent-color:#457B9D;}
+  .cd-fixo{font-size:13.5px;color:var(--c-text-1,#1A1A2E);padding:9px 0;min-height:38px;box-sizing:border-box;word-break:break-word;}
+  .cd-fixo.mono{font-family:var(--font-mono,monospace);font-size:12.5px;}
+  .cd-nota{font-size:12px;color:var(--c-text-3,#9898B0);line-height:1.5;margin-top:10px;display:flex;gap:6px;align-items:flex-start;}
+  .cd-nota .material-icons-round{font-size:15px;flex-shrink:0;}
+  .cd-aviso{background:#FAEEDA;border:1px solid rgba(233,196,106,0.5);border-radius:8px;padding:10px 14px;font-size:12.5px;color:#5C4200;display:flex;align-items:flex-start;gap:8px;margin-bottom:16px;line-height:1.5;}
+  .cd-aviso .material-icons-round{font-size:16px;flex-shrink:0;margin-top:1px;}
+  .cd-mats{width:100%;border-collapse:collapse;font-size:13px;}
+  .cd-mats th{font-size:10.5px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--c-text-3,#9898B0);text-align:left;padding:0 6px 6px;white-space:nowrap;}
+  .cd-mats td{padding:4px 6px;vertical-align:top;}
+  .cd-mats .cd-input{height:34px;font-size:13px;}
+  .cd-mats .num{width:76px;}
+  .cd-mats tr.cd-red td{padding-top:0;}
+  .cd-mats-wrap{overflow-x:auto;}
+  .cd-total{font-size:12.5px;color:var(--c-text-2,#5C5C7A);margin-top:8px;}
+  .cd-total strong{color:var(--c-text-1,#1A1A2E);}
+  .btn-cd{height:38px;padding:0 16px;border-radius:8px;font-family:var(--font-sans,sans-serif);font-size:13.5px;font-weight:500;cursor:pointer;border:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+  .btn-cd .material-icons-round{font-size:17px;}
+  .btn-cd-pri{background:#E63946;color:#fff;}
+  .btn-cd-pri:hover{background:#C1121F;}
+  .btn-cd-sec{background:#fff;color:var(--c-text-1,#1A1A2E);border:1.5px solid var(--c-border,#E8E7E2);}
+  .btn-cd-sec:hover{background:#F5F4F0;}
+  .btn-cd:disabled{opacity:0.55;cursor:not-allowed;}
+  .btn-cd-mini{height:30px;width:30px;border-radius:6px;border:1.5px solid rgba(230,57,70,0.25);background:#fff;color:#A32D2D;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
+  .btn-cd-mini .material-icons-round{font-size:16px;}
+  .cd-rodape{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:4px 0 24px;}
+  .cd-rodape-info{font-size:12px;color:var(--c-text-3,#9898B0);}
+  .cd-estado{padding:48px 24px;text-align:center;color:var(--c-text-3,#9898B0);font-size:13.5px;}
+  .cd-estado .material-icons-round{font-size:34px;display:block;margin:0 auto 10px;}
+  .cd-spinner{width:24px;height:24px;border:2.5px solid var(--c-border,#E8E7E2);border-top-color:#E63946;border-radius:50%;animation:cd-spin 0.7s linear infinite;margin:0 auto 10px;}
+  @keyframes cd-spin{to{transform:rotate(360deg);}}
+  .cd-regras{background:#F8F7F3;border:1px solid var(--c-border,#E8E7E2);border-radius:8px;padding:10px 14px;margin-top:4px;}
+  .cd-regra{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--c-text-3,#9898B0);margin:3px 0;}
+  .cd-regra .material-icons-round{font-size:13px;}
+  .cd-regra.ok{color:#2A9D8F;}
+  .cd-senha-box{max-width:420px;}
+  .cd-senha-box .cd-campo{margin-bottom:12px;}
+  .cd-busca{max-width:340px;margin-bottom:12px;}
+  .cd-contatos{width:100%;border-collapse:collapse;font-size:13px;}
+  .cd-contatos th{font-size:10.5px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--c-text-3,#9898B0);text-align:left;padding:8px 10px;background:#F8F7F3;border-bottom:1px solid var(--c-border,#E8E7E2);white-space:nowrap;}
+  .cd-contatos td{padding:8px 10px;border-bottom:1px solid var(--c-border,#E8E7E2);vertical-align:top;}
+  .cd-contatos small{display:block;color:var(--c-text-3,#9898B0);font-size:11.5px;}
+  .cd-contatos a{color:#185FA5;text-decoration:none;}
+  .cd-contatos a:hover{text-decoration:underline;}
+  .cd-papel{display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:#F0EFEA;color:#5C5C7A;white-space:nowrap;}
+  @media(max-width:760px){
+    .cd-grid{grid-template-columns:1fr 1fr;}
+    .cd-campo.s4{grid-column:span 2;}
+  }
+  @media(max-width:480px){
+    .cd-grid{grid-template-columns:1fr;}
+    .cd-campo.s2,.cd-campo.s4{grid-column:span 1;}
+  }
+</style>
+
+<div class="cd-raiz" id="cd-raiz">
+  <div class="cd-abas" id="cd-abas" style="display:none;">
+    <button class="cd-aba ativa" type="button" data-aba="dados"><span class="material-icons-round">badge</span>Meus dados</button>
+    <button class="cd-aba" type="button" data-aba="senha"><span class="material-icons-round">lock</span>Senha</button>
+    <button class="cd-aba" type="button" data-aba="contatos" id="cd-aba-contatos" style="display:none;"><span class="material-icons-round">contacts</span>Contatos da equipe</button>
+  </div>
+
+  <div id="cd-painel-dados">
+    <div class="cd-estado" id="cd-estado"><div class="cd-spinner"></div><p>Carregando cadastro…</p></div>
+    <div id="cd-form" style="display:none;"></div>
+  </div>
+
+  <div id="cd-painel-senha" style="display:none;">
+    <div class="cd-card cd-senha-box">
+      <div class="cd-card-titulo"><span class="material-icons-round">lock_reset</span>Trocar a senha</div>
+      <div class="cd-campo">
+        <label for="cd-s-atual">Senha atual</label>
+        <input type="password" class="cd-input" id="cd-s-atual" autocomplete="current-password">
+      </div>
+      <div class="cd-campo">
+        <label for="cd-s-nova">Nova senha</label>
+        <input type="password" class="cd-input" id="cd-s-nova" autocomplete="new-password">
+        <div class="cd-regras">
+          <div class="cd-regra" data-r="len"><span class="material-icons-round">radio_button_unchecked</span>Pelo menos 8 caracteres</div>
+          <div class="cd-regra" data-r="mai"><span class="material-icons-round">radio_button_unchecked</span>Uma letra maiúscula</div>
+          <div class="cd-regra" data-r="min"><span class="material-icons-round">radio_button_unchecked</span>Uma letra minúscula</div>
+          <div class="cd-regra" data-r="num"><span class="material-icons-round">radio_button_unchecked</span>Um número</div>
+          <div class="cd-regra" data-r="esp"><span class="material-icons-round">radio_button_unchecked</span>Um caractere especial (!@#$%...)</div>
+        </div>
+      </div>
+      <div class="cd-campo">
+        <label for="cd-s-conf">Confirmar nova senha</label>
+        <input type="password" class="cd-input" id="cd-s-conf" autocomplete="new-password">
+      </div>
+      <label class="cd-check"><input type="checkbox" id="cd-s-mostrar"> Mostrar as senhas</label>
+      <div style="margin-top:8px;">
+        <button class="btn-cd btn-cd-pri" type="button" id="cd-s-btn"><span class="material-icons-round">key</span>Trocar senha</button>
+      </div>
+      <p class="cd-nota"><span class="material-icons-round">info</span>Esqueceu a senha atual? Saia do sistema e use "Esqueci minha senha" na tela de login.</p>
+    </div>
+  </div>
+
+  <div id="cd-painel-contatos" style="display:none;">
+    <input type="text" class="cd-input cd-busca" id="cd-c-busca" placeholder="Buscar por nome ou papel…">
+    <div class="cd-card" style="padding:0;overflow-x:auto;">
+      <div class="cd-estado" id="cd-c-estado"><div class="cd-spinner"></div><p>Carregando contatos…</p></div>
+      <table class="cd-contatos" id="cd-c-tabela" style="display:none;">
+        <thead><tr><th>Nome</th><th>Papel</th><th>Telefone</th><th>E-mail</th><th>Contato de emergência</th></tr></thead>
+        <tbody id="cd-c-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var VINCULOS = ['Efetivo', 'Contratado', 'Prestador de serviço', 'Cedido', 'Comissionado', 'Outro'];
+  var UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
+  var ROTULO_PAPEL = { admin:'Admin', coordenacao:'Coordenação', professor:'Professor', secretaria:'Secretaria' };
+  var PADRAO_TURMAS = 7, PADRAO_DEP = 2;
+
+  // Campos do cadastro, por bloco. prot = protegido (depois de salvo, só a
+  // coordenação altera); req = necessário para o cadastro completo.
+  var BLOCOS = [
+    { titulo: 'Dados pessoais', icone: 'person', campos: [
+      { k: 'nome_social', r: 'Nome social', cls: 's2' },
+      { k: 'data_nascimento', r: 'Data de nascimento', tipo: 'date', prot: true, req: true },
+      { k: 'cpf', r: 'CPF', mask: 'cpf', prot: true, req: true },
+      { k: 'rg', r: 'RG', prot: true },
+      { k: 'rg_orgao', r: 'Órgão emissor', prot: true },
+      { k: 'rg_uf', r: 'UF do RG', tipo: 'uf', prot: true }
+    ]},
+    { titulo: 'Contato', icone: 'call', campos: [
+      { k: 'telefone', r: 'Telefone', mask: 'tel', req: true },
+      { k: 'telefone_whatsapp', r: 'Este número é WhatsApp', tipo: 'check' },
+      { k: 'email_pessoal', r: 'E-mail pessoal', tipo: 'email', cls: 's2' }
+    ]},
+    { titulo: 'Endereço', icone: 'home', campos: [
+      { k: 'cep', r: 'CEP', mask: 'cep' },
+      { k: 'logradouro', r: 'Endereço (rua, avenida…)', cls: 's2' },
+      { k: 'numero', r: 'Número' },
+      { k: 'complemento', r: 'Complemento' },
+      { k: 'bairro', r: 'Bairro' },
+      { k: 'municipio', r: 'Município' },
+      { k: 'uf', r: 'UF', tipo: 'uf' }
+    ]},
+    { titulo: 'Contato de emergência', icone: 'emergency', campos: [
+      { k: 'emergencia_nome', r: 'Nome', cls: 's2', req: true },
+      { k: 'emergencia_parentesco', r: 'Parentesco', req: true },
+      { k: 'emergencia_telefone', r: 'Telefone', mask: 'tel', req: true }
+    ]},
+    { titulo: 'Formação', icone: 'school', campos: [
+      { k: 'graduacao', r: 'Graduação (curso e instituição)', tipo: 'area', cls: 's4', req: true },
+      { k: 'pos_graduacao', r: 'Pós-graduação', tipo: 'area', cls: 's2' },
+      { k: 'certificacoes', r: 'Certificações de proficiência', tipo: 'area', cls: 's2' }
+    ]}
+  ];
+
+  var raiz = document.getElementById('cd-raiz');
+  var container = raiz.closest('#u3-cad-container');
+  var embutido = !!container;
+  var alvoId = embutido ? (container.getAttribute('data-usuario-id') || null) : null;
+  var eu = (typeof App !== 'undefined' && App.usuario) ? App.usuario : {};
+  var meuPapel = eu.papel || '';
+
+  var state = { dados: null, mats: [], salvando: false, contatos: null };
+
+  function el(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); }
+  function aviso(msg, tipo) { if (typeof toast === 'function') toast(esc(msg), tipo || 'success', tipo === 'error' ? 7000 : 4500); else alert(msg); }
+  function digitos(s) { return String(s || '').replace(/\D/g, ''); }
+  function fmtCpf(s) { var d = digitos(s); return d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : (s || ''); }
+  function fmtTel(s) {
+    var d = digitos(s);
+    if (d.length === 11) return d.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    if (d.length === 10) return d.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+    return s || '';
+  }
+  function fmtCep(s) { var d = digitos(s); return d.length === 8 ? d.replace(/(\d{5})(\d{3})/, '$1-$2') : (s || ''); }
+  function formatar(mask, v) { return mask === 'cpf' ? fmtCpf(v) : mask === 'tel' ? fmtTel(v) : mask === 'cep' ? fmtCep(v) : (v == null ? '' : v); }
+  function dataHora(iso) {
+    if (!iso) return '';
+    var d = new Date(iso); if (isNaN(d)) return '';
+    return d.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' }) + ' às ' +
+           d.toLocaleTimeString('pt-BR', { timeZone: 'America/Fortaleza', hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ── Abas (só em "Meu cadastro") ─────────────────────────────────────────
+  function mostrarAba(aba) {
+    raiz.querySelectorAll('.cd-aba').forEach(function(b) { b.classList.toggle('ativa', b.dataset.aba === aba); });
+    el('cd-painel-dados').style.display = aba === 'dados' ? '' : 'none';
+    el('cd-painel-senha').style.display = aba === 'senha' ? '' : 'none';
+    el('cd-painel-contatos').style.display = aba === 'contatos' ? '' : 'none';
+    if (aba === 'contatos' && !state.contatos) carregarContatos();
+  }
+
+  // ── Carregar e desenhar o cadastro ──────────────────────────────────────
+  function carregar() {
+    el('cd-estado').style.display = 'block';
+    el('cd-estado').innerHTML = '<div class="cd-spinner"></div><p>Carregando cadastro…</p>';
+    el('cd-form').style.display = 'none';
+    postApi('cadastro.ler', { usuario_id: alvoId }).then(function(res) {
+      if (!res.sucesso) {
+        el('cd-estado').innerHTML = '<span class="material-icons-round">error_outline</span><p>' + esc(res.mensagem || 'Erro ao carregar.') + '</p>';
+        return;
+      }
+      aplicar(res.dados);
+    }).catch(function(e) {
+      el('cd-estado').innerHTML = '<span class="material-icons-round">error_outline</span><p>' + esc(e.message || 'Erro de comunicação.') + '</p>';
+    });
+  }
+
+  function aplicar(d) {
+    state.dados = d;
+    state.mats = (d.matriculas || []).map(function(m) { return Object.assign({}, m); });
+    desenhar();
+  }
+
+  function travado(k) {
+    var d = state.dados;
+    if (d.nivel === 'leitura') return true;
+    return (d.travados || []).indexOf(k) !== -1;
+  }
+
+  function campoHtml(c, cad) {
+    var trav = travado(c.k);
+    var v = cad[c.k];
+    var id = 'cd-f-' + c.k;
+    var dis = trav ? ' disabled' : '';
+    var rot = esc(c.r) + (c.req ? ' <span class="req">*</span>' : '') +
+              (trav && state.dados.nivel !== 'leitura' ? ' <span class="material-icons-round" title="Já informado: só a coordenação altera">lock</span>' : '');
+    if (c.tipo === 'check') {
+      var marcado = (v === undefined || v === null) ? true : !!v;
+      return '<div class="cd-campo ' + (c.cls || '') + '"><label>&nbsp;</label><label class="cd-check" style="text-transform:none;font-weight:400;letter-spacing:0;font-size:13px;color:var(--c-text-1,#1A1A2E);">' +
+             '<input type="checkbox" id="' + id + '"' + (marcado ? ' checked' : '') + dis + '> ' + esc(c.r) + '</label></div>';
+    }
+    var input;
+    if (c.tipo === 'area') {
+      input = '<textarea class="cd-input" id="' + id + '" maxlength="2000"' + dis + '>' + esc(v) + '</textarea>';
+    } else if (c.tipo === 'uf') {
+      input = '<select class="cd-input" id="' + id + '"' + dis + '><option value="">—</option>' +
+              UFS.map(function(u) { return '<option' + (u === v ? ' selected' : '') + '>' + u + '</option>'; }).join('') + '</select>';
+    } else {
+      var tipo = c.tipo === 'date' ? 'date' : c.tipo === 'email' ? 'email' : 'text';
+      var extra = c.mask === 'cpf' ? ' inputmode="numeric" maxlength="14" placeholder="000.000.000-00"'
+                : c.mask === 'tel' ? ' inputmode="tel" maxlength="15" placeholder="(83) 90000-0000"'
+                : c.mask === 'cep' ? ' inputmode="numeric" maxlength="9" placeholder="00000-000"' : ' maxlength="200"';
+      input = '<input type="' + tipo + '" class="cd-input" id="' + id + '" value="' + esc(formatar(c.mask, v)) + '"' +
+              (c.mask ? ' data-mask="' + c.mask + '"' : '') + extra + dis + '>';
+    }
+    return '<div class="cd-campo ' + (c.cls || '') + '"><label for="' + id + '">' + rot + '</label>' + input + '</div>';
+  }
+
+  function desenhar() {
+    var d = state.dados, u = d.usuario || {}, cad = d.cadastro || {};
+    var leitura = d.nivel === 'leitura';
+    var html = '';
+
+    if (embutido) {
+      html += '<div class="cd-aviso" style="background:#EEF4F8;border-color:rgba(69,123,157,0.3);color:#1F4E6B;"><span class="material-icons-round">badge</span>' +
+              '<span>Cadastro de <strong>' + esc(u.nome) + '</strong> (' + esc(u.codigo || '') + ')' +
+              (leitura ? ' — somente leitura: a coordenação não altera o cadastro de administradores.' : '.') + '</span></div>';
+    }
+    if (d.nivel === 'proprio' && (!cad.cpf || !cad.data_nascimento || !(d.matriculas || []).length)) {
+      html += '<div class="cd-aviso"><span class="material-icons-round">info</span><span>Confira os dados antes de salvar: ' +
+              '<strong>data de nascimento, CPF, RG e matrículas funcionais</strong>, depois de salvos, só podem ser alterados pela coordenação.</span></div>';
+    }
+
+    // Identificação (vem de Usuários — não muda aqui)
+    html += '<div class="cd-card"><div class="cd-card-titulo"><span class="material-icons-round">account_circle</span>Identificação no sistema' +
+            '<small>Alterados pela coordenação em Usuários</small></div><div class="cd-grid">' +
+            '<div class="cd-campo s2"><label>Nome completo</label><div class="cd-fixo">' + esc(u.nome || '—') + '</div></div>' +
+            '<div class="cd-campo"><label>Código</label><div class="cd-fixo mono">' + esc(u.codigo || '—') + '</div></div>' +
+            '<div class="cd-campo"><label>Papel</label><div class="cd-fixo">' + esc(ROTULO_PAPEL[u.papel] || u.papel || '—') + '</div></div>' +
+            '<div class="cd-campo"><label>Login</label><div class="cd-fixo mono">' + esc(u.login || '—') + '</div></div>' +
+            '<div class="cd-campo s2"><label>E-mail de acesso</label><div class="cd-fixo">' + esc(u.email || '—') + '</div></div>' +
+            '</div></div>';
+
+    BLOCOS.forEach(function(b) {
+      html += '<div class="cd-card"><div class="cd-card-titulo"><span class="material-icons-round">' + b.icone + '</span>' + esc(b.titulo) + '</div><div class="cd-grid">' +
+              b.campos.map(function(c) { return campoHtml(c, cad); }).join('') + '</div></div>';
+    });
+
+    // Vínculo funcional
+    html += '<div class="cd-card"><div class="cd-card-titulo"><span class="material-icons-round">work</span>Vínculo funcional</div>' +
+            '<div id="cd-mats"></div></div>';
+
+    html += '<div class="cd-rodape"><span class="cd-rodape-info">' +
+            '<span class="req" style="color:#E63946;">*</span> necessário para o cadastro completo' +
+            (cad.atualizado_em ? ' · última atualização em ' + esc(dataHora(cad.atualizado_em)) + (d.atualizado_por ? ' por ' + esc(d.atualizado_por) : '') : '') +
+            '</span>' +
+            (leitura ? '' : '<button class="btn-cd btn-cd-pri" type="button" id="cd-salvar"><span class="material-icons-round">save</span>Salvar cadastro</button>') +
+            '</div>';
+
+    el('cd-form').innerHTML = html;
+    el('cd-estado').style.display = 'none';
+    el('cd-form').style.display = 'block';
+    desenharMats();
+
+    // Máscaras ao sair do campo
+    el('cd-form').querySelectorAll('input[data-mask]').forEach(function(inp) {
+      inp.addEventListener('blur', function() { inp.value = formatar(inp.getAttribute('data-mask'), inp.value); });
+    });
+    if (el('cd-salvar')) el('cd-salvar').addEventListener('click', salvar);
+  }
+
+  // ── Matrículas funcionais ───────────────────────────────────────────────
+  function podeMats() { return !state.dados.matriculas_travadas && state.dados.nivel !== 'leitura'; }
+  function souGestor() { return state.dados.nivel === 'gestor'; }
+
+  function desenharMats() {
+    var d = state.dados, box = el('cd-mats');
+    var edita = podeMats(), gestor = souGestor(), docente = !!d.docente;
+    var editaNum = edita;                // número, vínculo e carga horária
+    var editaDoc = edita && gestor;      // turmas, departamento e redução
+    var html = '';
+
+    if (!state.mats.length && !edita) {
+      html = '<p class="cd-nota" style="margin-top:0;"><span class="material-icons-round">info</span>Nenhuma matrícula funcional cadastrada.</p>';
+    } else if (state.mats.length) {
+      html += '<div class="cd-mats-wrap"><table class="cd-mats"><thead><tr>' +
+              '<th>Matrícula</th><th>Vínculo</th><th>Carga horária (h/sem.)</th>' +
+              (docente ? '<th>Turmas</th><th>Departamento</th><th>Redução</th>' : '') +
+              '<th></th></tr></thead><tbody>';
+      state.mats.forEach(function(m, i) {
+        var dis = editaNum ? '' : ' disabled';
+        var disDoc = editaDoc ? '' : ' disabled';
+        var podeRemover = edita && (gestor || !m.id);
+        html += '<tr data-i="' + i + '">' +
+          '<td><input class="cd-input" data-m="matricula" value="' + esc(m.matricula) + '" maxlength="40"' + dis + '></td>' +
+          '<td><select class="cd-input" data-m="vinculo"' + dis + '><option value="">Escolha…</option>' +
+            VINCULOS.concat(m.vinculo && VINCULOS.indexOf(m.vinculo) === -1 ? [m.vinculo] : []).map(function(v) {
+              return '<option' + (v === m.vinculo ? ' selected' : '') + '>' + esc(v) + '</option>';
+            }).join('') + '</select></td>' +
+          '<td><input class="cd-input num" type="number" min="1" max="60" data-m="carga_horaria" value="' + esc(m.carga_horaria) + '"' + dis + '></td>' +
+          (docente
+            ? '<td><input class="cd-input num" type="number" min="0" max="30" data-m="turmas" value="' + esc(m.turmas == null ? PADRAO_TURMAS : m.turmas) + '"' + disDoc + '></td>' +
+              '<td><input class="cd-input num" type="number" min="0" max="30" data-m="departamento" value="' + esc(m.departamento == null ? PADRAO_DEP : m.departamento) + '"' + disDoc + '></td>' +
+              '<td><label class="cd-check"><input type="checkbox" data-m="reducao"' + (m.reducao ? ' checked' : '') + disDoc + '> Tem</label></td>'
+            : '') +
+          '<td>' + (podeRemover ? '<button class="btn-cd-mini" type="button" data-rem="' + i + '" title="Remover"><span class="material-icons-round">delete</span></button>' : '') + '</td>' +
+          '</tr>';
+        if (docente && m.reducao) {
+          html += '<tr class="cd-red" data-i="' + i + '"><td colspan="3"></td><td colspan="4">' +
+            '<div class="cd-grid" style="grid-template-columns:2fr 1fr;gap:8px;">' +
+            '<div class="cd-campo"><label>Ato da redução (portaria) <span class="req">*</span></label><input class="cd-input" data-m="reducao_ato" value="' + esc(m.reducao_ato) + '" maxlength="200"' + disDoc + '></div>' +
+            '<div class="cd-campo"><label>Válida até</label><input class="cd-input" type="date" data-m="reducao_validade" value="' + esc(m.reducao_validade) + '"' + disDoc + '></div>' +
+            '</div></td></tr>';
+        }
+      });
+      html += '</tbody></table></div>';
+      if (docente) {
+        html += '<div class="cd-total">Horários a marcar na disponibilidade (turmas + departamento): <strong>' + totalHorarios() + '</strong></div>';
+      }
+    }
+
+    if (edita && state.mats.length < 5) {
+      html += '<div style="margin-top:10px;"><button class="btn-cd btn-cd-sec" type="button" id="cd-m-add"><span class="material-icons-round">add</span>Adicionar matrícula funcional</button></div>';
+    }
+    if (docente && edita && !gestor) {
+      html += '<p class="cd-nota"><span class="material-icons-round">info</span>A quantidade de turmas (padrão ' + PADRAO_TURMAS +
+              ') e de horários de departamento (padrão ' + PADRAO_DEP + ') é definida pela coordenação, inclusive quando há redução de carga horária prevista em portaria.</p>';
+    }
+    if (d.nivel === 'proprio' && d.matriculas_travadas) {
+      html += '<p class="cd-nota"><span class="material-icons-round">lock</span>Para alterar as matrículas funcionais, fale com a coordenação.</p>';
+    }
+    box.innerHTML = html;
+
+    box.querySelectorAll('[data-m]').forEach(function(inp) {
+      var ev = inp.type === 'checkbox' || inp.tagName === 'SELECT' ? 'change' : 'input';
+      inp.addEventListener(ev, function() {
+        var i = Number(inp.closest('tr').getAttribute('data-i'));
+        var campo = inp.getAttribute('data-m');
+        state.mats[i][campo] = inp.type === 'checkbox' ? inp.checked : inp.value;
+        if (campo === 'reducao') desenharMats();
+        else if (campo === 'turmas' || campo === 'departamento') atualizarTotal();
+      });
+    });
+    box.querySelectorAll('[data-rem]').forEach(function(b) {
+      b.addEventListener('click', function() {
+        var i = Number(b.getAttribute('data-rem'));
+        var m = state.mats[i];
+        if (m.id && !confirm('Remover a matrícula funcional ' + (m.matricula || '') + '? A exclusão vale ao salvar o cadastro.')) return;
+        state.mats.splice(i, 1);
+        desenharMats();
+      });
+    });
+    if (el('cd-m-add')) el('cd-m-add').addEventListener('click', function() {
+      state.mats.push({ matricula: '', vinculo: '', carga_horaria: '', turmas: null, departamento: null, reducao: false });
+      desenharMats();
+    });
+  }
+
+  // Campo vazio = padrão (o banco grava 7 turmas + 2 de departamento)
+  function totalHorarios() {
+    function n(v, padrao) { return (v == null || v === '') ? padrao : (Number(v) || 0); }
+    return state.mats.reduce(function(s, m) { return s + n(m.turmas, PADRAO_TURMAS) + n(m.departamento, PADRAO_DEP); }, 0);
+  }
+
+  function atualizarTotal() {
+    var t = raiz.querySelector('.cd-total strong'); if (!t) return;
+    t.textContent = totalHorarios();
+  }
+
+  // ── Salvar ──────────────────────────────────────────────────────────────
+  function coletar() {
+    var dados = {};
+    BLOCOS.forEach(function(b) {
+      b.campos.forEach(function(c) {
+        var inp = el('cd-f-' + c.k);
+        if (!inp || inp.disabled) return;
+        dados[c.k] = c.tipo === 'check' ? inp.checked : inp.value.trim();
+      });
+    });
+    if (podeMats()) {
+      dados.matriculas = state.mats.map(function(m) {
+        var x = { id: m.id || null, matricula: String(m.matricula || '').trim(), vinculo: m.vinculo || '',
+                  carga_horaria: m.carga_horaria === '' ? null : m.carga_horaria };
+        if (souGestor()) {
+          x.turmas = m.turmas === '' ? null : m.turmas;
+          x.departamento = m.departamento === '' ? null : m.departamento;
+          x.reducao = !!m.reducao;
+          x.reducao_ato = m.reducao_ato || null;
+          x.reducao_validade = m.reducao_validade || null;
+        }
+        return x;
+      });
+    }
+    return dados;
+  }
+
+  function salvar() {
+    if (state.salvando) return;
+    var d = state.dados, cad = d.cadastro || {};
+    var dados = coletar();
+
+    if (d.nivel === 'proprio') {
+      var novos = [];
+      if (dados.cpf && !cad.cpf) novos.push('CPF');
+      if (dados.data_nascimento && !cad.data_nascimento) novos.push('data de nascimento');
+      if (dados.rg && !cad.rg) novos.push('RG');
+      if (dados.matriculas && dados.matriculas.length) novos.push('matrículas funcionais');
+      if (novos.length && !confirm('Confira antes de salvar: depois de salvos, ' + novos.join(', ') +
+          ' só poderão ser alterados pela coordenação.\n\nSalvar agora?')) return;
+    }
+
+    var btn = el('cd-salvar');
+    state.salvando = true; btn.disabled = true;
+    postApi('cadastro.salvar', { usuario_id: alvoId, dados: dados }).then(function(res) {
+      if (!res.sucesso) { aviso(res.mensagem || 'Erro ao salvar.', 'error'); return; }
+      aviso(res.dados && res.dados.alterado === false ? 'Nenhuma alteração para salvar.' : 'Cadastro salvo.');
+      aplicar(res.dados);
+    }).catch(function() { aviso('Erro de comunicação.', 'error'); })
+      .finally(function() { state.salvando = false; if (el('cd-salvar')) el('cd-salvar').disabled = false; });
+  }
+
+  // ── Senha ───────────────────────────────────────────────────────────────
+  function regrasSenha() {
+    var s = el('cd-s-nova').value;
+    var r = { len: s.length >= 8, mai: /[A-Z]/.test(s), min: /[a-z]/.test(s), num: /[0-9]/.test(s), esp: /[^A-Za-z0-9]/.test(s) };
+    raiz.querySelectorAll('.cd-regra').forEach(function(x) {
+      var ok = r[x.getAttribute('data-r')];
+      x.classList.toggle('ok', ok);
+      x.querySelector('.material-icons-round').textContent = ok ? 'check_circle' : 'radio_button_unchecked';
+    });
+    return r.len && r.mai && r.min && r.num && r.esp;
+  }
+
+  function trocarSenha() {
+    var atual = el('cd-s-atual').value, nova = el('cd-s-nova').value, conf = el('cd-s-conf').value;
+    if (!atual) { aviso('Informe a senha atual.', 'error'); return; }
+    if (!regrasSenha()) { aviso('A nova senha não atende a todas as regras.', 'error'); return; }
+    if (nova !== conf) { aviso('A confirmação não é igual à nova senha.', 'error'); return; }
+    var btn = el('cd-s-btn'); btn.disabled = true;
+    postApi('conta.trocarSenha', { senhaAtual: atual, novaSenha: nova }).then(function(res) {
+      if (!res.sucesso) { aviso(res.mensagem || 'Não foi possível trocar a senha.', 'error'); return; }
+      ['cd-s-atual', 'cd-s-nova', 'cd-s-conf'].forEach(function(id) { el(id).value = ''; });
+      regrasSenha();
+      aviso(res.mensagem || 'Senha alterada.');
+    }).catch(function() { aviso('Erro de comunicação.', 'error'); })
+      .finally(function() { btn.disabled = false; });
+  }
+
+  // ── Contatos da equipe ──────────────────────────────────────────────────
+  function carregarContatos() {
+    postApi('cadastro.contatos', {}).then(function(res) {
+      if (!res.sucesso) {
+        el('cd-c-estado').innerHTML = '<span class="material-icons-round">error_outline</span><p>' + esc(res.mensagem || 'Erro ao carregar.') + '</p>';
+        return;
+      }
+      state.contatos = res.dados || [];
+      desenharContatos();
+    }).catch(function() {
+      el('cd-c-estado').innerHTML = '<span class="material-icons-round">error_outline</span><p>Erro de comunicação.</p>';
+    });
+  }
+
+  function telHtml(t, whats) {
+    var d = digitos(t);
+    if (!d) return '<span style="color:var(--c-text-3,#9898B0);">—</span>';
+    return '<a href="tel:+55' + d + '">' + esc(fmtTel(d)) + '</a>' +
+           (whats ? ' · <a href="https://wa.me/55' + d + '" target="_blank" rel="noopener">WhatsApp</a>' : '');
+  }
+
+  function desenharContatos() {
+    var b = el('cd-c-busca').value.trim().toLowerCase();
+    var lista = (state.contatos || []).filter(function(c) {
+      if (!b) return true;
+      return [c.nome, c.nome_social, ROTULO_PAPEL[c.papel], c.codigo].some(function(x) { return (x || '').toLowerCase().indexOf(b) !== -1; });
+    });
+    if (!lista.length) {
+      el('cd-c-tabela').style.display = 'none';
+      el('cd-c-estado').style.display = 'block';
+      el('cd-c-estado').innerHTML = '<span class="material-icons-round">person_search</span><p>Nenhum contato encontrado.</p>';
+      return;
+    }
+    el('cd-c-tbody').innerHTML = lista.map(function(c) {
+      var emerg = c.emergencia_nome
+        ? esc(c.emergencia_nome) + (c.emergencia_parentesco ? ' <small>' + esc(c.emergencia_parentesco) + '</small>' : '') +
+          '<small>' + telHtml(c.emergencia_telefone, false) + '</small>'
+        : '<span style="color:var(--c-text-3,#9898B0);">—</span>';
+      return '<tr><td>' + esc(c.nome_social || c.nome) + (c.nome_social ? '<small>' + esc(c.nome) + '</small>' : '') + '<small>' + esc(c.codigo || '') + '</small></td>' +
+             '<td><span class="cd-papel">' + esc(ROTULO_PAPEL[c.papel] || c.papel) + '</span></td>' +
+             '<td>' + telHtml(c.telefone, c.whatsapp) + '</td>' +
+             '<td><a href="mailto:' + esc(c.email) + '">' + esc(c.email) + '</a>' +
+               (c.email_pessoal ? '<small><a href="mailto:' + esc(c.email_pessoal) + '">' + esc(c.email_pessoal) + '</a> (pessoal)</small>' : '') + '</td>' +
+             '<td>' + emerg + '</td></tr>';
+    }).join('');
+    el('cd-c-estado').style.display = 'none';
+    el('cd-c-tabela').style.display = 'table';
+  }
+
+  // ── Início ──────────────────────────────────────────────────────────────
+  function init() {
+    if (!embutido) {
+      el('cd-abas').style.display = 'flex';
+      if (['admin', 'coordenacao', 'secretaria'].indexOf(meuPapel) !== -1) el('cd-aba-contatos').style.display = '';
+      raiz.querySelectorAll('.cd-aba').forEach(function(b) { b.addEventListener('click', function() { mostrarAba(b.dataset.aba); }); });
+      el('cd-s-nova').addEventListener('input', regrasSenha);
+      el('cd-s-btn').addEventListener('click', trocarSenha);
+      el('cd-s-conf').addEventListener('keydown', function(e) { if (e.key === 'Enter') trocarSenha(); });
+      el('cd-s-mostrar').addEventListener('change', function() {
+        var t = this.checked ? 'text' : 'password';
+        ['cd-s-atual', 'cd-s-nova', 'cd-s-conf'].forEach(function(id) { el(id).type = t; });
+      });
+      el('cd-c-busca').addEventListener('input', desenharContatos);
+    }
+    carregar();
+  }
+
+  init();
+}());
+</script>
