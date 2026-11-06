@@ -42,6 +42,7 @@
     .sidebar-footer{border-top:1px solid rgba(255,255,255,0.07);padding:12px;flex-shrink:0;}
     .user-card{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);transition:background var(--transition);}
     .user-card:hover{background:rgba(255,255,255,0.06);}
+    .user-card .user-avatar,.user-card .user-info{cursor:pointer;}
     .user-avatar{width:32px;height:32px;border-radius:50%;background:var(--c-accent);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;flex-shrink:0;letter-spacing:-0.3px;}
     .user-info{flex:1;min-width:0;}
     .user-name{font-size:12.5px;font-weight:500;color:rgba(255,255,255,0.88);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -108,7 +109,7 @@
     </div>
     <nav class="sidebar-nav" id="sidebar-nav"></nav>
     <div class="sidebar-footer">
-      <div class="user-card">
+      <div class="user-card" title="Meu cadastro">
         <div class="user-avatar" id="user-avatar">?</div>
         <div class="user-info">
           <div class="user-name" id="user-name">—</div>
@@ -166,7 +167,9 @@ var MODULOS = {
   auditoria:  'modulos/f10-auditoria.html',
   transicao:  'modulos/f11-transicao.html',
   nivelamento: 'modulos/f12-nivelamento.html',
+  matricula_novatos: 'modulos/f13-matricula.html',
   config:     'modulos/f-config.html',
+  meu_cadastro: 'modulos/f14-cadastro.html',
 };
 
 // =========================================================
@@ -433,6 +436,7 @@ function renderizarMenuFallback() {
     if (App.ciclo && App.ciclo.ativo) {
       itens.push({ id: 'transicao', label: 'Transição de semestre', icone: 'published_with_changes' });
       itens.push({ id: 'nivelamento', label: 'Nivelamento', icone: 'quiz' });
+      itens.push({ id: 'matricula_novatos', label: 'Matrícula de novatos', icone: 'person_add' });
     }
     if (papel === 'admin') {
       itens.push({ id: 'auditoria', label: 'Auditoria', icone: 'history' });
@@ -463,8 +467,12 @@ function renderizarMenuFallback() {
     if (App.ciclo && App.ciclo.ativo) {
       itens.push({ id: 'transicao', label: 'Rematrícula', icone: 'how_to_reg' });
       itens.push({ id: 'nivelamento', label: 'Nivelamento', icone: 'quiz' });
+      itens.push({ id: 'matricula_novatos', label: 'Matrícula de novatos', icone: 'person_add' });
     }
   }
+  // Meu cadastro (etapa 24): todos os papéis — dados, senha e, para
+  // secretaria/coordenação/admin, os contatos da equipe.
+  if (papel) itens.push({ id: 'meu_cadastro', label: 'Meu cadastro', icone: 'badge' });
   renderizarMenu(itens);
 }
 
@@ -551,6 +559,12 @@ document.getElementById('btn-logout').addEventListener('click', function() {
       App.modulo  = null;
       window.location.href = window.location.href.split('?')[0] + '?t=' + Date.now();
     });
+});
+
+// Clicar no nome/foto no rodapé do menu abre "Meu cadastro" (etapa 24)
+document.querySelector('.user-card').addEventListener('click', function(e) {
+  if (e.target.closest('#btn-logout')) return;
+  if (App.usuario) navegarPara('meu_cadastro', 'Meu cadastro');
 });
 
 // =========================================================
