@@ -1,5 +1,5 @@
 <!--
-  f14-cadastro.html — etapa 24 (cadastro ampliado de usuários)
+  f14-cadastro.html — etapa 24 (cadastro ampliado de usuários) + etapa 25 (idiomas)
   Usado de dois jeitos:
     1. Menu "Meu cadastro" (todos os papéis): os próprios dados, troca de
        senha e, para secretaria/coordenação/admin, os contatos da equipe.
@@ -75,6 +75,22 @@
   .cd-contatos small{display:block;color:var(--c-text-3,#9898B0);font-size:11.5px;}
   .cd-contatos a{color:#185FA5;text-decoration:none;}
   .cd-contatos a:hover{text-decoration:underline;}
+  .cd-idi-grupo{margin-bottom:14px;}
+  .cd-idi-grupo:last-child{margin-bottom:0;}
+  .cd-idi-titulo{font-size:11px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;color:var(--c-text-2,#5C5C7A);margin-bottom:8px;}
+  .cd-idi-lista{display:flex;flex-wrap:wrap;gap:8px;}
+  .cd-idi{display:inline-flex;align-items:center;gap:7px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:8px;padding:6px 10px;font-size:13px;background:#fff;}
+  .cd-idi.on{border-color:#457B9D;background:rgba(69,123,157,0.06);}
+  .cd-idi input{width:15px;height:15px;accent-color:#457B9D;margin:0;}
+  .cd-idi label{display:inline-flex;align-items:center;gap:7px;cursor:pointer;}
+  .cd-idi.dis label{cursor:default;}
+  .cd-selo{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:99px;font-size:10.5px;font-weight:600;}
+  .cd-selo.validado{background:rgba(42,157,143,0.14);color:#1A6E65;}
+  .cd-selo.pendente{background:rgba(233,196,106,0.28);color:#7A5C00;}
+  .cd-idi-btn{height:24px;padding:0 8px;border-radius:5px;font-size:11px;font-weight:500;cursor:pointer;font-family:var(--font-sans,sans-serif);border:1.5px solid;background:#fff;}
+  .cd-idi-btn.ok{border-color:rgba(42,157,143,0.4);color:#1A6E65;}
+  .cd-idi-btn.nao{border-color:rgba(230,57,70,0.3);color:#A32D2D;}
+  .cd-idi-btn:disabled{opacity:0.5;cursor:wait;}
   .cd-papel{display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:#F0EFEA;color:#5C5C7A;white-space:nowrap;}
   @media(max-width:760px){
     .cd-grid{grid-template-columns:1fr 1fr;}
@@ -193,7 +209,7 @@
   var eu = (typeof App !== 'undefined' && App.usuario) ? App.usuario : {};
   var meuPapel = eu.papel || '';
 
-  var state = { dados: null, mats: [], salvando: false, contatos: null };
+  var state = { dados: null, mats: [], salvando: false, contatos: null, idiLeciona: [], idiCoordena: [] };
 
   function el(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); }
@@ -243,6 +259,7 @@
   function aplicar(d) {
     state.dados = d;
     state.mats = (d.matriculas || []).map(function(m) { return Object.assign({}, m); });
+    lerIdiomas(d);
     desenhar();
   }
 
@@ -315,6 +332,12 @@
     html += '<div class="cd-card"><div class="cd-card-titulo"><span class="material-icons-round">work</span>Vínculo funcional</div>' +
             '<div id="cd-mats"></div></div>';
 
+    // Idiomas (etapa 25)
+    if (mostraIdiomas()) {
+      html += '<div class="cd-card"><div class="cd-card-titulo"><span class="material-icons-round">translate</span>Idiomas</div>' +
+              '<div id="cd-idiomas"></div></div>';
+    }
+
     html += '<div class="cd-rodape"><span class="cd-rodape-info">' +
             '<span class="req" style="color:#E63946;">*</span> necessário para o cadastro completo' +
             (cad.atualizado_em ? ' · última atualização em ' + esc(dataHora(cad.atualizado_em)) + (d.atualizado_por ? ' por ' + esc(d.atualizado_por) : '') : '') +
@@ -326,6 +349,7 @@
     el('cd-estado').style.display = 'none';
     el('cd-form').style.display = 'block';
     desenharMats();
+    desenharIdiomas();
 
     // Máscaras ao sair do campo
     el('cd-form').querySelectorAll('input[data-mask]').forEach(function(inp) {
@@ -432,6 +456,107 @@
     t.textContent = totalHorarios();
   }
 
+  // ── Idiomas (etapa 25) ──────────────────────────────────────────────────
+  function lerIdiomas(d) {
+    var lista = d.idiomas || [];
+    state.idiLeciona = lista.filter(function(x) { return x.tipo === 'leciona'; }).map(function(x) { return x.idioma_id; });
+    state.idiCoordena = lista.filter(function(x) { return x.tipo === 'coordena'; }).map(function(x) { return x.idioma_id; });
+  }
+  function temCoordena() { return (state.dados.idiomas || []).some(function(x) { return x.tipo === 'coordena'; }); }
+  function mostraIdiomas() { var d = state.dados; return !!(d.docente || d.pode_coordena || temCoordena()); }
+  function podeLeciona() { var d = state.dados; return d.docente && !d.idiomas_travados && d.nivel !== 'leitura'; }
+
+  function marcacao(id, tipo) {
+    return (state.dados.idiomas || []).filter(function(x) { return x.idioma_id === id && x.tipo === tipo; })[0] || null;
+  }
+
+  // Opções = idiomas com curso ativo + os que a pessoa já tem (mesmo que não estejam mais na lista)
+  function opcoes() {
+    var ops = (state.dados.idiomas_opcoes || []).slice();
+    (state.dados.idiomas || []).forEach(function(x) {
+      if (!ops.some(function(o) { return o.id === x.idioma_id; })) ops.push({ id: x.idioma_id, nome: x.nome });
+    });
+    return ops;
+  }
+
+  function seloHtml(m) {
+    if (!m) return '';
+    if (m.situacao === 'pendente') return '<span class="cd-selo pendente" title="Aguardando validação da coordenação">pendente</span>';
+    var dica = m.origem === 'turmas' ? 'Validado pelas turmas do semestre (etapa 25)'
+             : 'Validado' + (m.validado_por ? ' por ' + m.validado_por : '') + (m.validado_em ? ' em ' + dataHora(m.validado_em) : '');
+    return '<span class="cd-selo validado" title="' + esc(dica) + '">validado</span>';
+  }
+
+  function grupoHtml(tipo, titulo, edita, ids) {
+    var d = state.dados;
+    var html = '<div class="cd-idi-grupo"><div class="cd-idi-titulo">' + esc(titulo) + '</div><div class="cd-idi-lista">';
+    opcoes().forEach(function(o) {
+      var marcado = ids.indexOf(o.id) !== -1;
+      var m = marcacao(o.id, tipo);
+      if (!edita && !marcado) return;
+      html += '<span class="cd-idi' + (marcado ? ' on' : '') + (edita ? '' : ' dis') + '"><label>' +
+              (edita ? '<input type="checkbox" data-idi="' + tipo + '" value="' + esc(o.id) + '"' + (marcado ? ' checked' : '') + '>' : '') +
+              esc(o.nome) + '</label>' + (marcado ? seloHtml(m) : '') +
+              (tipo === 'leciona' && d.pode_validar && m && m.situacao === 'pendente'
+                ? '<button class="cd-idi-btn ok" type="button" data-validar="1" data-idioma="' + esc(o.id) + '">Validar</button>' +
+                  '<button class="cd-idi-btn nao" type="button" data-validar="0" data-idioma="' + esc(o.id) + '">Recusar</button>'
+                : '') +
+              '</span>';
+    });
+    if (!edita && !ids.length) html += '<span style="font-size:13px;color:var(--c-text-3,#9898B0);">Nenhum.</span>';
+    return html + '</div></div>';
+  }
+
+  function desenharIdiomas() {
+    var box = el('cd-idiomas'); if (!box) return;
+    var d = state.dados, html = '';
+    if (d.docente) {
+      html += grupoHtml('leciona', 'Idiomas que leciona', podeLeciona(), state.idiLeciona);
+      if (d.nivel === 'proprio' && !d.idiomas_travados) {
+        html += '<p class="cd-nota" style="margin-top:-4px;"><span class="material-icons-round">info</span>Os idiomas que você marcar ficam <strong>pendentes</strong> até a coordenação validar. Depois da primeira validação, só a coordenação altera.</p>';
+      } else if (d.nivel === 'proprio') {
+        html += '<p class="cd-nota" style="margin-top:-4px;"><span class="material-icons-round">lock</span>Para alterar os idiomas que você leciona, fale com a coordenação.</p>';
+      }
+    }
+    if (d.pode_coordena || temCoordena()) {
+      html += grupoHtml('coordena', 'Idiomas que coordena', !!d.pode_coordena, state.idiCoordena);
+      if (!d.pode_coordena) html += '<p class="cd-nota" style="margin-top:-4px;"><span class="material-icons-round">info</span>Os idiomas coordenados são definidos pelo admin.</p>';
+    }
+    box.innerHTML = html;
+
+    box.querySelectorAll('input[data-idi]').forEach(function(c) {
+      c.addEventListener('change', function() {
+        var lista = c.getAttribute('data-idi') === 'leciona' ? state.idiLeciona : state.idiCoordena;
+        var i = lista.indexOf(c.value);
+        if (c.checked && i === -1) lista.push(c.value);
+        if (!c.checked && i !== -1) lista.splice(i, 1);
+        c.closest('.cd-idi').classList.toggle('on', c.checked);
+      });
+    });
+    box.querySelectorAll('button[data-validar]').forEach(function(b) {
+      b.addEventListener('click', function() { validarIdioma(b.getAttribute('data-idioma'), b.getAttribute('data-validar') === '1', b); });
+    });
+  }
+
+  // Validar/recusar grava na hora (não depende do botão "Salvar cadastro").
+  function validarIdioma(idiomaId, aprovar, btn) {
+    var u = state.dados.usuario || {};
+    var nome = (opcoes().filter(function(o) { return o.id === idiomaId; })[0] || {}).nome || '';
+    if (!aprovar && !confirm('Recusar o idioma ' + nome + ' para ' + (u.nome || '') + '?\n\nA marcação será apagada.')) return;
+    btn.disabled = true;
+    postApi('idiomas.validar', { usuario_id: u.id, idioma_id: idiomaId, aprovar: aprovar }).then(function(res) {
+      if (!res.sucesso) { aviso(res.mensagem || 'Erro.', 'error'); btn.disabled = false; return; }
+      aviso(res.mensagem || 'Feito.');
+      // Atualiza só a parte de idiomas, sem perder o que foi digitado no resto do formulário
+      return postApi('cadastro.ler', { usuario_id: alvoId }).then(function(r2) {
+        if (!r2.sucesso) return;
+        ['idiomas', 'idiomas_travados', 'pode_validar', 'pode_coordena', 'idiomas_opcoes'].forEach(function(k) { state.dados[k] = r2.dados[k]; });
+        if (!aprovar) state.idiLeciona = state.idiLeciona.filter(function(x) { return x !== idiomaId; });
+        desenharIdiomas();
+      });
+    }).catch(function() { aviso('Erro de comunicação.', 'error'); btn.disabled = false; });
+  }
+
   // ── Salvar ──────────────────────────────────────────────────────────────
   function coletar() {
     var dados = {};
@@ -456,6 +581,8 @@
         return x;
       });
     }
+    if (podeLeciona()) dados.idiomas_leciona = state.idiLeciona.slice();
+    if (state.dados.pode_coordena) dados.idiomas_coordena = state.idiCoordena.slice();
     return dados;
   }
 
