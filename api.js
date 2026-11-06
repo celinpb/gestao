@@ -137,6 +137,15 @@ async function postApi(acao, dados) {
     // dono); o caminho certo é inativar.
     if (acao === 'usuarios.deletar')    return _err('Usuários não são excluídos: use "Inativar".', 400);
 
+    // ── CADASTRO AMPLIADO (etapa 24) ──────────────────────────────────────────
+    // Quem pode ver/alterar o quê é conferido no banco (usuario_cadastro_*).
+    // usuario_id vazio = o próprio usuário logado.
+    if (acao === 'cadastro.ler')      return await _rpcTransicao(sb, 'usuario_cadastro_ler', { p_usuario_id: (dados && dados.usuario_id) || null });
+    if (acao === 'cadastro.salvar')   return await _rpcTransicao(sb, 'usuario_cadastro_salvar', { p_usuario_id: (dados && dados.usuario_id) || null, p: (dados && dados.dados) || {} }, 'Cadastro salvo.');
+    if (acao === 'cadastro.contatos') return await _rpcTransicao(sb, 'usuarios_contatos', {});
+    // Troca de senha com a senha atual: Edge Function minha-conta
+    if (acao === 'conta.trocarSenha') return await _minhaConta(sb, 'trocarSenha', { senha_atual: dados.senhaAtual || '', nova_senha: dados.novaSenha || '' });
+
     // ── ALUNOS ────────────────────────────────────────────────────────────────
     if (acao === 'alunos.listar')    return await _alunosListar(sb, dados);
     if (acao === 'alunos.buscar')    return await _alunosBuscar(sb, dados);
@@ -260,6 +269,19 @@ async function postApi(acao, dados) {
     if (acao === 'niv.oral')          return await _rpcTransicao(sb, 'nivel_oral_registrar', { p: dados || {} }, 'Prova oral registrada.');
     if (acao === 'niv.final')         return await _rpcTransicao(sb, 'nivel_final_registrar', { p: dados || {} }, 'Resultado final lançado.');
     if (acao === 'niv.finalLimpar')   return await _rpcTransicao(sb, 'nivel_final_limpar', { p_id: dados && dados.id, p_motivo: (dados && dados.motivo) || null }, 'Resultado final retirado.');
+
+    // Matrícula de novatos (etapa 23 — Fase 7). Os papéis são conferidos no banco.
+    if (acao === 'mat.painel')        return await _rpcTransicao(sb, 'mat_painel', { p_idioma_id: (dados && dados.idioma_id) || null });
+    if (acao === 'mat.detalhe')       return await _rpcTransicao(sb, 'mat_detalhe', { p_id: dados && dados.id });
+    if (acao === 'mat.importar')      return await _rpcTransicao(sb, 'mat_importar', { p_idioma_id: (dados && dados.idioma_id) || null, p_arquivo: (dados && dados.arquivo) || null, p_linhas: (dados && dados.linhas) || [], p_importacao_id: (dados && dados.importacao_id) || null });
+    if (acao === 'mat.reverificar')   return await _rpcTransicao(sb, 'mat_reverificar', { p_idioma_id: (dados && dados.idioma_id) || null });
+    if (acao === 'mat.validar')       return await _rpcTransicao(sb, 'mat_validar', { p_id: dados && dados.id, p_publico_tipo: (dados && dados.publico_tipo) || null }, 'Solicitação validada.');
+    if (acao === 'mat.indeferir')     return await _rpcTransicao(sb, 'mat_indeferir', { p_id: dados && dados.id, p_motivo: (dados && dados.motivo) || null }, 'Solicitação indeferida.');
+    if (acao === 'mat.reabrir')       return await _rpcTransicao(sb, 'mat_reabrir', { p_id: dados && dados.id }, 'Solicitação voltou para "a validar".');
+    if (acao === 'mat.classificar')   return await _rpcTransicao(sb, 'mat_classificar', { p_idioma_id: (dados && dados.idioma_id) || null });
+    if (acao === 'mat.efetivar')      return await _rpcTransicao(sb, 'mat_efetivar', { p_idioma_id: (dados && dados.idioma_id) || null });
+    if (acao === 'mat.cursosIniciantes') return await _rpcTransicao(sb, 'cursos_iniciantes', { p_idioma_id: (dados && dados.idioma_id) || null });
+    if (acao === 'mat.iniciantesSalvar') return await _rpcTransicao(sb, 'cursos_iniciantes_salvar', { p_curso_id: dados && dados.curso_id, p_aceita: !!(dados && dados.aceita) });
 
     if (acao === 'disp.painel')              return await _rpcTransicao(sb, 'disp_painel', {});
     if (acao === 'disp.slotsGerar')          return await _rpcTransicao(sb, 'disp_slots_gerar', {}, 'Slots gerados.');
@@ -507,6 +529,27 @@ async function _usuariosAdmin(sb, acao, corpo) {
     return _ok(d.dados, d.mensagem);
   } catch (e) {
     return _err(e.message || 'Erro ao chamar o servidor de usuários.', 500);
+  }
+}
+
+// Chama a Edge Function minha-conta (etapa 24): ações do próprio usuário
+// sobre a conta de acesso. Mesmo formato de resposta da usuarios-admin.
+async function _minhaConta(sb, acao, corpo) {
+  try {
+    var res = await sb.functions.invoke('minha-conta', {
+      body: Object.assign({ acao: acao }, corpo || {}),
+    });
+    if (res.error) {
+      console.error('minha-conta [' + acao + ']:', res.error);
+      return _err('Não foi possível falar com o servidor (Edge Function "minha-conta"). ' +
+        'Confira se ela foi publicada. Detalhe: ' + (res.error.message || ''), 502);
+    }
+    var d = res.data || {};
+    if (typeof d === 'string') { try { d = JSON.parse(d); } catch (e) { d = {}; } }
+    if (!d.sucesso) return _err(d.mensagem || 'Operação não concluída.', 400);
+    return _ok(d.dados, d.mensagem);
+  } catch (e) {
+    return _err(e.message || 'Erro ao chamar o servidor.', 500);
   }
 }
 
