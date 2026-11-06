@@ -326,7 +326,7 @@ function onLoginSucesso(token, usuario) {
   // token ignorado — sessão gerenciada pelo Supabase Auth SDK
   window.SGE_MODO_SENHA = null;
   window.SGE_AVISO_LOGIN = null;
-  try { sessionStorage.removeItem('sge_modo_senha'); } catch (e) {}
+  try { sessionStorage.removeItem('sge_modo_senha'); sessionStorage.removeItem('sge_cadastro_adiado'); } catch (e) {}
   if (usuario) Auth.salvar(usuario);
   App.usuario = usuario;
   document.getElementById('login-overlay').style.display = 'none';
@@ -363,10 +363,95 @@ function carregarShell() {
       App.ciclo = (resCiclo && resCiclo.sucesso) ? resCiclo.dados : null;
       renderizarMenuFallback();
       navegarPara('dashboard', 'Início');
+      verificarPedidoCadastro(false);
     })
     .catch(function() {
       navegarPara('dashboard', 'Início');
+      verificarPedidoCadastro(false);
     });
+}
+
+// =========================================================
+// PEDIDO DE COMPLETAR CADASTRO (etapa 26)
+// =========================================================
+// Admin/coordenação pedem; no acesso seguinte aparece este aviso. A pessoa
+// pode adiar 3 vezes (uma por sessão); depois disso, o sistema só abre
+// "Meu cadastro" até o cadastro ficar completo. O pedido some sozinho
+// quando não falta mais nada (o banco confere).
+var CHAVE_ADIADO = 'sge_cadastro_adiado';
+
+window.verificarPedidoCadastro = function(depoisDeSalvar) {
+  return postApi('cadastro.pedidoEstado', {}).then(function(res) {
+    var e = (res && res.sucesso) ? res.dados : null;
+    if (!e) return null;
+    var tinha = !!App.pedidoCadastro;
+    if (!e.pedido) {
+      App.pedidoCadastro = null;
+      App.cadastroObrigatorio = false;
+      fecharAvisoCadastro();
+      if (tinha && depoisDeSalvar) toast('Cadastro completo. Obrigado!', 'success', 5000);
+      return e;
+    }
+    App.pedidoCadastro = e;
+    App.cadastroObrigatorio = e.restantes === 0;
+    if (App.cadastroObrigatorio && App.modulo !== 'meu_cadastro') navegarPara('meu_cadastro', 'Meu cadastro');
+    var jaAdiou = false;
+    try { jaAdiou = sessionStorage.getItem(CHAVE_ADIADO) === '1'; } catch (x) {}
+    if (!depoisDeSalvar && (App.cadastroObrigatorio || !jaAdiou)) mostrarAvisoCadastro(e);
+    return e;
+  }).catch(function() { return null; });
+};
+
+function escIdx(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+    return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+  });
+}
+
+function fecharAvisoCadastro() {
+  var o = document.getElementById('aviso-cadastro');
+  if (o) o.remove();
+}
+
+function mostrarAvisoCadastro(e) {
+  fecharAvisoCadastro();
+  var obrig = e.restantes === 0;
+  var div = document.createElement('div');
+  div.id = 'aviso-cadastro';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(26,26,46,0.45);z-index:400;display:flex;align-items:center;justify-content:center;padding:16px;';
+  div.innerHTML =
+    '<div style="background:#fff;border-radius:14px;max-width:460px;width:100%;box-shadow:var(--shadow-lg);overflow:hidden;">' +
+      '<div style="padding:18px 22px;border-bottom:1px solid var(--c-border);display:flex;align-items:center;gap:10px;">' +
+        '<span class="material-icons-round" style="color:#B8860B;">assignment_ind</span>' +
+        '<strong style="font-size:15px;">Complete o seu cadastro</strong></div>' +
+      '<div style="padding:18px 22px;font-size:13.5px;color:var(--c-text-2);line-height:1.6;">' +
+        '<p>' + (e.pedido_por ? escIdx(e.pedido_por) + ' pediu' : 'A coordenação pediu') + ' que você complete o seu cadastro no sistema.</p>' +
+        '<p style="margin-top:10px;"><strong style="color:var(--c-text-1);">Falta:</strong> ' + escIdx((e.pendencias || []).join(', ')) + '.</p>' +
+        '<p style="margin-top:10px;">' + (obrig
+          ? '<strong style="color:var(--c-danger);">Você já adiou 3 vezes.</strong> Até completar, o sistema só abre "Meu cadastro".'
+          : 'Você pode adiar mais <strong>' + e.restantes + '</strong> vez(es). Depois disso, só será possível usar o sistema com o cadastro completo.') + '</p>' +
+      '</div>' +
+      '<div style="padding:14px 22px;background:#FAFAF8;border-top:1px solid var(--c-border);display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;">' +
+        (obrig ? '' : '<button type="button" id="aviso-cad-depois" style="height:38px;padding:0 16px;border-radius:8px;border:1.5px solid var(--c-border);background:#fff;font-size:13.5px;">Depois</button>') +
+        '<button type="button" id="aviso-cad-agora" style="height:38px;padding:0 16px;border-radius:8px;background:var(--c-accent);color:#fff;font-size:13.5px;font-weight:500;">Preencher agora</button>' +
+      '</div></div>';
+  document.body.appendChild(div);
+  document.getElementById('aviso-cad-agora').addEventListener('click', function() {
+    fecharAvisoCadastro();
+    navegarPara('meu_cadastro', 'Meu cadastro');
+  });
+  var depois = document.getElementById('aviso-cad-depois');
+  if (depois) depois.addEventListener('click', function() {
+    depois.disabled = true;
+    postApi('cadastro.pedidoAdiar', {}).then(function(res) {
+      if (!res.sucesso) { toast(escIdx(res.mensagem || 'Erro.'), 'error'); depois.disabled = false; return; }
+      try { sessionStorage.setItem(CHAVE_ADIADO, '1'); } catch (x) {}
+      fecharAvisoCadastro();
+      var r = res.dados || {};
+      App.pedidoCadastro = r.pedido ? r : null;
+      if (r.pedido) toast(r.restantes > 0 ? 'Lembrete adiado. Restam ' + r.restantes + ' adiamento(s).' : 'Último adiamento usado: no próximo acesso, complete o cadastro.', 'info', 5000);
+    });
+  });
 }
 
 function preencherUsuarioSidebar() {
@@ -512,6 +597,12 @@ window.atualizarCiclo = function() {
 // NAVEGAÇÃO
 // =========================================================
 function navegarPara(moduloId, titulo) {
+  // Pedido de completar cadastro já adiado 3 vezes: só "Meu cadastro" (etapa 26)
+  if (App.cadastroObrigatorio && moduloId !== 'meu_cadastro') {
+    toast('Complete o seu cadastro para continuar usando o sistema.', 'error', 5000);
+    moduloId = 'meu_cadastro';
+    titulo = 'Meu cadastro';
+  }
   if (App.modulo === moduloId) return;
   App.modulo = moduloId;
 
@@ -554,6 +645,7 @@ document.getElementById('btn-logout').addEventListener('click', function() {
     .catch(function() {})
     .then(function() {
       Auth.limpar();
+      try { sessionStorage.removeItem('sge_cadastro_adiado'); } catch (e) {}
       App.usuario = null;
       App.ciclo = null;
       App.modulo  = null;
@@ -623,6 +715,7 @@ function expirarSessaoPorTempo() {
     .catch(function() {})
     .then(function() {
       Auth.limpar();
+      try { sessionStorage.removeItem('sge_cadastro_adiado'); } catch (e) {}
       App.usuario = null;
       App.ciclo = null;
       App.modulo  = null;
