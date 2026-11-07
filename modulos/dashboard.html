@@ -64,6 +64,28 @@
   .dash-disp-cont.falta{color:#A32D2D;font-weight:600;}
   .dash-disp-btn{height:38px;padding:0 18px;border-radius:8px;border:none;background:#457B9D;color:#fff;font-family:var(--font-sans,sans-serif);font-size:13.5px;font-weight:500;cursor:pointer;}
   .dash-disp-btn:disabled{opacity:0.5;cursor:not-allowed;}
+  .dash-disp-extra{display:flex;gap:18px;flex-wrap:wrap;margin:4px 0 14px;}
+  .dash-disp-ead{display:flex;flex-direction:column;gap:6px;font-size:13px;min-width:200px;}
+  .dash-disp-ead b,.dash-disp-coment b{font-size:12px;color:var(--c-text-2,#5C5C7A);}
+  .dash-disp-ead label{display:flex;align-items:center;gap:6px;cursor:pointer;}
+  .dash-disp-ead input{accent-color:#457B9D;}
+  .dash-disp-coment{flex:1;min-width:240px;display:flex;flex-direction:column;gap:6px;}
+  .dash-disp-coment textarea{border:1.5px solid var(--c-border,#E8E7E2);border-radius:7px;padding:7px 9px;font-family:var(--font-sans,sans-serif);font-size:13px;resize:vertical;}
+  .dash-rev-overlay{position:fixed;inset:0;background:rgba(26,26,46,0.45);z-index:300;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;}
+  .dash-rev{background:#fff;border-radius:14px;max-width:520px;width:100%;box-shadow:0 12px 48px rgba(26,26,46,0.18);overflow:hidden;}
+  .dash-rev-h{padding:16px 20px;border-bottom:1px solid var(--c-border,#E8E7E2);font-weight:600;font-size:15px;}
+  .dash-rev-c{padding:16px 20px;font-size:13.5px;line-height:1.55;}
+  .dash-rev-c p{margin:8px 0;}
+  .dash-rev-tab{border-collapse:collapse;width:100%;font-size:13px;}
+  .dash-rev-tab th,.dash-rev-tab td{border:1px solid var(--c-border,#E8E7E2);padding:5px 8px;text-align:left;vertical-align:top;}
+  .dash-rev-tab th{background:#F8F7F3;width:100px;}
+  .dash-rev-senha{display:flex;flex-direction:column;gap:6px;margin-top:12px;}
+  .dash-rev-senha input{height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:7px;padding:0 10px;font-size:14px;}
+  .dash-rev-alerta{color:#B01020;font-weight:500;min-height:1em;}
+  .dash-rev-f{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;background:#FAFAF8;border-top:1px solid var(--c-border,#E8E7E2);flex-wrap:wrap;}
+  .dash-rev-btn{height:38px;padding:0 16px;border-radius:8px;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;font-size:13.5px;cursor:pointer;font-family:var(--font-sans,sans-serif);}
+  .dash-rev-btn.pri{background:#457B9D;border-color:#457B9D;color:#fff;font-weight:500;}
+  .dash-rev-btn:disabled{opacity:0.6;cursor:wait;}
 
   /* ── Idiomas para validar (etapa 25) ── */
   .dash-idi{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-left:4px solid #E9C46A;border-radius:12px;padding:18px 20px;margin-bottom:28px;}
@@ -166,7 +188,7 @@
 <!-- Transição de semestre: datas do ciclo (só aparece com a transição ativada) -->
 <div class="dash-ciclo" id="dash-ciclo" style="display:none;"></div>
 
-<!-- Disponibilidade do professor para o próximo semestre (só professor, com a transição ativada) -->
+<!-- Disponibilidade do docente para o próximo semestre (professor e coordenação que leciona, com a transição ativada) -->
 <div class="dash-disp" id="dash-disp" style="display:none;"></div>
 
 <!-- Idiomas lecionados aguardando validação (só admin e coordenação, quando houver) -->
@@ -562,9 +584,12 @@
     box.style.display = '';
   }
 
-  // ── Disponibilidade do professor (etapa 19 — D-54) ──────────────────────────
+  // ── Disponibilidade do docente (etapa 19 + etapa 27) ─────────────────────────
+  // O docente marca os horários, responde EAD e (opcional) comenta. Nada é
+  // gravado até "Revisar e enviar" → confirmação com a senha. Cada envio fica
+  // guardado; o comprovante pode ser impresso/salvo em PDF.
   var DISP_DIAS = ['', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-  var disp = { dados: null, orig: '' };
+  var disp = { dados: null, orig: '', ead: null, comentario: '', origEad: null, origComent: '' };
   function fmtDispData(iso) {
     if (!iso) return '';
     var d = new Date(iso); if (isNaN(d)) return '';
@@ -573,10 +598,14 @@
   }
   function carregarDisp() {
     var c = (typeof App !== 'undefined') ? App.ciclo : null;
-    if (state.papel !== 'professor' || !c || !c.ativo || !c.proximo) return;
+    if ((state.papel !== 'professor' && state.papel !== 'coordenacao') || !c || !c.ativo || !c.proximo) return;
     postApi('disp.minha', {}).then(function(res) {
       if (!res.sucesso || !res.dados) return;
       disp.dados = res.dados;
+      var u = res.dados.ultimo_envio;
+      disp.ead = u ? u.ead : null;
+      disp.comentario = u && u.comentario ? u.comentario : '';
+      disp.origEad = disp.ead; disp.origComent = disp.comentario;
       renderDisp();
     }).catch(function() {});
   }
@@ -585,24 +614,35 @@
     document.querySelectorAll('#dash-disp input[type=checkbox]:checked').forEach(function(c) { ids.push(c.value); });
     return ids;
   }
+  function dispMudou() {
+    if (!disp.dados || !disp.dados.aberto) return false;
+    return dispMarcados().slice().sort().join(',') !== disp.orig || disp.ead !== disp.origEad || (disp.comentario || '') !== (disp.origComent || '');
+  }
+  function textoMinimo(d) {
+    var origem = d.minimo_origem === 'matriculas'
+      ? ' (pelas suas matrículas funcionais: turmas + departamento)'
+      : d.minimo_origem === 'individual' ? ' (definido pela coordenação)'
+      : ' (padrão — sua matrícula funcional ainda não está no cadastro)';
+    return 'pelo menos <strong>' + d.minimo + '</strong>' + escD(origem) +
+      (d.minimo_sabado ? ', sendo pelo menos <strong>' + d.minimo_sabado + ' no sábado</strong>' : '');
+  }
   function renderDisp() {
     var d = disp.dados, box = el('dash-disp'); if (!box || !d) return;
-    var slots = d.slots || [], per = d.periodo || {};
+    var slots = d.slots || [], per = d.periodo || {}, u = d.ultimo_envio;
     var agora = Date.now();
     var abre = per.inicio ? new Date(per.inicio).getTime() : null;
     var marcados = slots.filter(function(s) { return s.marcado; });
     var texto;
     if (d.aberto) {
       texto = slots.length
-        ? 'Marque os horários em que você pode dar aula no <strong>' + escD(d.semestre) + '</strong> — pelo menos <strong>' + d.minimo + '</strong>' +
-          (d.minimo_sabado ? ', sendo pelo menos <strong>' + d.minimo_sabado + ' no sábado</strong>' : '') + '.' +
-          (per.fim ? ' Prazo: até <strong>' + fmtDispData(per.fim) + '</strong>.' : '') + ' Quanto mais horários, mais opções a coordenação tem.'
+        ? 'Marque os horários em que você pode trabalhar no <strong>' + escD(d.semestre) + '</strong> — ' + textoMinimo(d) + '.' +
+          (per.fim ? ' Prazo: até <strong>' + fmtDispData(per.fim) + '</strong>.' : '') + ' Quanto mais horários, mais opções a coordenação tem para montar a grade.'
         : 'A coordenação ainda não cadastrou os horários. Volte mais tarde.';
     } else if (abre && abre > agora) {
-      if (!slots.length && !marcados.length) { box.style.display = 'none'; return; }
+      if (!slots.length && !u) { box.style.display = 'none'; return; }
       texto = 'O período para informar sua disponibilidade para o <strong>' + escD(d.semestre) + '</strong> abre em <strong>' + fmtDispData(per.inicio) + '</strong>.';
     } else if (abre) {
-      texto = 'O período para informar a disponibilidade terminou.' + (marcados.length ? ' Você marcou:' : ' Você não marcou nenhum horário; fale com a coordenação.');
+      texto = 'O período para informar a disponibilidade terminou.' + (marcados.length ? ' Horários registrados:' : ' Você não enviou disponibilidade; fale com a coordenação.');
     } else {
       box.style.display = 'none'; return;
     }
@@ -616,41 +656,116 @@
           escD(s.horario) + '<small>' + escD(s.turno) + '</small></label>';
       }).join('') + '</div>';
     }).join('');
+    var envioTxt = u
+      ? '<p class="dash-disp-texto" style="margin-bottom:10px;"><span class="material-icons-round" style="font-size:15px;vertical-align:-3px;color:#2A9D8F;">task_alt</span> ' +
+        'Último envio: <strong>nº ' + u.numero + '</strong> em ' + escD(fmtDispData(u.enviado_em)) +
+        (u.confirmado_senha ? ' (confirmado com a sua senha)' : ' (registrado por ' + escD(u.registrado_por || 'a coordenação') + ')') +
+        ' · EAD: ' + (u.ead ? 'sim' : 'não') +
+        ' · <a href="#" id="dash-disp-comp">Ver / imprimir comprovante</a></p>'
+      : (d.aberto && slots.length ? '<p class="dash-disp-texto" style="margin-bottom:10px;color:#A32D2D;"><strong>Você ainda não enviou a sua disponibilidade.</strong></p>' : '');
+    var form = d.aberto && slots.length
+      ? '<div class="dash-disp-extra">' +
+          '<div class="dash-disp-ead"><b>Deseja ter turmas na modalidade EAD? <span style="color:#E63946;">*</span></b>' +
+            '<label><input type="radio" name="dash-disp-ead" value="sim"' + (disp.ead === true ? ' checked' : '') + '> Sim</label>' +
+            '<label><input type="radio" name="dash-disp-ead" value="nao"' + (disp.ead === false ? ' checked' : '') + '> Não</label></div>' +
+          '<label class="dash-disp-coment"><b>Comentários ou pedidos específicos (opcional)</b>' +
+            '<textarea id="dash-disp-coment" maxlength="2000" rows="2" placeholder="Ex.: prefiro turmas no mesmo turno; não posso às sextas à noite…">' + escD(disp.comentario) + '</textarea></label>' +
+        '</div>'
+      : '';
     box.innerHTML =
       '<div class="dash-disp-topo"><span class="dash-disp-titulo"><span class="material-icons-round">event_available</span>Sua disponibilidade para ' + escD(d.semestre) + '</span></div>' +
-      '<p class="dash-disp-texto">' + texto + '</p>' +
-      (grade ? '<div class="dash-disp-dias">' + grade + '</div>' : '') +
+      '<p class="dash-disp-texto">' + texto + '</p>' + envioTxt +
+      (grade ? '<div class="dash-disp-dias">' + grade + '</div>' : '') + form +
       (d.aberto && slots.length ? '<div class="dash-disp-rodape"><span class="dash-disp-cont" id="dash-disp-cont"></span>' +
-        '<button class="dash-disp-btn" id="dash-disp-salvar">Salvar disponibilidade</button></div>' : '');
+        '<button class="dash-disp-btn" id="dash-disp-revisar">Revisar e enviar</button></div>' : '');
     box.style.display = '';
+    if (el('dash-disp-comp')) el('dash-disp-comp').addEventListener('click', function(e) {
+      e.preventDefault();
+      window.SGE_comprovanteDisp(postApi('disp.comprovante', {})).then(function(res) {
+        if (res && !res.sucesso && typeof toast === 'function') toast(escD(res.mensagem || 'Erro.'), 'error');
+      });
+    });
     if (d.aberto && slots.length) {
       disp.orig = marcados.map(function(s) { return s.id; }).sort().join(',');
       box.querySelectorAll('input[type=checkbox]').forEach(function(c) {
         c.addEventListener('change', function() { c.closest('label').classList.toggle('on', c.checked); atualizarContDisp(); });
       });
-      el('dash-disp-salvar').addEventListener('click', salvarDisp);
+      box.querySelectorAll('input[name=dash-disp-ead]').forEach(function(r) {
+        r.addEventListener('change', function() { disp.ead = r.value === 'sim'; atualizarContDisp(); });
+      });
+      el('dash-disp-coment').addEventListener('input', function() { disp.comentario = this.value; atualizarContDisp(); });
+      el('dash-disp-revisar').addEventListener('click', abrirRevisao);
       atualizarContDisp();
     }
   }
-  function atualizarContDisp() {
-    var ids = dispMarcados(), n = ids.length, min = disp.dados.minimo, cont = el('dash-disp-cont');
-    var minSab = disp.dados.minimo_sabado || 0;
-    var nSab = (disp.dados.slots || []).filter(function(s) { return s.dia === 6 && ids.indexOf(s.id) !== -1; }).length;
-    var mudou = ids.slice().sort().join(',') !== disp.orig;
-    var falta = n < min || nSab < minSab;
-    cont.textContent = n + ' marcado(s) · mínimo ' + min +
-      (minSab ? ' · sábado: ' + nSab + ' de ' + minSab : '') + (mudou ? ' · alterações não salvas' : '');
-    cont.className = 'dash-disp-cont' + (falta ? ' falta' : '');
-    el('dash-disp-salvar').disabled = !mudou || falta;
+  function contagem() {
+    var ids = dispMarcados(), d = disp.dados;
+    var nSab = (d.slots || []).filter(function(s) { return s.dia === 6 && ids.indexOf(s.id) !== -1; }).length;
+    return { ids: ids, n: ids.length, nSab: nSab, falta: ids.length < d.minimo || nSab < (d.minimo_sabado || 0) };
   }
-  function salvarDisp() {
-    var ids = dispMarcados(), btn = el('dash-disp-salvar');
-    btn.disabled = true;
-    postApi('disp.marcar', { slot_ids: ids }).then(function(res) {
-      if (!res.sucesso) { btn.disabled = false; if (typeof toast === 'function') toast(res.mensagem || 'Erro.', 'error'); return; }
-      if (typeof toast === 'function') toast('Disponibilidade salva.', 'success');
-      carregarDisp();
-    }).catch(function() { btn.disabled = false; if (typeof toast === 'function') toast('Erro de comunicação.', 'error'); });
+  function atualizarContDisp() {
+    var c = contagem(), d = disp.dados, cont = el('dash-disp-cont'); if (!cont) return;
+    var mudou = dispMudou();
+    cont.textContent = c.n + ' marcado(s) · mínimo ' + d.minimo +
+      (d.minimo_sabado ? ' · sábado: ' + c.nSab + ' de ' + d.minimo_sabado : '') +
+      (disp.ead === null ? ' · responda sobre EAD' : '') + (mudou ? ' · alterações não enviadas' : '');
+    cont.className = 'dash-disp-cont' + (c.falta || disp.ead === null ? ' falta' : '');
+    el('dash-disp-revisar').disabled = c.falta || disp.ead === null || (!mudou && !!d.ultimo_envio);
+    // Avisa antes de sair do Início (ou fechar a aba) com alterações não enviadas
+    window.SGE_ANTES_DE_SAIR = mudou ? function() {
+      return confirm('Você tem alterações na disponibilidade que ainda NÃO foram enviadas.\n\nSair mesmo assim?');
+    } : null;
+    window.onbeforeunload = mudou ? function() { return 'Alterações não enviadas.'; } : null;
+  }
+
+  // Tela de confirmação: resumo + senha
+  function abrirRevisao() {
+    var d = disp.dados, c = contagem();
+    var porDia = {};
+    (d.slots || []).filter(function(s) { return c.ids.indexOf(s.id) !== -1; })
+      .forEach(function(s) { (porDia[s.dia] = porDia[s.dia] || []).push(s); });
+    var resumo = Object.keys(porDia).sort().map(function(dia) {
+      return '<tr><th>' + DISP_DIAS[dia] + '</th><td>' + porDia[dia].map(function(s) { return escD(s.horario) + ' <small>(' + escD(s.turno) + ')</small>'; }).join('<br>') + '</td></tr>';
+    }).join('');
+    var ov = document.createElement('div');
+    ov.className = 'dash-rev-overlay'; ov.id = 'dash-rev';
+    ov.innerHTML =
+      '<div class="dash-rev"><div class="dash-rev-h">Confirme a sua disponibilidade — ' + escD(d.semestre) + '</div>' +
+      '<div class="dash-rev-c">' +
+        '<p><strong>' + c.n + '</strong> horário(s) marcado(s) (mínimo ' + d.minimo + (d.minimo_sabado ? ', sendo ' + d.minimo_sabado + ' no sábado' : '') + '):</p>' +
+        '<table class="dash-rev-tab">' + resumo + '</table>' +
+        '<p><strong>Deseja turmas EAD?</strong> ' + (disp.ead ? 'Sim' : 'Não') + '</p>' +
+        '<p><strong>Comentários:</strong> ' + (disp.comentario.trim() ? escD(disp.comentario.trim()).replace(/\n/g, '<br>') : '<span style="color:#9898B0;">(nenhum)</span>') + '</p>' +
+        '<label class="dash-rev-senha"><b>Para confirmar o envio, digite a sua senha do SGE:</b>' +
+          '<input type="password" id="dash-rev-senha" autocomplete="current-password"></label>' +
+        '<p class="dash-rev-alerta" id="dash-rev-alerta"></p>' +
+        '<p style="font-size:12px;color:#9898B0;">Depois de enviar, abre o comprovante para imprimir ou salvar em PDF. Enquanto o período estiver aberto, você pode enviar de novo: vale o último envio.</p>' +
+      '</div><div class="dash-rev-f">' +
+        '<button type="button" class="dash-rev-btn" id="dash-rev-voltar">Voltar e corrigir</button>' +
+        '<button type="button" class="dash-rev-btn pri" id="dash-rev-ok">Confirmar e enviar</button>' +
+      '</div></div>';
+    document.body.appendChild(ov);
+    el('dash-rev-senha').focus();
+    el('dash-rev-voltar').addEventListener('click', function() { ov.remove(); });
+    el('dash-rev-senha').addEventListener('keydown', function(e) { if (e.key === 'Enter') el('dash-rev-ok').click(); });
+    el('dash-rev-ok').addEventListener('click', function() {
+      var senha = el('dash-rev-senha').value;
+      if (!senha) { el('dash-rev-alerta').textContent = 'Digite a sua senha.'; return; }
+      var btn = el('dash-rev-ok'); btn.disabled = true; btn.textContent = 'Enviando…';
+      var envio = postApi('disp.enviar', { senha: senha, slot_ids: c.ids, ead: disp.ead, comentario: disp.comentario.trim() });
+      // A janela do comprovante é aberta já no clique (senão o navegador bloqueia)
+      window.SGE_comprovanteDisp(envio).then(function(res) {
+        if (!res || !res.sucesso) {
+          btn.disabled = false; btn.textContent = 'Confirmar e enviar';
+          el('dash-rev-alerta').textContent = (res && res.mensagem) || 'Erro de comunicação.';
+          return;
+        }
+        ov.remove();
+        window.SGE_ANTES_DE_SAIR = null; window.onbeforeunload = null;
+        if (typeof toast === 'function') toast('Disponibilidade enviada (envio nº ' + res.dados.numero + ').', 'success', 6000);
+        carregarDisp();
+      });
+    });
   }
 
   // ── Idiomas para validar (etapa 25) ─────────────────────────────────────────
