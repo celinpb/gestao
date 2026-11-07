@@ -228,6 +228,7 @@
   .r8g-outro{background:#fff;color:#8A8AA0;font-style:italic;}
   .r8g-conf{box-shadow:inset 0 0 0 2px #E63946;}
   .r8g-dispant{background:#E4FAFC;}
+  .r8g-gestao{background:#FFC27A;}
   .r8g-indisp{background:#C9C9C9;}
   .r8g-ok{background:#D9F2D5;}
   .r8g-falta{background:#FFE8B3;}
@@ -2426,8 +2427,9 @@
   //    em itálico, sem cor. Duas turmas no mesmo horário = borda vermelha.
   //  • Horário vazio (só quando há disponibilidade registrada no semestre):
   //    branco = marcado na disponibilidade e livre; ciano-claro = marcado e
-  //    o professor teve turma nesse horário no semestre anterior; cinza = não
-  //    marcado na disponibilidade.
+  //    o professor teve turma nesse horário no semestre anterior; laranja =
+  //    horário que o docente não marcou e a coordenação/admin marcou por ele
+  //    (ex.: sábado obrigatório); cinza = não marcado na disponibilidade.
   //  • Previsto = turmas das matrículas funcionais; Ocupado = horários com
   //    turma (de qualquer idioma); DEP = departamento das matrículas
   //    funcionais. Nome em verde quando Ocupado = Previsto, amarelo quando
@@ -2595,9 +2597,12 @@
     // 1) Linhas: professores + "a definir"
     var linhas={}, ordem=[];
     (d.professores||[]).forEach(function(p){
-      var linha={p:p, celulas:{}, fora:[], disp:{}, ant:{}};
+      var linha={p:p, celulas:{}, fora:[], disp:{}, gestao:{}, ant:{}};
       (p.disponivel||[]).forEach(function(s){
-        gradeColunasDoHorario(Number(s.dia), gradeIntervalo(s)).forEach(function(k){ linha.disp[k]=true; });
+        gradeColunasDoHorario(Number(s.dia), gradeIntervalo(s)).forEach(function(k){
+          linha.disp[k]=true;
+          if(s.pela_gestao) linha.gestao[k]=true;
+        });
       });
       (p.anteriores||[]).forEach(function(t){
         var iv=gradeIntervalo(t);
@@ -2614,7 +2619,7 @@
       var linha;
       if(t.professor_id){ linha=linhas[t.professor_id]; }
       else {
-        if(!linhaSem) linhaSem={p:{id:'', nome:'A definir', papel:'', previsto:null, dep:null, semProfessor:true}, celulas:{}, fora:[], disp:{}, ant:{}};
+        if(!linhaSem) linhaSem={p:{id:'', nome:'A definir', papel:'', previsto:null, dep:null, semProfessor:true}, celulas:{}, fora:[], disp:{}, gestao:{}, ant:{}};
         linha=linhaSem;
       }
       if(!linha) return;
@@ -2673,10 +2678,11 @@
         if(!itens.length){
           var cls='';
           if(temDisp && !p.semProfessor && p.enviou_disponibilidade){
-            cls = l.disp[c.chave] ? (l.ant[c.chave] ? 'r8g-dispant' : '') : 'r8g-indisp';
+            cls = !l.disp[c.chave] ? 'r8g-indisp'
+              : (l.gestao[c.chave] ? 'r8g-gestao' : (l.ant[c.chave] ? 'r8g-dispant' : ''));
           }
           tr+='<td class="r8g-cel'+ini+(cls?' '+cls:'')+'"></td>';
-          linhaX.push(cls==='r8g-indisp' ? '–' : '');
+          linhaX.push(cls==='r8g-indisp' ? '–' : (cls==='r8g-gestao' ? 'marc. coord.' : ''));
           return;
         }
         var principal=null;
@@ -2749,7 +2755,7 @@
       sw('r8g-tp','Demais estágios presencial')+sw('r8g-te','Demais estágios EAD/híbrido')+
       sw('r8g-zero','Turma sem alunos')+sw('r8g-outro','Turma de outro idioma',' style="border-style:dashed;"')+
       sw('r8g-conf','Duas turmas no mesmo horário')+
-      (temDisp ? sw('','Disponível, livre')+sw('r8g-dispant','Disponível, teve turma no '+((d.anterior&&d.anterior.rotulo)||'semestre anterior'))+sw('r8g-indisp','Não marcado na disponibilidade') : '')+
+      (temDisp ? sw('','Disponível, livre')+sw('r8g-dispant','Disponível, teve turma no '+((d.anterior&&d.anterior.rotulo)||'semestre anterior'))+sw('r8g-gestao','Marcado pela coordenação/admin (o docente não marcou)')+sw('r8g-indisp','Não marcado na disponibilidade') : '')+
       '<span><strong>e</strong>&nbsp;EAD · <strong>h</strong>&nbsp;híbrido</span>'+
       '<span>Nome: '+'<i class="r8g-ok"></i> ocupado = previsto · <i class="r8g-falta"></i> falta · <i class="r8g-excede"></i> passa</span>'+
     '</div>';
