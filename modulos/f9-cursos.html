@@ -693,6 +693,8 @@
 </div>
 
 <script>
+// Protege texto vindo do banco antes de pôr na página (não deixa virar código).
+function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 (function(){
   'use strict';
   var S={cursos:[],avaliacoes:[],idiomas:[],busca:'',buscaAv:'',papel:'',podeEditar:false,modoCurso:'novo',modoAv:'novo',cursoSel:null,avSel:null,formAvaliacoes:[],formProximos:[]};
@@ -763,15 +765,15 @@
       : {lista:S.formProximos,   cont:'fc-proximos-lista',   sel:'fc-proximos-add',   vazio:'Nenhum próximo curso (último curso da sequência).'};
     var cont=el(cfg.cont); if(!cont) return;
     cont.innerHTML='';
-    if(!cfg.lista.length){ cont.innerHTML='<div class="f9-lista-vazia">'+cfg.vazio+'</div>'; }
+    if(!cfg.lista.length){ cont.innerHTML='<div class="f9-lista-vazia">'+escTxt(cfg.vazio)+'</div>'; }
     cfg.lista.forEach(function(id,i){
       var item=document.createElement('div'); item.className='f9-item-ord';
       var txt='';
       if(tipo==='av'){ txt=esc(rotuloAv(avPorId(id))); }
       else { var c=cursoPorId(id); txt=esc(rotuloCurso(c))+(c&&c.Idioma?'<small>'+esc(c.Idioma)+'</small>':'')+(c&&!c.Ativo?'<span class="badge-inativo">Inativo</span>':''); }
-      item.innerHTML='<span class="ordem">'+(i+1)+'</span><span class="txt">'+txt+'</span>'+
-        '<button type="button" data-m="sobe" title="Subir"'+(i===0?' disabled':'')+'><span class="material-icons-round">arrow_upward</span></button>'+
-        '<button type="button" data-m="desce" title="Descer"'+(i===cfg.lista.length-1?' disabled':'')+'><span class="material-icons-round">arrow_downward</span></button>'+
+      item.innerHTML='<span class="ordem">'+(escTxt(i)+1)+'</span><span class="txt">'+txt+'</span>'+
+        '<button type="button" data-m="sobe" title="Subir"'+(escTxt(i===0?' disabled':''))+'><span class="material-icons-round">arrow_upward</span></button>'+
+        '<button type="button" data-m="desce" title="Descer"'+(escTxt(i===cfg.lista.length-1?' disabled':''))+'><span class="material-icons-round">arrow_downward</span></button>'+
         '<button type="button" data-m="remove" title="Remover"><span class="material-icons-round">close</span></button>';
       item.querySelectorAll('button').forEach(function(b){
         b.addEventListener('click',function(){
@@ -786,7 +788,7 @@
     });
     // Select "Adicionar…" sem os itens já escolhidos (nem o próprio curso)
     var sel=el(cfg.sel); if(!sel) return;
-    sel.innerHTML='<option value="">'+(tipo==='av'?'+ Adicionar avaliação…':'+ Adicionar próximo curso…')+'</option>';
+    sel.innerHTML='<option value="">'+(escTxt(tipo==='av'?'+ Adicionar avaliação…':'+ Adicionar próximo curso…'))+'</option>';
     if(tipo==='av'){
       S.avaliacoes.slice().sort(function(a,b){return (a.AvaliacaoID||'').localeCompare(b.AvaliacaoID||'','pt-BR');}).forEach(function(a){
         if(cfg.lista.indexOf(a.id)!==-1) return;
@@ -850,12 +852,12 @@
       // Avaliações vinculadas: um selo por componente (antes só a quantidade)
       var avsHtml=c.AvaliacaoIDs.map(function(id){var a=avPorId(id);return '<span class="badge-av">'+esc(a?(a.ComponenteNota||a.AvaliacaoID):'?')+'</span>';}).join('');
       tr.innerHTML=
-        '<td><span class="badge-idioma '+idiomaClass+'">'+(c.Idioma||'—')+'</span></td>'+
-        '<td class="f9-nome-cel">'+(c.Nome||'—')+(c.Ativo?'':'<span class="badge-inativo">Inativo</span>')+'</td>'+
-        '<td><code style="font-size:12px;background:#F5F4F0;padding:2px 7px;border-radius:4px;">'+(c.Sigla||'—')+'</code></td>'+
+        '<td><span class="badge-idioma '+escTxt(idiomaClass)+'">'+(escTxt(c.Idioma||'—'))+'</span></td>'+
+        '<td class="f9-nome-cel">'+(escTxt(c.Nome||'—'))+(c.Ativo?'':'<span class="badge-inativo">Inativo</span>')+'</td>'+
+        '<td><code style="font-size:12px;background:#F5F4F0;padding:2px 7px;border-radius:4px;">'+(escTxt(c.Sigla||'—'))+'</code></td>'+
         '<td>'+(avsHtml||'—')+'</td>'+
         '<td class="f9-acoes-cel">'+
-          (S.podeEditar?'<button class="btn-linha" data-id="'+c.id+'"><span class="material-icons-round">edit</span>Editar</button>':'')+
+          (S.podeEditar?'<button class="btn-linha" data-id="'+escTxt(c.id)+'"><span class="material-icons-round">edit</span>Editar</button>':'')+
         '</td>';
       if(S.podeEditar){var btn=tr.querySelector('button[data-id]');if(btn)btn.addEventListener('click',function(){abrirModalCurso('editar',c);});}
       tbody.appendChild(tr);
@@ -890,15 +892,15 @@
     lista.forEach(function(a){
       var tr=document.createElement('tr');
       tr.innerHTML=
-        '<td><code style="font-size:11.5px;background:#F5F4F0;padding:2px 7px;border-radius:4px;">'+(a.AvaliacaoID||'—')+'</code></td>'+
-        '<td>'+(a.ComponenteNota||'—')+'</td>'+
-        '<td>'+(a.Tipo||'—')+'</td>'+
-        '<td>'+a.QntNotas+'</td>'+
-        '<td>'+(a.NotaAprovacao||'—')+'</td>'+
-        '<td>'+(a.NotaMin!==undefined?a.NotaMin:'—')+'</td>'+
-        '<td>'+(a.Obrigatoria?'Sim':'Não')+'</td>'+
+        '<td><code style="font-size:11.5px;background:#F5F4F0;padding:2px 7px;border-radius:4px;">'+(escTxt(a.AvaliacaoID||'—'))+'</code></td>'+
+        '<td>'+(escTxt(a.ComponenteNota||'—'))+'</td>'+
+        '<td>'+(escTxt(a.Tipo||'—'))+'</td>'+
+        '<td>'+escTxt(a.QntNotas)+'</td>'+
+        '<td>'+(escTxt(a.NotaAprovacao||'—'))+'</td>'+
+        '<td>'+(escTxt(a.NotaMin!==undefined?a.NotaMin:'—'))+'</td>'+
+        '<td>'+(escTxt(a.Obrigatoria?'Sim':'Não'))+'</td>'+
         '<td class="f9-acoes-cel">'+
-          (S.podeEditar?'<button class="btn-linha" data-id="'+a.id+'"><span class="material-icons-round">edit</span>Editar</button>':'')+
+          (S.podeEditar?'<button class="btn-linha" data-id="'+escTxt(a.id)+'"><span class="material-icons-round">edit</span>Editar</button>':'')+
         '</td>';
       if(S.podeEditar){var btn=tr.querySelector('button[data-id]');if(btn)btn.addEventListener('click',function(){abrirModalAv('editar',a);});}
       tbody.appendChild(tr);
