@@ -330,6 +330,8 @@
 </div>
 
 <script>
+// Protege texto vindo do banco antes de pôr na página (não deixa virar código).
+function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 (function(){
   'use strict';
   var state={todas:[],matriculas:[],turmas:[],busca:'',filtroTurma:'',filtroSit:'ATIVA',papel:'',podeEditar:false,matriculaParaSit:null,matriculaParaTrans:null,turmaTransSelecionada:null,novaAlunoSel:null,novaMatriculaPendente:null};
@@ -456,9 +458,9 @@
       var titulo='Cancelada em '+(formatarDataHora(m.DataCancelamento)||'—')+
         (m.MotivoCancelamento?'\nMotivo: '+m.MotivoCancelamento:'')+
         (m.CanceladoPor?'\nPor: '+m.CanceladoPor:'');
-      return '<span class="badge-m5 '+sit+'" title="'+escAttr(titulo)+'" style="cursor:help;border-bottom:1px dotted currentColor;">'+sit+'</span>';
+      return '<span class="badge-m5 '+escTxt(sit)+'" title="'+escAttr(titulo)+'" style="cursor:help;border-bottom:1px dotted currentColor;">'+escTxt(sit)+'</span>';
     }
-    return '<span class="badge-m5 '+sit+'">'+sit+'</span>';
+    return '<span class="badge-m5 '+escTxt(sit)+'">'+escTxt(sit)+'</span>';
   }
 
   function renderizar(){
@@ -479,18 +481,18 @@
       var tr=document.createElement('tr');
       var acoes='';
       if(state.podeEditar){
-        acoes+='<button class="btn-m5-acao" data-acao="sit" data-id="'+m.id+'"><span class="material-icons-round">edit</span>Situação</button>';
+        acoes+='<button class="btn-m5-acao" data-acao="sit" data-id="'+escTxt(m.id)+'"><span class="material-icons-round">edit</span>Situação</button>';
         // Como no legado: só matrícula ATIVA pode ser transferida.
         if(m.SituacaoMatricula==='ATIVA')
-          acoes+='<button class="btn-m5-acao trans" data-acao="trans" data-id="'+m.id+'"><span class="material-icons-round">swap_horiz</span>Transferir</button>';
+          acoes+='<button class="btn-m5-acao trans" data-acao="trans" data-id="'+escTxt(m.id)+'"><span class="material-icons-round">swap_horiz</span>Transferir</button>';
       }
       // 6 células, na mesma ordem do cabeçalho: MatriculaID · Aluno · TurmaID · Estágio · Situação · ações
       tr.innerHTML=
-        '<td class="m5-mat-id">'+(m.MatriculaID||'—')+'</td>'+
-        '<td><div class="m5-nome">'+(m.NomeExibicao||m.AlunoID||'—')+'</div>'+
-            '<div style="font-size:11.5px;color:var(--c-text-3);">'+(m.AlunoID||'')+'</div></td>'+
-        '<td class="m5-turma-id">'+(m.TurmaID||'—')+'</td>'+
-        '<td style="font-size:13px;">'+(m.Estagio||'—')+'</td>'+
+        '<td class="m5-mat-id">'+(escTxt(m.MatriculaID||'—'))+'</td>'+
+        '<td><div class="m5-nome">'+(escTxt(m.NomeExibicao||m.AlunoID||'—'))+'</div>'+
+            '<div style="font-size:11.5px;color:var(--c-text-3);">'+(escTxt(m.AlunoID||''))+'</div></td>'+
+        '<td class="m5-turma-id">'+(escTxt(m.TurmaID||'—'))+'</td>'+
+        '<td style="font-size:13px;">'+(escTxt(m.Estagio||'—'))+'</td>'+
         '<td>'+badgeSituacao(m)+'</td>'+
         '<td><div class="m5-acoes">'+acoes+'</div></td>';
       var btnSit=tr.querySelector('button[data-acao="sit"]');
@@ -567,7 +569,7 @@
       return temVaga;
     });
     if(!candidatas.length){
-      cont.innerHTML='<div class="mat-vazio" style="padding:24px 0;text-align:center;color:var(--c-text-3);font-size:13px;">Nenhuma turma de destino disponível'+(outrosCursos?'.':' — marque "Outros cursos" para ver mais opções, ou verifique se há turmas com vaga.')+'</div>';
+      cont.innerHTML='<div class="mat-vazio" style="padding:24px 0;text-align:center;color:var(--c-text-3);font-size:13px;">Nenhuma turma de destino disponível'+(escTxt(outrosCursos?'.':' — marque "Outros cursos" para ver mais opções, ou verifique se há turmas com vaga.'))+'</div>';
       return;
     }
     cont.innerHTML='';
@@ -582,10 +584,10 @@
       var vagasTxt=(typeof t.VagasRestantes==='number')?(temVaga?(t.VagasRestantes+' vaga'+(t.VagasRestantes!==1?'s':'')):'Sem vagas'):'';
       item.innerHTML=
         '<div>'+
-          '<div class="m5-trans-nome">'+(t.TurmaID||'—')+' — '+(t.Estagio||t.CursoSigla||'—')+'</div>'+
-          '<div class="m5-trans-meta">'+metaPartes.join(' · ')+'</div>'+
+          '<div class="m5-trans-nome">'+(escTxt(t.TurmaID||'—'))+' — '+(escTxt(t.Estagio||t.CursoSigla||'—'))+'</div>'+
+          '<div class="m5-trans-meta">'+escTxt(metaPartes.join(' · '))+'</div>'+
         '</div>'+
-        (vagasTxt?'<span class="m5-trans-vagas '+(temVaga?'ok':'cheio')+'">'+vagasTxt+'</span>':'');
+        (vagasTxt?'<span class="m5-trans-vagas '+(escTxt(temVaga?'ok':'cheio'))+'">'+escTxt(vagasTxt)+'</span>':'');
       item.addEventListener('click',function(){
         document.querySelectorAll('.m5-trans-item').forEach(function(i){i.classList.remove('selecionado');});
         item.classList.add('selecionado');
@@ -639,7 +641,7 @@
       lista.slice(0,8).forEach(function(a){
         var ne=(a.nome_social||a.nome_completo||'');
         var div=document.createElement('div');div.className='m5-aluno-item';
-        div.innerHTML='<span class="m5-ai-nome">'+ne+'</span><span class="m5-ai-id">'+(a.external_id||a.id)+'</span>';
+        div.innerHTML='<span class="m5-ai-nome">'+escTxt(ne)+'</span><span class="m5-ai-id">'+(escTxt(a.external_id||a.id))+'</span>';
         div.addEventListener('click',function(){
           state.novaAlunoSel={id:a.id,AlunoID:a.external_id||a.id,NomeExibicao:ne};
           if(el('m5-nova-aluno-busca'))el('m5-nova-aluno-busca').value=''; // ID real
