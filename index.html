@@ -2,6 +2,10 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <!-- Política de segurança (CSP): de onde a página pode carregar scripts e para onde pode mandar dados.
+       O endereço 127.0.0.1:54321 é o Supabase da cópia local; na produção ele não é usado. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://kolomiisespdgaoukvbj.supabase.co wss://kolomiisespdgaoukvbj.supabase.co http://127.0.0.1:54321 ws://127.0.0.1:54321; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SGE · CELINPB</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -139,7 +143,8 @@
 <div id="toast-container"></div>
 
 <!-- Carrega os módulos JS -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Versão fixa + impressão digital (integrity): se o arquivo no distribuidor for trocado, o navegador não o executa. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="auth.js"></script>
 <script src="api.js"></script>
 
@@ -390,10 +395,9 @@ function htmlComprovanteDisp(d) {
     return x.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' }) + ' às ' +
            x.toLocaleTimeString('pt-BR', { timeZone: 'America/Fortaleza', hour: '2-digit', minute: '2-digit' });
   };
+  // Logo cadastrada em Configurações; sem ela, a logo do próprio site.
   var logo = '';
-  if (esc.logo_url) {
-    try { logo = new URL(esc.logo_url, window.location.href).href; } catch (x) { logo = ''; }
-  }
+  try { logo = new URL(esc.logo_url || 'logo192x192.png', window.location.href).href; } catch (x) { logo = ''; }
   var porDia = {};
   (d.slots || []).forEach(function(s) { (porDia[s.dia] = porDia[s.dia] || []).push(s); });
   var linhasDias = Object.keys(porDia).sort().map(function(dia) {
