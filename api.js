@@ -301,6 +301,13 @@ async function postApi(acao, dados) {
     if (acao === 'disp.professoresTurma')    return await _rpcTransicao(sb, 'disp_professores_turma', { p_turma_id: dados && dados.turma_id });
     if (acao === 'disp.minha')               return await _rpcTransicao(sb, 'disp_minha', {});
     if (acao === 'disp.marcar')              return await _rpcTransicao(sb, 'disp_marcar', { p_slot_ids: (dados && dados.slot_ids) || [], p_professor_id: (dados && dados.professor_id) || null }, 'Disponibilidade salva.');
+    // Etapa 27: envio com senha (Edge Function), registro pela coordenação,
+    // comprovante, histórico e EAD de cada docente
+    if (acao === 'disp.enviar')              return await _minhaConta(sb, 'enviarDisponibilidade', { senha: (dados && dados.senha) || '', slot_ids: (dados && dados.slot_ids) || [], ead: dados ? dados.ead : null, comentario: (dados && dados.comentario) || '' });
+    if (acao === 'disp.registrarPor')        return await _rpcTransicao(sb, 'disp_registrar_por', { p_professor_id: dados && dados.professor_id, p_slot_ids: (dados && dados.slot_ids) || [], p_ead: dados ? dados.ead : null, p_comentario: (dados && dados.comentario) || null }, 'Disponibilidade registrada.');
+    if (acao === 'disp.comprovante')         return await _rpcTransicao(sb, 'disp_comprovante', { p_envio_id: (dados && dados.envio_id) || null, p_professor_id: (dados && dados.professor_id) || null });
+    if (acao === 'disp.envios')              return await _rpcTransicao(sb, 'disp_envios', { p_professor_id: (dados && dados.professor_id) || null });
+    if (acao === 'disp.eadDocentes')         return await _rpcTransicao(sb, 'disp_ead_docentes', {});
 
     // ── RELATÓRIOS ────────────────────────────────────────────────────────────
     // ── COMENTÁRIOS ───────────────────────────────────────────────────────────
