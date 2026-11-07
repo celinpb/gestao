@@ -144,6 +144,8 @@
 <script src="api.js"></script>
 
 <script>
+// Protege texto vindo do banco antes de pôr na página (não deixa virar código).
+function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 // =========================================================
 // ESTADO GLOBAL
 // =========================================================
@@ -401,7 +403,7 @@ function htmlComprovanteDisp(d) {
   var mats = (d.matriculas || []).map(function(m) {
     return '<tr><td>' + e(m.matricula) + '</td><td>' + e(m.vinculo || '') + '</td><td>' +
       (m.turmas == null ? '—' : e(m.turmas)) + '</td><td>' + (m.departamento == null ? '—' : e(m.departamento)) + '</td><td>' +
-      (m.reducao ? 'Sim' : 'Não') + '</td></tr>';
+      (escTxt(m.reducao ? 'Sim' : 'Não')) + '</td></tr>';
   }).join('');
   var confirmacao = d.confirmado_senha
     ? '<div class="selo ok">✔ Disponibilidade confirmada pelo(a) próprio(a) docente com a sua senha pessoal de acesso ao SGE.</div>'
@@ -432,7 +434,7 @@ function htmlComprovanteDisp(d) {
       '<tr><td>Envio</td><td>nº ' + e(d.numero) + (d.total_envios > 1 ? ' de ' + e(d.total_envios) : '') + ' — ' + e(quando(d.enviado_em)) + '</td></tr>' +
       '<tr><td>Horários marcados</td><td>' + (d.slots || []).length + ' (mínimo pedido: ' + e(d.minimo) +
         (d.minimo_sabado ? ', sendo ' + e(d.minimo_sabado) + ' no sábado' : '') + ')</td></tr>' +
-      '<tr><td>Deseja turmas EAD?</td><td><strong>' + (d.ead ? 'Sim' : 'Não') + '</strong></td></tr></table>' +
+      '<tr><td>Deseja turmas EAD?</td><td><strong>' + (escTxt(d.ead ? 'Sim' : 'Não')) + '</strong></td></tr></table>' +
     confirmacao +
     '<h3>Horários disponíveis</h3>' + (linhasDias ? '<table>' + linhasDias + '</table>' : '<p>Nenhum horário marcado.</p>') +
     '<h3>Comentários e pedidos</h3><p>' + (d.comentario ? e(d.comentario).replace(/\n/g, '<br>') : '<small>(sem comentários)</small>') + '</p>' +
@@ -522,7 +524,7 @@ function mostrarAvisoCadastro(e) {
         '<p style="margin-top:10px;"><strong style="color:var(--c-text-1);">Falta:</strong> ' + escIdx((e.pendencias || []).join(', ')) + '.</p>' +
         '<p style="margin-top:10px;">' + (obrig
           ? '<strong style="color:var(--c-danger);">Você já adiou 3 vezes.</strong> Até completar, o sistema só abre "Meu cadastro".'
-          : 'Você pode adiar mais <strong>' + e.restantes + '</strong> vez(es). Depois disso, só será possível usar o sistema com o cadastro completo.') + '</p>' +
+          : 'Você pode adiar mais <strong>' + escTxt(e.restantes) + '</strong> vez(es). Depois disso, só será possível usar o sistema com o cadastro completo.') + '</p>' +
       '</div>' +
       '<div style="padding:14px 22px;background:#FAFAF8;border-top:1px solid var(--c-border);display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;">' +
         (obrig ? '' : '<button type="button" id="aviso-cad-depois" style="height:38px;padding:0 16px;border-radius:8px;border:1.5px solid var(--c-border);background:#fff;font-size:13.5px;">Depois</button>') +
@@ -665,8 +667,8 @@ function renderizarMenu(itens) {
     li.className = 'nav-item';
     li.dataset.id = item.id;
     li.innerHTML =
-      '<span class="material-icons-round">' + (item.icone || 'circle') + '</span>' +
-      '<span>' + item.label + '</span>';
+      '<span class="material-icons-round">' + (escTxt(item.icone || 'circle')) + '</span>' +
+      '<span>' + escTxt(item.label) + '</span>';
     if (App.modulo === item.id) li.classList.add('active');
     li.addEventListener('click', function() { navegarPara(item.id, item.label); });
     nav.appendChild(li);
@@ -829,8 +831,8 @@ function toast(mensagem, tipo, duracao) {
   var el = document.createElement('div');
   el.className = 'toast ' + tipo;
   el.innerHTML =
-    '<span class="material-icons-round">' + (iconMap[tipo] || 'notifications') + '</span>' +
-    '<span>' + mensagem + '</span>';
+    '<span class="material-icons-round">' + (escTxt(iconMap[tipo] || 'notifications')) + '</span>' +
+    '<span>' + escTxt(mensagem) + '</span>';
   document.getElementById('toast-container').appendChild(el);
   setTimeout(function() {
     el.style.transition  = '0.25s ease';
