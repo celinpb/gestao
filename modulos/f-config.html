@@ -893,6 +893,8 @@
 </div>
 
 <script>
+// Protege texto vindo do banco antes de pôr na página (não deixa virar código).
+function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 (function(){
   'use strict';
   function postApi(a,d){return window.postApi(a,d);}
@@ -1012,7 +1014,7 @@
     if(s.SemestreAtual) badges+='<span class="sem-badge atual">Atual</span>';
     badges+= s.EdicaoAtiva ? '<span class="sem-badge edicao">Edição aberta</span>' : '<span class="sem-badge fechado">Edição fechada</span>';
     badges+= s.VisualizacaoAtiva ? '<span class="sem-badge vis">Visível</span>' : '<span class="sem-badge fechado">Oculto</span>';
-    if(s.Fase==='planejamento'||s.Fase==='inscricoes') badges+='<span class="sem-badge fase">'+(NOMES_FASE_SEM[s.Fase])+'</span>';
+    if(s.Fase==='planejamento'||s.Fase==='inscricoes') badges+='<span class="sem-badge fase">'+(escTxt(NOMES_FASE_SEM[s.Fase]))+'</span>';
     return badges;
   }
 
@@ -1027,17 +1029,17 @@
         var div=document.createElement('div'); div.className='sem-item'+(s.SemestreAtual?' atual':'');
         div.innerHTML=
           '<div class="sem-info">'+
-            '<div class="sem-nome">'+(s.Semestre||s.SemestreID)+'</div>'+
-            '<div class="sem-id">'+s.SemestreID+'</div>'+
+            '<div class="sem-nome">'+(escTxt(s.Semestre||s.SemestreID))+'</div>'+
+            '<div class="sem-id">'+escTxt(s.SemestreID)+'</div>'+
             '<div class="sem-badges">'+badgeSemestre(s)+'</div>'+
           '</div>'+
           '<div class="sem-acoes">'+
-            '<button class="btn-sem" data-id="'+s.id+'" data-acao="'+(s.EdicaoAtiva?'fechar':'abrir')+'">'+
-              '<span class="material-icons-round">'+(s.EdicaoAtiva?'lock':'lock_open')+'</span>'+(s.EdicaoAtiva?'Fechar edição':'Abrir edição')+
+            '<button class="btn-sem" data-id="'+escTxt(s.id)+'" data-acao="'+(escTxt(s.EdicaoAtiva?'fechar':'abrir'))+'">'+
+              '<span class="material-icons-round">'+(escTxt(s.EdicaoAtiva?'lock':'lock_open'))+'</span>'+(escTxt(s.EdicaoAtiva?'Fechar edição':'Abrir edição'))+
             '</button>'+
             // O próximo semestre em preparação (planejamento/inscrições) só vira
             // o atual na virada do semestre (Fase 8), não por este botão.
-            (!s.SemestreAtual&&s.Fase!=='planejamento'&&s.Fase!=='inscricoes'?'<button class="btn-sem" data-id="'+s.id+'" data-acao="tornarAtual"><span class="material-icons-round">star</span>Tornar atual</button>':'')+
+            (!s.SemestreAtual&&s.Fase!=='planejamento'&&s.Fase!=='inscricoes'?'<button class="btn-sem" data-id="'+escTxt(s.id)+'" data-acao="tornarAtual"><span class="material-icons-round">star</span>Tornar atual</button>':'')+
           '</div>';
         wrap.appendChild(div);
       });
@@ -1204,7 +1206,7 @@
     definirSelo('aba-selo-calendario',pend?(pend+' não salva'+(pend>1?'s':'')):'','alerta');
     if(el('cal-semestre')){
       el('cal-semestre').innerHTML='Semestre <strong>'+esc(cal.semestre.rotulo||cal.semestre.external_id||'')+'</strong>'+
-        (datas.length?' · de '+fmtCal(datas[0])+' a '+fmtCal(datas[datas.length-1]):' · calendário vazio');
+        (escTxt(datas.length?' · de '+fmtCal(datas[0])+' a '+fmtCal(datas[datas.length-1]):' · calendário vazio'));
     }
 
     var lim=limitesMeses(), atual=cal.ano*12+cal.mes;
@@ -1459,8 +1461,8 @@
     var ativos=pa.tipos.filter(function(t){return t.ativo;}).length;
     var prio=pa.tipos.filter(function(t){return t.ativo&&t.prioritario;}).length;
     var inativos=pa.tipos.length-ativos;
-    wrap.innerHTML='<strong>'+ativos+'</strong> tipo(s) ativo(s) no cadastro de alunos, dos quais <strong>'+prio+'</strong> prioritário(s) na matrícula'+
-      (inativos?' · <strong>'+inativos+'</strong> inativo(s)':'')+'.';
+    wrap.innerHTML='<strong>'+escTxt(ativos)+'</strong> tipo(s) ativo(s) no cadastro de alunos, dos quais <strong>'+escTxt(prio)+'</strong> prioritário(s) na matrícula'+
+      (inativos?' · <strong>'+escTxt(inativos)+'</strong> inativo(s)':'')+'.';
   }
 
   function renderTabelaTipos(erro){
@@ -1478,9 +1480,9 @@
         '<td class="pa-c">'+(t.prioritario?'<span class="pa-badge prio">Prioritário</span>':'<span class="pa-badge geral">Sem prioridade</span>')+'</td>'+
         '<td class="pa-c">'+(t.ativo?'<span class="pa-badge ativo">Ativo</span>':'<span class="pa-badge inativo">Inativo</span>')+'</td>'+
         '<td><div class="pa-acoes">'+
-          '<button class="btn-sem" data-pa-acao="editar" data-id="'+t.id+'"><span class="material-icons-round">edit</span>Editar</button>'+
-          '<button class="btn-sem" data-pa-acao="'+(t.ativo?'inativar':'ativar')+'" data-id="'+t.id+'">'+
-            '<span class="material-icons-round">'+(t.ativo?'visibility_off':'visibility')+'</span>'+(t.ativo?'Inativar':'Ativar')+
+          '<button class="btn-sem" data-pa-acao="editar" data-id="'+escTxt(t.id)+'"><span class="material-icons-round">edit</span>Editar</button>'+
+          '<button class="btn-sem" data-pa-acao="'+(escTxt(t.ativo?'inativar':'ativar'))+'" data-id="'+escTxt(t.id)+'">'+
+            '<span class="material-icons-round">'+(escTxt(t.ativo?'visibility_off':'visibility'))+'</span>'+(escTxt(t.ativo?'Inativar':'Ativar'))+
           '</button>'+
         '</div></td>';
       tbody.appendChild(tr);
@@ -1610,7 +1612,7 @@
     return dia+' às '+hora;
   }
   function linhaPt(classe,icone,html){
-    return '<div class="pt-linha '+classe+'"><span class="material-icons-round">'+icone+'</span><span>'+html+'</span></div>';
+    return '<div class="pt-linha '+escTxt(classe)+'"><span class="material-icons-round">'+escTxt(icone)+'</span><span>'+html+'</span></div>';
   }
 
   function carregarPortal(){
@@ -1628,10 +1630,10 @@
       renovarSessao();
       var html='';
       if(c.ultima_geracao){
-        html+=linhaPt('ok','check_circle','Última atualização: <strong>'+fmtMomentoPt(c.ultima_geracao)+'</strong> ('+
-          (c.origem==='manual'?'pedida pelo admin':'automática')+'). '+
-          '<strong>'+(c.total_alunos||0).toLocaleString('pt-BR')+'</strong> alunos com acesso'+
-          (c.duracao_ms?', levou '+(c.duracao_ms/1000).toLocaleString('pt-BR',{maximumFractionDigits:1})+' s':'')+'.');
+        html+=linhaPt('ok','check_circle','Última atualização: <strong>'+escTxt(fmtMomentoPt(c.ultima_geracao))+'</strong> ('+
+          (escTxt(c.origem==='manual'?'pedida pelo admin':'automática'))+'). '+
+          '<strong>'+escTxt((c.total_alunos||0).toLocaleString('pt-BR'))+'</strong> alunos com acesso'+
+          (escTxt(c.duracao_ms?', levou '+(c.duracao_ms/1000).toLocaleString('pt-BR',{maximumFractionDigits:1})+' s':''))+'.');
       } else {
         html+=linhaPt('pendente','schedule','O portal ainda não foi gerado nenhuma vez.');
       }
@@ -1705,17 +1707,17 @@
       pe.automatico=!!r.automatico;
       var total=(r.enviados||0)+(r.pendentes||0)+(r.sem_email||0)+(r.falhas||0);
       var html='';
-      html+=linhaPt('ok','mark_email_read','<strong>'+fmtNumPt(r.enviados)+'</strong> de '+fmtNumPt(total)+' alunos ativos já receberam o código'+
-        (r.para_responsavel?' ('+fmtNumPt(r.para_responsavel)+' pelo e-mail do responsável)':'')+'.');
+      html+=linhaPt('ok','mark_email_read','<strong>'+escTxt(fmtNumPt(r.enviados))+'</strong> de '+escTxt(fmtNumPt(total))+' alunos ativos já receberam o código'+
+        (escTxt(r.para_responsavel?' ('+fmtNumPt(r.para_responsavel)+' pelo e-mail do responsável)':''))+'.');
       html+=linhaPt(r.pendentes?'pendente':'ok', r.pendentes?'schedule_send':'done_all',
-        r.pendentes?('<strong>'+fmtNumPt(r.pendentes)+'</strong> na fila para envio.'):'Nenhum código na fila.');
-      if(r.sem_email) html+=linhaPt('pendente','person_off','<strong>'+fmtNumPt(r.sem_email)+'</strong> sem e-mail cadastrado: a secretaria informa o código (baixe a lista).');
-      if(r.falhas) html+=linhaPt('erro','error','<strong>'+fmtNumPt(r.falhas)+'</strong> com falha depois de 3 tentativas (e-mail provavelmente errado): corrija a ficha e use "Reenviar código".');
-      html+=linhaPt('', 'today','Últimas 24 h: <strong>'+fmtNumPt(r.enviados_24h)+'</strong> de '+fmtNumPt(r.limite_diario)+' e-mails permitidos.');
+        r.pendentes?('<strong>'+escTxt(fmtNumPt(r.pendentes))+'</strong> na fila para envio.'):'Nenhum código na fila.');
+      if(r.sem_email) html+=linhaPt('pendente','person_off','<strong>'+escTxt(fmtNumPt(r.sem_email))+'</strong> sem e-mail cadastrado: a secretaria informa o código (baixe a lista).');
+      if(r.falhas) html+=linhaPt('erro','error','<strong>'+escTxt(fmtNumPt(r.falhas))+'</strong> com falha depois de 3 tentativas (e-mail provavelmente errado): corrija a ficha e use "Reenviar código".');
+      html+=linhaPt('', 'today','Últimas 24 h: <strong>'+escTxt(fmtNumPt(r.enviados_24h))+'</strong> de '+escTxt(fmtNumPt(r.limite_diario))+' e-mails permitidos.');
       if(r.automatico){
         var dias=r.pendentes?Math.ceil(r.pendentes/(r.limite_diario||400)):0;
         html+=linhaPt('ok','autorenew','Envio automático <strong>ligado</strong>'+(r.alterado_por?' por '+esc(r.alterado_por):'')+
-          (dias?'. Previsão para esvaziar a fila: cerca de '+dias+' dia'+(dias>1?'s':'')+'.':'.'));
+          (escTxt(dias?'. Previsão para esvaziar a fila: cerca de '+dias+' dia'+(dias>1?'s':'')+'.':'.')));
       } else {
         html+=linhaPt('', 'pause_circle','Envio automático <strong>desligado</strong>.');
       }
@@ -1873,8 +1875,8 @@
         '<div class="tr-acoes">'+
           '<label for="tr-fase-sem" class="tr-texto">Fase:</label>'+
           '<select class="tr-select" id="tr-fase-sem">'+
-            '<option value="planejamento"'+(p.fase==='planejamento'?' selected':'')+'>Planejamento</option>'+
-            '<option value="inscricoes"'+(p.fase==='inscricoes'?' selected':'')+'>Inscrições</option>'+
+            '<option value="planejamento"'+(escTxt(p.fase==='planejamento'?' selected':''))+'>Planejamento</option>'+
+            '<option value="inscricoes"'+(escTxt(p.fase==='inscricoes'?' selected':''))+'>Inscrições</option>'+
           '</select>'+
         '</div>'+
       '</div>'+
@@ -1894,10 +1896,10 @@
     tr.fasesOrig=JSON.stringify(lerFases(fases));
     corpo.innerHTML=fases.map(function(f){
       return '<tr data-tipo="'+esc(f.tipo)+'">'+
-        '<td class="tr-ord">'+f.ordem+'</td>'+
+        '<td class="tr-ord">'+escTxt(f.ordem)+'</td>'+
         '<td class="tr-fase"><b>'+esc(f.nome)+'</b>'+(f.descricao?'<small>'+esc(f.descricao)+'</small>':'')+'</td>'+
-        '<td><input type="datetime-local" class="tr-dt" data-campo="inicio" value="'+isoParaLocalBR(f.inicio)+'"></td>'+
-        '<td><input type="datetime-local" class="tr-dt" data-campo="fim" value="'+isoParaLocalBR(f.fim)+'"></td>'+
+        '<td><input type="datetime-local" class="tr-dt" data-campo="inicio" value="'+escTxt(isoParaLocalBR(f.inicio))+'"></td>'+
+        '<td><input type="datetime-local" class="tr-dt" data-campo="fim" value="'+escTxt(isoParaLocalBR(f.fim))+'"></td>'+
         '<td><input type="text" class="tr-dt tr-obs" data-campo="observacao" maxlength="300" value="'+esc(f.observacao||'')+'"></td>'+
       '</tr>';
     }).join('');
@@ -1910,7 +1912,7 @@
     }
     var out=[];
     document.querySelectorAll('#tr-fases-corpo tr[data-tipo]').forEach(function(linha){
-      var v=function(c){ var i=linha.querySelector('[data-campo="'+c+'"]'); return i?i.value.trim():''; };
+      var v=function(c){ var i=linha.querySelector('[data-campo="'+escTxt(c)+'"]'); return i?i.value.trim():''; };
       out.push({tipo:linha.dataset.tipo,inicio:v('inicio'),fim:v('fim'),observacao:v('observacao')});
     });
     return out;
