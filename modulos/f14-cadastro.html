@@ -106,6 +106,7 @@
   <div class="cd-abas" id="cd-abas" style="display:none;">
     <button class="cd-aba ativa" type="button" data-aba="dados"><span class="material-icons-round">badge</span>Meus dados</button>
     <button class="cd-aba" type="button" data-aba="senha"><span class="material-icons-round">lock</span>Senha</button>
+    <button class="cd-aba" type="button" data-aba="disp" id="cd-aba-disp" style="display:none;"><span class="material-icons-round">event_available</span>Disponibilidade</button>
     <button class="cd-aba" type="button" data-aba="contatos" id="cd-aba-contatos" style="display:none;"><span class="material-icons-round">contacts</span>Contatos da equipe</button>
   </div>
 
@@ -141,6 +142,13 @@
         <button class="btn-cd btn-cd-pri" type="button" id="cd-s-btn"><span class="material-icons-round">key</span>Trocar senha</button>
       </div>
       <p class="cd-nota"><span class="material-icons-round">info</span>Esqueceu a senha atual? Saia do sistema e use "Esqueci minha senha" na tela de login.</p>
+    </div>
+  </div>
+
+  <div id="cd-painel-disp" style="display:none;">
+    <div class="cd-card"><div class="cd-card-titulo"><span class="material-icons-round">event_available</span><span id="cd-disp-titulo">Disponibilidade</span></div>
+      <div id="cd-disp-lista"><div class="cd-estado"><div class="cd-spinner"></div><p>Carregando…</p></div></div>
+      <p class="cd-nota"><span class="material-icons-round">info</span>A disponibilidade é informada no Início, durante o período definido pela coordenação. Aqui ficam os seus envios e os comprovantes.</p>
     </div>
   </div>
 
@@ -237,7 +245,9 @@
     el('cd-painel-dados').style.display = aba === 'dados' ? '' : 'none';
     el('cd-painel-senha').style.display = aba === 'senha' ? '' : 'none';
     el('cd-painel-contatos').style.display = aba === 'contatos' ? '' : 'none';
+    el('cd-painel-disp').style.display = aba === 'disp' ? '' : 'none';
     if (aba === 'contatos' && !state.contatos) carregarContatos();
+    if (aba === 'disp') carregarEnvios('cd-disp-lista', 'cd-disp-titulo');
   }
 
   // ── Carregar e desenhar o cadastro ──────────────────────────────────────
@@ -339,6 +349,12 @@
     html += '<div class="cd-card"><div class="cd-card-titulo"><span class="material-icons-round">work</span>Vínculo funcional</div>' +
             '<div id="cd-mats"></div></div>';
 
+    // Disponibilidade (etapa 27): histórico de envios, visto pela coordenação
+    if (embutido && d.docente) {
+      html += '<div class="cd-card"><div class="cd-card-titulo"><span class="material-icons-round">event_available</span><span id="cd-dispe-titulo">Disponibilidade</span></div>' +
+              '<div id="cd-dispe-lista"><div class="cd-estado"><div class="cd-spinner"></div><p>Carregando…</p></div></div></div>';
+    }
+
     // Idiomas (etapa 25)
     if (mostraIdiomas()) {
       html += '<div class="cd-card"><div class="cd-card-titulo"><span class="material-icons-round">translate</span>Idiomas</div>' +
@@ -357,6 +373,7 @@
     el('cd-form').style.display = 'block';
     desenharMats();
     desenharIdiomas();
+    if (el('cd-dispe-lista')) carregarEnvios('cd-dispe-lista', 'cd-dispe-titulo');
 
     // Máscaras ao sair do campo
     el('cd-form').querySelectorAll('input[data-mask]').forEach(function(inp) {
@@ -647,6 +664,38 @@
       .finally(function() { btn.disabled = false; });
   }
 
+  // ── Disponibilidade: envios e comprovantes (etapa 27) ───────────────────
+  function carregarEnvios(boxId, tituloId) {
+    var box = el(boxId); if (!box) return;
+    postApi('disp.envios', { professor_id: alvoId }).then(function(res) {
+      if (!res.sucesso) {
+        box.innerHTML = '<p class="cd-nota" style="margin-top:0;"><span class="material-icons-round">info</span>' + esc(res.mensagem || 'Sem semestre em preparação.') + '</p>';
+        return;
+      }
+      var d = res.dados || {}, lista = d.envios || [];
+      if (el(tituloId)) el(tituloId).textContent = 'Disponibilidade para ' + (d.semestre || 'o próximo semestre');
+      if (!lista.length) {
+        box.innerHTML = '<p class="cd-nota" style="margin-top:0;"><span class="material-icons-round">info</span>Nenhum envio de disponibilidade ainda.</p>';
+        return;
+      }
+      box.innerHTML = '<div class="cd-mats-wrap"><table class="cd-contatos"><thead><tr><th>Envio</th><th>Data e hora</th><th>Horários</th><th>EAD</th><th>Confirmação</th><th></th></tr></thead><tbody>' +
+        lista.map(function(e, i) {
+          return '<tr><td>nº ' + esc(e.numero) + (i === 0 ? ' <span class="cd-selo validado">vale este</span>' : '') + '</td>' +
+            '<td>' + esc(dataHora(e.enviado_em)) + '</td><td>' + esc(e.qtd_slots) + '</td><td>' + (e.ead ? 'Sim' : 'Não') + '</td>' +
+            '<td>' + (e.confirmado_senha ? 'Com a senha do docente' : 'Registrado por ' + esc(e.registrado_por || 'coordenação')) + '</td>' +
+            '<td><button class="cd-idi-btn ok" type="button" data-envio="' + esc(e.id) + '">Comprovante</button></td></tr>' +
+            (e.comentario ? '<tr><td></td><td colspan="5"><small>Comentário: ' + esc(e.comentario) + '</small></td></tr>' : '');
+        }).join('') + '</tbody></table></div>';
+      box.querySelectorAll('button[data-envio]').forEach(function(b) {
+        b.addEventListener('click', function() {
+          window.SGE_comprovanteDisp(postApi('disp.comprovante', { envio_id: b.getAttribute('data-envio') })).then(function(r) {
+            if (r && !r.sucesso) aviso(r.mensagem || 'Erro.', 'error');
+          });
+        });
+      });
+    }).catch(function() { box.innerHTML = '<p class="cd-nota">Erro de comunicação.</p>'; });
+  }
+
   // ── Contatos da equipe ──────────────────────────────────────────────────
   function carregarContatos() {
     postApi('cadastro.contatos', {}).then(function(res) {
@@ -710,6 +759,10 @@
         ['cd-s-atual', 'cd-s-nova', 'cd-s-conf'].forEach(function(id) { el(id).type = t; });
       });
       el('cd-c-busca').addEventListener('input', desenharContatos);
+      // Aba Disponibilidade: para docentes (ou quem já tem envio)
+      postApi('disp.envios', {}).then(function(res) {
+        if (res.sucesso && res.dados && (res.dados.docente || (res.dados.envios || []).length)) el('cd-aba-disp').style.display = '';
+      }).catch(function() {});
     }
     carregar();
   }
