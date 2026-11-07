@@ -251,6 +251,8 @@
 </div>
 
 <script>
+// Protege texto vindo do banco antes de pôr na página (não deixa virar código).
+function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 (function () {
   'use strict';
 
@@ -350,7 +352,7 @@
       el('diario-turmas-loading').style.display='none';
       if(!res.sucesso){
         el('diario-turma-grid').style.display='grid';
-        el('diario-turma-grid').innerHTML='<p style="color:#E63946;font-size:13px;grid-column:1/-1;">Erro: '+(res.mensagem||'Falha ao carregar turmas.')+'</p>';
+        el('diario-turma-grid').innerHTML='<p style="color:#E63946;font-size:13px;grid-column:1/-1;">Erro: '+(escTxt(res.mensagem||'Falha ao carregar turmas.'))+'</p>';
         return;
       }
       // _turmasListar devolve um array plano em res.dados (não res.dados.dados)
@@ -389,11 +391,11 @@
       var card=document.createElement('div');
       card.className='turma-card'+(ativa?'':' turma-nao-ativa');
       card.dataset.turmaId=String(t.TurmaID);
-      card.innerHTML='<div class="turma-card-id">'+t.TurmaID+'</div>'+
-        '<div class="turma-card-estagio">'+(t.Estagio||t.CursoID)+'</div>'+
-        '<div class="turma-card-detalhe">'+(t.DiaSemana||'')+(t.Horario?' · '+t.Horario:'')+'</div>'+
-        '<div class="turma-card-detalhe" style="margin-top:2px;">'+(t.Modalidade||'')+'</div>'+
-        (!ativa?'<div class="turma-card-badge-status"><span class="material-icons-round">'+(encerrada?'lock':'block')+'</span>'+(encerrada?'Encerrada':'Inativa')+'</div>':'');
+      card.innerHTML='<div class="turma-card-id">'+escTxt(t.TurmaID)+'</div>'+
+        '<div class="turma-card-estagio">'+(escTxt(t.Estagio||t.CursoID))+'</div>'+
+        '<div class="turma-card-detalhe">'+(escTxt(t.DiaSemana||''))+(escTxt(t.Horario?' · '+t.Horario:''))+'</div>'+
+        '<div class="turma-card-detalhe" style="margin-top:2px;">'+(escTxt(t.Modalidade||''))+'</div>'+
+        (!ativa?'<div class="turma-card-badge-status"><span class="material-icons-round">'+(escTxt(encerrada?'lock':'block'))+'</span>'+(escTxt(encerrada?'Encerrada':'Inativa'))+'</div>':'');
       card.addEventListener('click',function(){ selecionarTurma(t); });
       grid.appendChild(card);
     });
@@ -668,15 +670,15 @@
       var nFaltas=S.contFaltas[matId]||0;
       var badgeClass=nFaltas===0?'zero':(nFaltas<=2?'baixo':'alto');
       var tr=document.createElement('tr');
-      tr.innerHTML='<td><div class="aluno-nome">'+nome+'</div>'+
-        '<div id="just-wrap-'+matId+'" class="freq-justificativa'+(freqAtual==='J'?' show':'')+'">'+
-          '<input type="text" id="just-'+matId+'" placeholder="Motivo da justificativa…" value="'+anotacao.replace(/"/g,'&quot;')+'">'+
+      tr.innerHTML='<td><div class="aluno-nome">'+escTxt(nome)+'</div>'+
+        '<div id="just-wrap-'+escTxt(matId)+'" class="freq-justificativa'+(escTxt(freqAtual==='J'?' show':''))+'">'+
+          '<input type="text" id="just-'+escTxt(matId)+'" placeholder="Motivo da justificativa…" value="'+escTxt(anotacao)+'">'+
         '</div></td>'+
-        '<td class="col-faltas"><span class="badge-faltas '+badgeClass+'">'+nFaltas+'</span></td>'+
+        '<td class="col-faltas"><span class="badge-faltas '+escTxt(badgeClass)+'">'+escTxt(nFaltas)+'</span></td>'+
         '<td class="col-freq"><div class="freq-btns">'+
-          '<button class="freq-btn '+(freqAtual==='P'?'ativo-p':'')+'\" data-mat="'+matId+'" data-freq="P">P</button>'+
-          '<button class="freq-btn '+(freqAtual==='F'?'ativo-f':'')+'\" data-mat="'+matId+'" data-freq="F">F</button>'+
-          '<button class="freq-btn '+(freqAtual==='J'?'ativo-j':'')+'\" data-mat="'+matId+'" data-freq="J">J</button>'+
+          '<button class="freq-btn '+(escTxt(freqAtual==='P'?'ativo-p':''))+'\" data-mat="'+escTxt(matId)+'" data-freq="P">P</button>'+
+          '<button class="freq-btn '+(escTxt(freqAtual==='F'?'ativo-f':''))+'\" data-mat="'+escTxt(matId)+'" data-freq="F">F</button>'+
+          '<button class="freq-btn '+(escTxt(freqAtual==='J'?'ativo-j':''))+'\" data-mat="'+escTxt(matId)+'" data-freq="J">J</button>'+
         '</div></td>';
       tbody.appendChild(tr);
       tr.querySelectorAll('.freq-btn').forEach(function(btn){
@@ -719,7 +721,7 @@
     historico.forEach(function(c){
       var div=document.createElement('div'); div.className='historico-item';
       var data=c.data_aula?String(c.data_aula).substring(0,16):'—';
-      div.innerHTML='<div class="historico-data">'+data+'</div><div class="historico-conteudo">'+(c.conteudo_ministrado||'—')+'</div>';
+      div.innerHTML='<div class="historico-data">'+escTxt(data)+'</div><div class="historico-conteudo">'+(escTxt(c.conteudo_ministrado||'—'))+'</div>';
       corpo.appendChild(div);
     });
   }
@@ -728,7 +730,7 @@
     S.matriculas.forEach(function(m){
       S.frequencias[m.id]=S.frequencias[m.id]||{anotacao:''};
       S.frequencias[m.id].freq='P';
-      var btn=document.querySelector('[data-mat="'+m.id+'"][data-freq="P"]');
+      var btn=document.querySelector('[data-mat="'+escTxt(m.id)+'"][data-freq="P"]');
       if(btn) marcarFrequencia(m.id,'P',btn.closest('tr'));
     });
   }
@@ -737,7 +739,7 @@
     S.matriculas.forEach(function(m){
       S.frequencias[m.id]=S.frequencias[m.id]||{anotacao:''};
       S.frequencias[m.id].freq='F';
-      var btn=document.querySelector('[data-mat="'+m.id+'"][data-freq="F"]');
+      var btn=document.querySelector('[data-mat="'+escTxt(m.id)+'"][data-freq="F"]');
       if(btn) marcarFrequencia(m.id,'F',btn.closest('tr'));
     });
   }
