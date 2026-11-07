@@ -391,7 +391,8 @@
         T.idiomas = Object.keys(mapaId).map(function(id) { return { id: id, nome: mapaId[id] }; })
           .sort(function(a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
         T.profs = ((r[2].sucesso && r[2].dados) ? r[2].dados : [])
-          .filter(function(u) { return u.papel === 'professor' && u.situacao_ativo !== false; })
+          // Etapa 27: a coordenação que leciona também pode ser atribuída
+          .filter(function(u) { return (u.papel === 'professor' || u.papel === 'coordenacao') && u.situacao_ativo !== false; })
           .sort(function(a, b) { return String(a.nome).localeCompare(String(b.nome), 'pt-BR', { sensitivity: 'base' }); });
         montar();
       }).catch(function() { box.innerHTML = '<div class="tt-vazio">Erro de comunicação.</div>'; });
@@ -706,7 +707,14 @@
     ];
     function marcarDisponiveis(t) {
       var sel = el('tt-a-prof');
-      api('disp.professoresTurma', { turma_id: t.id }).then(function(res) {
+      var ehEad = String(t.modalidade || '').toUpperCase() === 'EAD';
+      Promise.all([
+        api('disp.professoresTurma', { turma_id: t.id }),
+        // Etapa 27: em turma EAD, avisa quem respondeu que não deseja EAD
+        ehEad ? api('disp.eadDocentes', {}).catch(function() { return { sucesso: false }; }) : Promise.resolve({ sucesso: false })
+      ]).then(function(rs) {
+        var res = rs[0];
+        var ead = (rs[1] && rs[1].sucesso && rs[1].dados) ? rs[1].dados : {};
         if (!res.sucesso || !res.dados || T.atribuindo !== t) return;
         var mapa = res.dados, valor = sel.value;
         var atuais = Array.prototype.filter.call(sel.querySelectorAll('option'), function(o) { return o.value; })
@@ -723,7 +731,7 @@
           html += '<optgroup label="' + esc(g[1]) + ' (' + lista.length + ')">' + lista.map(function(p) {
             var n = T.turmas.filter(function(x) { return x.professor_id === p.id && x.id !== t.id; }).length;
             return '<option value="' + esc(p.id) + '" data-nome="' + esc(p.nome) + '">' + (g[0] === 'ok' ? '✓ ' : '') + esc(p.nome) +
-              (n ? ' · ' + n + ' turma' + (n > 1 ? 's' : '') : '') + '</option>';
+              (n ? ' · ' + n + ' turma' + (n > 1 ? 's' : '') : '') + (ehEad && ead[p.id] === false ? ' · ⚠ não deseja EAD' : '') + '</option>';
           }).join('') + '</optgroup>';
         });
         sel.innerHTML = html;
@@ -800,7 +808,8 @@
              d.toLocaleTimeString('pt-BR', { timeZone: 'America/Fortaleza', hour: '2-digit', minute: '2-digit' });
     }
     function situacao(p) {
-      if (!p.marcados) return { cls: 'nao', txt: 'Não marcou' };
+      if (!p.ultimo_envio) return p.marcados ? { cls: 'falta', txt: 'Marcou, sem envio' } : { cls: 'nao', txt: 'Não enviou' };
+      if (!p.marcados) return { cls: 'nao', txt: 'Enviou sem horários' };
       var faltam = [];
       if (p.marcados < p.minimo) faltam.push('Faltam ' + (p.minimo - p.marcados));
       var sab = p.minimo_sabado || 0, msab = p.marcados_sabado || 0;
@@ -863,12 +872,14 @@
           function rotSlot(s) { return DIA_CURTO[s.dia] + ' ' + s.horario + ' (' + s.turno + ')'; }
 
           // 1) Professores × horários (X = marcou)
-          var cab1 = ['Professor', 'Mínimo', 'Mínimo no sábado', 'Marcados', 'Marcados no sábado', 'Situação', 'Última marcação']
+          var cab1 = ['Docente', 'Mínimo', 'Mínimo no sábado', 'Marcados', 'Marcados no sábado', 'Situação', 'Última marcação', 'Envio', 'Deseja EAD?', 'Comentário']
             .concat(slots.map(rotSlot));
           var aba1 = [cab1].concat(profs.map(function(p) {
             var meus = marcadosPor[p.id] || [];
             return [p.nome, p.minimo, p.minimo_sabado || '', p.marcados, p.marcados_sabado || 0, situacao(p).txt,
-                    p.ultima_marcacao ? fmtDH(p.ultima_marcacao) : '']
+                    p.ultima_marcacao ? fmtDH(p.ultima_marcacao) : '',
+                    p.ultimo_envio ? 'nº ' + p.ultimo_envio.numero + ' em ' + fmtDH(p.ultimo_envio.enviado_em) + (p.ultimo_envio.confirmado_senha ? ' (senha)' : ' (coordenação)') : '',
+                    p.ultimo_envio ? (p.ultimo_envio.ead ? 'Sim' : 'Não') : '', p.ultimo_envio ? (p.ultimo_envio.comentario || '') : '']
               .concat(slots.map(function(s) { return meus.indexOf(s) !== -1 ? 'X' : ''; }));
           }));
 
@@ -907,7 +918,7 @@
             if (linhas.length > 1) ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: linhas.length - 1, c: linhas[0].length - 1 } }) };
             XLSX.utils.book_append_sheet(wb, ws, nome);
           }
-          addAba(aba1, 'Professores x horários', [32, 8, 10, 9, 10, 22, 16].concat(slots.map(function() { return 14; })));
+          addAba(aba1, 'Professores x horários', [32, 8, 10, 9, 10, 22, 16, 26, 10, 40].concat(slots.map(function() { return 14; })));
           addAba(aba2, 'Horários', [10, 16, 8, 10, 80]);
           addAba(aba3, 'Turmas ' + D.prox.rotulo, [16, 8, 24, 12, 16, 8, 12, 7, 30, 20, 10, 80]);
           var hoje = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' }).split('/').reverse().join('-');
@@ -934,7 +945,7 @@
             '<button class="tt-btn" id="dp-xlsx" title="Professores × horários, horários e turmas com os professores disponíveis"><span class="material-icons-round">download</span>Baixar planilha (.xlsx)</button></div>' +
           '<div class="tr11-card-c"><div class="dp-linha">' +
             '<div id="dp-periodo" class="tt-aviso" style="margin:8px 0;flex:1;min-width:240px;"></div>' +
-            '<div class="tt-campo dp-min"><label for="dp-padrao">Mínimo de slots por professor (padrão)</label>' +
+            '<div class="tt-campo dp-min"><label for="dp-padrao" title="O mínimo de cada docente é a soma de turmas + departamento das matrículas funcionais do cadastro. Este número vale só para quem ainda não tem matrícula funcional.">Mínimo para quem não tem matrícula funcional</label>' +
               '<span style="display:flex;gap:6px;"><input type="number" class="tt-input" id="dp-padrao" min="0" max="50" style="width:90px;">' +
               '<button class="tt-btn" id="dp-padrao-ok">Salvar</button></span></div>' +
           '</div></div></div>' +
@@ -961,8 +972,12 @@
         // modal marcar por professor
         '<div class="tt-overlay" id="dp-m-marcar"><div class="tt-modal">' +
           '<div class="tt-modal-h"><span id="dp-mm-titulo">Disponibilidade</span><button class="tt-ico" data-dfechar="dp-m-marcar"><span class="material-icons-round">close</span></button></div>' +
-          '<div class="tt-modal-c"><div class="tt-alerta" id="dp-mm-alerta"></div><p class="tt-aviso" id="dp-mm-info"></p><div class="tt-vlista" id="dp-mm-lista"></div></div>' +
-          '<div class="tt-modal-f"><button class="tt-btn" data-dfechar="dp-m-marcar">Cancelar</button><button class="tt-btn prim" id="dp-mm-ok"><span class="material-icons-round">save</span>Salvar</button></div>' +
+          '<div class="tt-modal-c"><div class="tt-alerta" id="dp-mm-alerta"></div><p class="tt-aviso" id="dp-mm-info"></p><div class="tt-vlista" id="dp-mm-lista"></div>' +
+            '<div class="tt-grid" style="margin-top:12px;">' +
+              '<div class="tt-campo"><label for="dp-mm-ead">Deseja turmas EAD? *</label><select class="tt-select" id="dp-mm-ead"><option value="">Escolha…</option><option value="sim">Sim</option><option value="nao">Não</option></select></div>' +
+              '<div class="tt-campo span2"><label for="dp-mm-coment">Comentário (opcional)</label><textarea class="tt-input" id="dp-mm-coment" rows="2" maxlength="2000" style="height:auto;padding:6px 8px;"></textarea></div>' +
+            '</div><p class="tt-aviso" style="margin-top:8px;">Fica registrado como um novo envio, "registrado por" você, sem a senha do docente. Gera comprovante.</p></div>' +
+          '<div class="tt-modal-f"><button class="tt-btn" data-dfechar="dp-m-marcar">Cancelar</button><button class="tt-btn prim" id="dp-mm-ok"><span class="material-icons-round">save</span>Registrar</button></div>' +
         '</div></div>';
       document.querySelectorAll('#tr11-disp [data-dfechar]').forEach(function(b) { b.addEventListener('click', function() { el(b.dataset.dfechar).classList.remove('show'); }); });
       document.querySelectorAll('#tr11-disp .tt-overlay').forEach(function(o) { o.addEventListener('click', function(e) { if (e.target === o) o.classList.remove('show'); }); });
@@ -1019,17 +1034,27 @@
       var todos = D.dados.professores || [];
       var ok = todos.filter(function(p) { return situacao(p).cls === 'ok'; }).length;
       var box = el('dp-profs');
-      if (!todos.length) { box.innerHTML = '<div class="tt-vazio">Nenhum professor ativo.</div>'; return; }
-      box.innerHTML = '<p class="tt-aviso" style="margin:8px 0;">' + ok + ' de ' + todos.length + ' professores já marcaram o mínimo. Deixe o mínimo em branco para usar o padrão. Em <strong>Sábado</strong>, informe quantos horários de sábado o professor deve marcar obrigatoriamente (vazio = sem obrigação).</p>' +
-        '<div class="tt-tabela-wrap"><table class="tt-tabela"><thead><tr><th>Professor</th><th>Mínimo</th><th>Sábado</th><th>Marcados</th><th>Situação</th><th></th></tr></thead><tbody>' +
+      if (!todos.length) { box.innerHTML = '<div class="tt-vazio">Nenhum docente ativo.</div>'; return; }
+      box.innerHTML = '<p class="tt-aviso" style="margin:8px 0;">' + ok + ' de ' + todos.length + ' docentes já enviaram o mínimo. ' +
+        'O mínimo de cada um vem do cadastro (turmas + departamento das matrículas funcionais); escreva um número só para abrir uma exceção (em branco = volta ao cálculo). ' +
+        'Em <strong>Sábado</strong>, informe quantos horários de sábado o docente deve marcar obrigatoriamente (vazio = sem obrigação).</p>' +
+        '<div class="tt-tabela-wrap"><table class="tt-tabela"><thead><tr><th>Docente</th><th>Mínimo</th><th>Sábado</th><th>Marcados</th><th>Envio</th><th>Situação</th><th></th></tr></thead><tbody>' +
         lista.map(function(p) {
-          var st = situacao(p);
-          return '<tr data-id="' + esc(p.id) + '"><td>' + esc(p.nome) + '<span class="tt-sub">' + (p.ultima_marcacao ? 'Última marcação: ' + fmtDH(p.ultima_marcacao) : '') + '</span></td>' +
-            '<td><input type="number" class="tt-input dp-min-ind" min="0" max="50" style="width:70px;" placeholder="' + esc(D.dados.minimo_padrao) + '" value="' + (p.minimo_individual == null ? '' : esc(p.minimo_individual)) + '"></td>' +
+          var st = situacao(p), u = p.ultimo_envio;
+          var origem = p.minimo_origem === 'matriculas' ? 'pelas matrículas' : p.minimo_origem === 'individual' ? 'exceção' : 'sem matrícula funcional';
+          return '<tr data-id="' + esc(p.id) + '"><td>' + esc(p.nome) + (p.papel === 'coordenacao' ? ' <span class="tt-sub" style="display:inline">(coordenação)</span>' : '') +
+              '<span class="tt-sub">' + (p.ultima_marcacao ? 'Última marcação: ' + fmtDH(p.ultima_marcacao) : '') + '</span></td>' +
+            '<td><input type="number" class="tt-input dp-min-ind" min="0" max="50" style="width:70px;" placeholder="' + esc(p.minimo_origem === 'individual' ? '' : p.minimo) + '" value="' + (p.minimo_individual == null ? '' : esc(p.minimo_individual)) + '">' +
+              '<span class="tt-sub">' + esc(origem) + '</span></td>' +
             '<td><input type="number" class="tt-input dp-min-sab" min="0" max="50" style="width:64px;" placeholder="—" title="Mínimo obrigatório de horários no sábado" value="' + (p.minimo_sabado ? esc(p.minimo_sabado) : '') + '"></td>' +
             '<td>' + p.marcados + ' / ' + p.minimo + (p.minimo_sabado ? '<span class="tt-sub">sábado: ' + (p.marcados_sabado || 0) + ' / ' + p.minimo_sabado + '</span>' : '') + '</td>' +
+            '<td>' + (u ? 'nº ' + esc(u.numero) + ' · ' + fmtDH(u.enviado_em) +
+                '<span class="tt-sub">' + (u.confirmado_senha ? '✔ com a senha' : 'registrado por ' + esc(u.registrado_por || 'coordenação')) + ' · EAD: ' + (u.ead ? 'sim' : '<strong>não</strong>') + '</span>' +
+                (u.comentario ? '<span class="tt-sub" title="' + esc(u.comentario) + '">💬 ' + esc(u.comentario.length > 40 ? u.comentario.slice(0, 40) + '…' : u.comentario) + '</span>' : '')
+              : '<span class="tt-sub">—</span>') + '</td>' +
             '<td><span class="dp-st ' + st.cls + '">' + st.txt + '</span></td>' +
-            '<td><button class="tt-btn" data-acao="marcar" style="height:30px;">Marcar por ele</button></td></tr>';
+            '<td style="white-space:nowrap;"><button class="tt-btn" data-acao="marcar" style="height:30px;">Registrar por ele</button>' +
+              (u ? ' <button class="tt-btn" data-acao="comprovante" style="height:30px;" title="Comprovante do último envio"><span class="material-icons-round">print</span></button>' : '') + '</td></tr>';
         }).join('') + '</tbody></table></div>';
       box.querySelectorAll('.dp-min-ind').forEach(function(inp) {
         inp.addEventListener('change', function() {
@@ -1046,6 +1071,14 @@
           api('disp.minimoSabado', { professor_id: id, minimo: inp.value === '' ? null : inp.value }).then(function(res) {
             if (!res.sucesso) { aviso(res.mensagem, 'error'); return; }
             aviso(inp.value && Number(inp.value) > 0 ? 'Sábado obrigatório salvo.' : 'Sem obrigação no sábado.'); atualizar();
+          });
+        });
+      });
+      box.querySelectorAll('button[data-acao="comprovante"]').forEach(function(b) {
+        b.addEventListener('click', function() {
+          var id = b.closest('tr').dataset.id;
+          window.SGE_comprovanteDisp(api('disp.comprovante', { professor_id: id })).then(function(r) {
+            if (r && !r.sucesso) aviso(r.mensagem || 'Erro.', 'error');
           });
         });
       });
@@ -1104,8 +1137,11 @@
       if (!p) return;
       D.profMarcar = p;
       el('dp-mm-alerta').className = 'tt-alerta';
-      el('dp-mm-titulo').textContent = 'Disponibilidade de ' + p.nome;
-      el('dp-mm-info').textContent = 'Mínimo pedido: ' + p.minimo + (p.minimo_sabado ? ', sendo ' + p.minimo_sabado + ' no sábado' : '') + '. Pela coordenação é possível salvar com menos.';
+      el('dp-mm-titulo').textContent = 'Registrar disponibilidade de ' + p.nome;
+      el('dp-mm-info').textContent = 'Mínimo pedido: ' + p.minimo + (p.minimo_sabado ? ', sendo ' + p.minimo_sabado + ' no sábado' : '') + '. Pela coordenação é possível registrar com menos.';
+      var u = p.ultimo_envio;
+      el('dp-mm-ead').value = u ? (u.ead ? 'sim' : 'nao') : '';
+      el('dp-mm-coment').value = u && u.comentario ? u.comentario : '';
       var slots = D.dados.slots || [];
       el('dp-mm-lista').innerHTML = slots.length ? slots.map(function(s) {
         var on = (s.professores || []).indexOf(p.id) !== -1;
@@ -1118,9 +1154,12 @@
       var p = D.profMarcar; if (!p) return;
       var ids = [];
       document.querySelectorAll('#dp-mm-lista input:checked').forEach(function(c) { ids.push(c.value); });
-      api('disp.marcar', { slot_ids: ids, professor_id: p.id }).then(function(res) {
+      var ead = el('dp-mm-ead').value;
+      if (!ead) { var a0 = el('dp-mm-alerta'); a0.textContent = 'Responda se o docente deseja turmas EAD.'; a0.className = 'tt-alerta show'; return; }
+      var envio = api('disp.registrarPor', { slot_ids: ids, professor_id: p.id, ead: ead === 'sim', comentario: el('dp-mm-coment').value.trim() });
+      window.SGE_comprovanteDisp(envio).then(function(res) {
         if (!res.sucesso) { var a = el('dp-mm-alerta'); a.textContent = res.mensagem; a.className = 'tt-alerta show'; return; }
-        el('dp-m-marcar').classList.remove('show'); aviso('Disponibilidade de ' + p.nome + ' salva.'); atualizar();
+        el('dp-m-marcar').classList.remove('show'); aviso('Disponibilidade de ' + p.nome + ' registrada (envio nº ' + res.dados.numero + ').'); atualizar();
       });
     }
 
