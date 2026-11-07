@@ -4,6 +4,7 @@
   Relatórios: Boletim, Listagem de turmas, Listagem de alunos,
   Frequência por turma, Resultados por turma, Alunos por turma com campos selecionados,
   Alunos com faltas (admin/coordenação/secretaria).
+  Grade de turmas por professor (admin/coordenação — etapa 28).
 -->
 <style>
   /* =========================================================
@@ -203,6 +204,41 @@
   .r8-rodape-folha{margin-top:auto;padding-top:10px;border-top:1px solid #E8E7E2;font-size:7.5pt;color:#9898B0;display:flex;justify-content:space-between;}
 
   /* =========================================================
+     GRADE POR PROFESSOR (etapa 28)
+  ========================================================= */
+  .r8g-tab{width:100%;border-collapse:collapse;table-layout:fixed;font-size:6.5pt;margin-bottom:8px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .r8g-tab th,.r8g-tab td{border:1px solid #C8C7C2;padding:1px;text-align:center;vertical-align:middle;line-height:1.05;overflow:hidden;}
+  .r8g-tab thead th{background:#1A1A2E;color:#fff;font-weight:600;font-size:6.5pt;}
+  .r8g-tab thead tr.r8g-dias th{font-size:7pt;letter-spacing:0.2px;}
+  .r8g-tab th.r8g-prof,.r8g-tab td.r8g-prof{text-align:left;padding:2px 4px;width:40mm;}
+  .r8g-tab td.r8g-prof{font-size:6.8pt;font-weight:500;}
+  .r8g-tab th.r8g-num,.r8g-tab td.r8g-num{width:8mm;font-size:7pt;}
+  .r8g-tab .r8g-ini{border-left:2px solid #1A1A2E;}
+  .r8g-tab td.r8g-cel{height:5.5mm;}
+  .r8g-tab tr{break-inside:avoid;page-break-inside:avoid;}
+  @media print{ .r8-folha.r8g-folha{padding:7mm 9mm;} .r8g-folha .r8-cab{padding-bottom:6px;margin-bottom:6px;} .r8g-folha .r8-titulo-rel{margin-top:6px;} .r8g-folha .r8-subtitulo-rel{margin-bottom:6px;} }
+  .r8g-tab .r8g-sig{display:block;font-weight:700;font-size:6.4pt;letter-spacing:-0.2px;white-space:nowrap;}
+  .r8g-tab .r8g-qtd{display:block;font-size:6pt;opacity:0.85;}
+  .r8g-tab .r8g-sep td{background:#F0EEE8;font-weight:700;font-size:6.5pt;text-align:left;padding:2px 4px;letter-spacing:0.4px;text-transform:uppercase;color:#5C5C7A;}
+  .r8g-t1p{background:#B9EDB0;color:#1E4D17;}
+  .r8g-t1e{background:#4FA85E;color:#fff;}
+  .r8g-tp{background:#C6F1F6;color:#0E4A52;}
+  .r8g-te{background:#C9DCF0;color:#1C3D63;}
+  .r8g-zero{background:#F6C6C6 !important;color:#9B1C1C !important;}
+  .r8g-outro{background:#fff;color:#8A8AA0;font-style:italic;}
+  .r8g-conf{box-shadow:inset 0 0 0 2px #E63946;}
+  .r8g-dispant{background:#E4FAFC;}
+  .r8g-indisp{background:#C9C9C9;}
+  .r8g-ok{background:#D9F2D5;}
+  .r8g-falta{background:#FFE8B3;}
+  .r8g-excede{background:#F9D0D0;}
+  .r8g-aviso{font-size:6pt;color:#A32D2D;font-weight:400;}
+  .r8g-legenda{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:7pt;color:#5C5C7A;margin-top:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .r8g-legenda span{display:inline-flex;align-items:center;gap:4px;}
+  .r8g-legenda i{display:inline-block;width:14px;height:9px;border:1px solid #C8C7C2;}
+  .r8g-obs{font-size:7pt;color:#5C5C7A;margin-top:6px;line-height:1.4;}
+
+  /* =========================================================
      CSS DE IMPRESSÃO
   ========================================================= */
   @media print {
@@ -278,6 +314,11 @@
     <div class="r8-tipo-icone"><span class="material-icons-round">trending_down</span></div>
     <div class="r8-tipo-nome">Transferências, desistência e evasão</div>
     <div class="r8-tipo-desc">Saídas de alunos por idioma, turma ou professor, com taxas sobre o total de matrículas</div>
+  </div>
+  <div class="r8-tipo-card" data-tipo="grade-professores">
+    <div class="r8-tipo-icone"><span class="material-icons-round">view_week</span></div>
+    <div class="r8-tipo-nome">Grade por professor</div>
+    <div class="r8-tipo-desc">Turmas de cada professor por dia e horário, de um idioma (paisagem)</div>
   </div>
 </div>
 
@@ -592,6 +633,45 @@
   </div>
 </div>
 
+<!-- PAINEL GRADE POR PROFESSOR (admin/coordenação) -->
+<div class="r8c-painel" id="r8g-painel">
+  <div class="r8c-titulo">
+    <span class="material-icons-round">view_week</span>
+    Grade por professor — configurar
+  </div>
+  <div class="r8c-grid">
+    <div class="r8c-field">
+      <label>Semestre</label>
+      <select class="r8c-select" id="r8g-semestre"><option value="">Carregando…</option></select>
+    </div>
+    <div class="r8c-field">
+      <label>Idioma</label>
+      <select class="r8c-select" id="r8g-idioma"><option value="">Carregando…</option></select>
+    </div>
+    <div class="r8c-field" id="r8g-contagem-wrap" style="display:none;">
+      <label>Número entre parênteses</label>
+      <select class="r8c-select" id="r8g-contagem">
+        <option value="ativos">Alunos ativos (matrículas efetivadas)</option>
+        <option value="intencoes">Intenções (rematrícula + novatos)</option>
+      </select>
+    </div>
+  </div>
+  <p class="r8f-nota" id="r8g-nota">
+    Linhas: professores com o idioma lecionado validado ou com turma do idioma no semestre, em ordem alfabética; a coordenação vem no fim.
+    <strong>Previsto</strong> = turmas das matrículas funcionais; <strong>Ocupado</strong> = horários da grade com turma (de qualquer idioma); <strong>DEP</strong> = horários de departamento das matrículas funcionais.
+  </p>
+  <div class="r8c-acoes">
+    <button class="btn-r8 btn-r8-primario" id="r8g-btn-gerar">
+      <div class="spinner-btn"></div>
+      <span class="material-icons-round btn-txt">play_arrow</span>
+      <span class="btn-txt">Gerar</span>
+    </button>
+    <button class="btn-r8 btn-r8-sec" id="r8g-btn-cancelar">
+      <span class="material-icons-round">close</span>Cancelar
+    </button>
+  </div>
+</div>
+
 
 <!-- PREVIEW -->
 <div class="r8-preview-wrap" id="r8-preview-wrap">
@@ -625,8 +705,12 @@
     turmas: [], semestres: [], semestreAtual: null, config: {},
     avaliacoes: [], cursos: [], calendario: [], papel: '', usuarioId: '',
     tipoAtual: '', alunosTodos: null, ultimoAlunosTurmaCampos: null,
-    ultimoAlunosFaltas: null, ultimoEvasao: null
+    ultimoAlunosFaltas: null, ultimoEvasao: null, ultimaGrade: null
   };
+
+  // "Grade por professor" (etapa 28): só admin e coordenação. O card fica
+  // escondido para os demais papéis, e o banco recusa do mesmo jeito.
+  var PAPEIS_GRADE = ['admin', 'coordenacao'];
 
   // "Alunos com faltas": só admin, coordenação e secretaria (o card fica
   // escondido para qualquer outro papel, e o gerador recusa).
@@ -649,6 +733,10 @@
   var TIPOS_OCULTOS_PROFESSOR = ['alunos-geral', 'condensado'];
 
   function aplicarRestricoesPapel(){
+    if(PAPEIS_GRADE.indexOf(S.papel) === -1){
+      var cardGrade = document.querySelector('.r8-tipo-card[data-tipo="grade-professores"]');
+      if(cardGrade) cardGrade.style.display = 'none';
+    }
     if(PAPEIS_ALUNOS_FALTAS.indexOf(S.papel) === -1){
       TIPOS_SO_GESTAO.forEach(function(tipo){
         var card = document.querySelector('.r8-tipo-card[data-tipo="'+tipo+'"]');
@@ -846,7 +934,7 @@
 
   // ── NAVEGAÇÃO ENTRE PAINÉIS ─────────────────────────────────────────────
   function fecharTudo(){
-    ['r8-params','r8c-painel','r8cr-painel','r8f-painel','r8e-painel','r8-preview-wrap','r8c-resultado','r8cr-resultado'].forEach(function(id){
+    ['r8-params','r8c-painel','r8cr-painel','r8f-painel','r8e-painel','r8g-painel','r8-preview-wrap','r8c-resultado','r8cr-resultado'].forEach(function(id){
       if(el(id)) el(id).classList.remove('show');
     });
     document.querySelectorAll('.r8-tipo-card').forEach(function(c){ c.classList.remove('sel'); });
@@ -859,7 +947,14 @@
     if(el('r8cr-resultado')) el('r8cr-resultado').classList.remove('show');
     if(el('r8f-painel')) el('r8f-painel').classList.remove('show');
     if(el('r8e-painel')) el('r8e-painel').classList.remove('show');
-    if(tipo==='evasao'){
+    if(el('r8g-painel')) el('r8g-painel').classList.remove('show');
+    if(tipo==='grade-professores'){
+      if(el('r8-params')) el('r8-params').classList.remove('show');
+      if(el('r8c-painel')) el('r8c-painel').classList.remove('show');
+      if(el('r8cr-painel')) el('r8cr-painel').classList.remove('show');
+      if(el('r8g-painel')) el('r8g-painel').classList.add('show');
+      popularGradeFiltros();
+    } else if(tipo==='evasao'){
       if(el('r8-params')) el('r8-params').classList.remove('show');
       if(el('r8c-painel')) el('r8c-painel').classList.remove('show');
       if(el('r8cr-painel')) el('r8cr-painel').classList.remove('show');
@@ -897,7 +992,8 @@
     'frequencia-turma':'Frequência por turma','resultados-turma':'Resultados por turma',
     'alunos-turma-campos':'Alunos por turma (campos)','conteudo-turma':'Conteúdos da turma',
     'grade-frequencia':'Grade de frequência','alunos-faltas':'Alunos com faltas',
-    'evasao':'Transferências, desistência e evasão'
+    'evasao':'Transferências, desistência e evasão',
+    'grade-professores':'Grade por professor'
   };
   var TIPOS_COM_TURMA=['boletim','turmas-alunos','frequencia-turma','resultados-turma','alunos-turma-campos','conteudo-turma','grade-frequencia'];
   var TIPOS_OUTRAS_SIT=['boletim','alunos-turma-campos','turmas-alunos','frequencia-turma','resultados-turma','grade-frequencia'];
@@ -1052,9 +1148,11 @@
   // global — este HTML é reaproveitado tal e qual dentro da janela de
   // impressão (imprimirConteudo), que é outro `window`, sem acesso às
   // funções deste módulo.
-  function headerInstitucional(subtitulo){
+  // semestreRotulo (opcional): para relatórios de outro semestre que não o
+  // atual (ex.: Grade por professor do próximo semestre).
+  function headerInstitucional(subtitulo, semestreRotulo){
     var c=S.config||{};
-    var sem=S.semestreAtual?(S.semestreAtual.rotulo||''):'';
+    var sem=semestreRotulo || (S.semestreAtual?(S.semestreAtual.rotulo||''):'');
     return '<div class="r8-cab">'+
       '<img src="logo192x192.png" alt="Logo da escola" class="r8-cab-logo" onerror="this.style.display=\'none\';">'+
       '<div class="r8-cab-info">'+
@@ -1071,6 +1169,7 @@
     if(el('r8-params')) el('r8-params').classList.remove('show');
     if(el('r8f-painel')) el('r8f-painel').classList.remove('show');
     if(el('r8e-painel')) el('r8e-painel').classList.remove('show');
+    if(el('r8g-painel')) el('r8g-painel').classList.remove('show');
     if(el('r8-preview-wrap')) el('r8-preview-wrap').classList.add('show');
     // "Baixar XLSX" só aparece para 'alunos-turma-campos' e 'alunos-faltas',
     // e só quando essa geração realmente produziu dados (os dados de
@@ -1079,7 +1178,8 @@
     if(el('btn-r8-xlsx')) el('btn-r8-xlsx').style.display =
       ((S.tipoAtual==='alunos-turma-campos' && S.ultimoAlunosTurmaCampos) ||
        (S.tipoAtual==='alunos-faltas' && S.ultimoAlunosFaltas) ||
-       (S.tipoAtual==='evasao' && S.ultimoEvasao)) ? 'inline-flex' : 'none';
+       (S.tipoAtual==='evasao' && S.ultimoEvasao) ||
+       (S.tipoAtual==='grade-professores' && S.ultimaGrade)) ? 'inline-flex' : 'none';
   }
   function mostrarEstadoVazio(msg){
     mostrarPreview(TITULOS_TIPO[S.tipoAtual]||'Relatório', '<p class="r8-estado">'+esc(msg)+'</p>');
@@ -1508,7 +1608,8 @@
     window.__xlsxCarregando = new Promise(function(resolve, reject){
       var script=document.createElement('script');
       script.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-      script.integrity='sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw'; script.crossOrigin='anonymous';
+      script.integrity='sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw';
+      script.crossOrigin='anonymous';
       script.onload=function(){ resolve(window.XLSX); };
       script.onerror=function(){ window.__xlsxCarregando=null; reject(new Error('Não foi possível carregar a biblioteca de exportação XLSX. Verifique a conexão e tente novamente.')); };
       document.head.appendChild(script);
@@ -1519,6 +1620,7 @@
   function baixarTabelaXLSX(){
     var dados = (S.tipoAtual==='alunos-faltas') ? S.ultimoAlunosFaltas
               : (S.tipoAtual==='evasao') ? S.ultimoEvasao
+              : (S.tipoAtual==='grade-professores') ? S.ultimaGrade
               : S.ultimoAlunosTurmaCampos;
     // Uma ou várias abas: { abas:[{nome, cabecalho, linhas}] } ou { aba, cabecalho, linhas }
     var abas = (dados && dados.abas) ? dados.abas : (dados ? [{nome:dados.aba||'Alunos', cabecalho:dados.cabecalho, linhas:dados.linhas}] : []);
@@ -2305,6 +2407,375 @@
     });
   }
 
+  // ── 13) GRADE POR PROFESSOR (etapa 28) ─────────────────────────────────
+  // Uma linha por professor do idioma e uma coluna por horário fixo da grade
+  // (segunda a sexta: 8h, 10h, 14h, 16h e 18h30; sábado: 8h e 10h). Os dados
+  // vêm todos de uma função do banco (relatorio_grade_professores, etapa 28),
+  // que só responde para admin e coordenação. Ela é chamada direto pelo
+  // cliente do Supabase (window._supabase), sem passar por api.js, para esta
+  // entrega não depender de uma mudança em api.js.
+  //
+  // Regras combinadas em 07/11/2026:
+  //  • Célula: sigla do curso + "e" (EAD) ou "h" (híbrido) + (nº de alunos).
+  //    Turma com mais de um dia aparece em cada dia; turma de 4h ocupa dois
+  //    horários. Turma que começa fora do horário fixo entra no horário de
+  //    início mais próximo (ex.: 9h30 → coluna das 10h).
+  //  • Cores: estágio 1 em verde (claro presencial, escuro EAD/híbrido);
+  //    demais estágios em ciano (presencial) ou azul-claro (EAD/híbrido);
+  //    vermelho = 0 alunos. Turma de outro idioma do mesmo professor aparece
+  //    em itálico, sem cor. Duas turmas no mesmo horário = borda vermelha.
+  //  • Horário vazio (só quando há disponibilidade registrada no semestre):
+  //    branco = marcado na disponibilidade e livre; ciano-claro = marcado e
+  //    o professor teve turma nesse horário no semestre anterior; cinza = não
+  //    marcado na disponibilidade.
+  //  • Previsto = turmas das matrículas funcionais; Ocupado = horários com
+  //    turma (de qualquer idioma); DEP = departamento das matrículas
+  //    funcionais. Nome em verde quando Ocupado = Previsto, amarelo quando
+  //    falta, vermelho quando passa.
+  //  • Ordem: professores em ordem alfabética; coordenação no fim, também
+  //    em ordem alfabética.
+  //  • Número entre parênteses: alunos ativos (matrículas ATIVA ou
+  //    CONCLUIDA). No próximo semestre, durante a transição, pode-se escolher
+  //    as intenções (rematrícula + novatos) no lugar.
+  var GRADE_HORARIOS = [
+    {k:'8h',    ini:480,  fim:600},
+    {k:'10h',   ini:600,  fim:720},
+    {k:'14h',   ini:840,  fim:960},
+    {k:'16h',   ini:960,  fim:1080},
+    {k:'18h30', ini:1110, fim:1230}
+  ];
+  var GRADE_DIAS = [
+    {d:1, nome:'Segunda-feira', abrev:'Seg', horarios:GRADE_HORARIOS},
+    {d:2, nome:'Terça-feira',   abrev:'Ter', horarios:GRADE_HORARIOS},
+    {d:3, nome:'Quarta-feira',  abrev:'Qua', horarios:GRADE_HORARIOS},
+    {d:4, nome:'Quinta-feira',  abrev:'Qui', horarios:GRADE_HORARIOS},
+    {d:5, nome:'Sexta-feira',   abrev:'Sex', horarios:GRADE_HORARIOS},
+    {d:6, nome:'Sábado',        abrev:'Sáb', horarios:GRADE_HORARIOS.slice(0,2)}
+  ];
+
+  function gradeColunas(){
+    var cols=[];
+    GRADE_DIAS.forEach(function(dia){
+      dia.horarios.forEach(function(h,i){
+        cols.push({d:dia.d, k:h.k, chave:dia.d+'|'+h.k, abrev:dia.abrev, primeiro:i===0});
+      });
+    });
+    return cols;
+  }
+
+  // Início e fim em minutos. Usa o que o banco calculou; se o texto do
+  // horário não estiver no formato reconhecido ("14h às 16h", "08:00-10:00"),
+  // pega só o início e considera 2 horas de aula.
+  function gradeIntervalo(obj){
+    if(obj && obj.ini!==null && obj.ini!==undefined && obj.fim!==null && obj.fim!==undefined){
+      return {ini:Number(obj.ini), fim:Number(obj.fim)};
+    }
+    var m=String((obj&&obj.horario)||'').toLowerCase().match(/(\d{1,2})\s*[h:]\s*(\d{2})?/);
+    if(!m) return null;
+    var ini=parseInt(m[1],10)*60+(m[2]?parseInt(m[2],10):0);
+    return {ini:ini, fim:ini+120};
+  }
+
+  // Colunas do dia em que um horário cai: as que ele cobre por pelo menos
+  // 1 hora; se nenhuma, a de início mais próximo (até 1 hora de distância).
+  function gradeColunasDoHorario(dia, intervalo){
+    var diaCfg=null;
+    GRADE_DIAS.forEach(function(x){ if(x.d===dia) diaCfg=x; });
+    if(!diaCfg || !intervalo) return [];
+    var cobre=diaCfg.horarios.filter(function(h){
+      return Math.min(h.fim, intervalo.fim) - Math.max(h.ini, intervalo.ini) >= 60;
+    });
+    if(cobre.length) return cobre.map(function(h){ return dia+'|'+h.k; });
+    var melhor=null, dist=Infinity;
+    diaCfg.horarios.forEach(function(h){
+      var x=Math.abs(h.ini-intervalo.ini);
+      if(x<dist){ dist=x; melhor=h; }
+    });
+    return (melhor && dist<=60) ? [dia+'|'+melhor.k] : [];
+  }
+
+  function gradeModalidadeSufixo(mod){
+    var m=String(mod||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    if(m==='EAD') return 'e';
+    if(m==='HIBRIDO') return 'h';
+    return '';
+  }
+  // Estágio 1 = sigla terminada em 1 (EN1, PT1, KD1, TN1, TC1, CON1…)
+  function gradeEstagio1(t){ return /(^|[^0-9])1$/.test(String(t.sigla||t.estagio||'').trim()); }
+  function gradeRotulo(t){ return String(t.sigla||t.estagio||'?').trim()+gradeModalidadeSufixo(t.modalidade); }
+
+  function gradeEhProximo(s){
+    return !!s && !s.semestre_atual && (s.fase==='planejamento' || s.fase==='inscricoes');
+  }
+
+  function popularGradeFiltros(){
+    var selSem=el('r8g-semestre'), selId=el('r8g-idioma');
+    var p1 = S.semestresTodos ? Promise.resolve(S.semestresTodos)
+      : postApi('semestres.listar',{incluirOcultos:true}).then(function(r){
+          S.semestresTodos=(r.sucesso&&r.dados)?r.dados.slice():S.semestres.slice();
+          S.semestresTodos.sort(function(a,b){ return String(b.external_id||'').localeCompare(String(a.external_id||'')); });
+          return S.semestresTodos;
+        });
+    var p2 = S.idiomas ? Promise.resolve(S.idiomas)
+      : postApi('idiomas.listar',{}).then(function(r){
+          S.idiomas=((r.sucesso&&r.dados)?r.dados:[]).filter(function(i){ return i.ativo!==false; });
+          return S.idiomas;
+        });
+    return Promise.all([p1,p2]).then(function(res){
+      if(selSem && selSem.dataset.pronto!=='1'){
+        selSem.innerHTML='';
+        res[0].forEach(function(s){
+          var opt=document.createElement('option');
+          opt.value=s.id;
+          opt.textContent=(s.rotulo||s.external_id||s.id)+(s.semestre_atual?' (atual)':(gradeEhProximo(s)?' (próximo)':''));
+          if(s.semestre_atual) opt.selected=true;
+          selSem.appendChild(opt);
+        });
+        selSem.dataset.pronto='1';
+      }
+      if(selId && selId.dataset.pronto!=='1'){
+        selId.innerHTML='';
+        res[1].forEach(function(i){
+          var opt=document.createElement('option'); opt.value=i.id; opt.textContent=i.nome;
+          selId.appendChild(opt);
+        });
+        selId.dataset.pronto='1';
+      }
+      atualizarGradeContagem();
+    });
+  }
+
+  // A escolha "alunos ativos × intenções" só aparece no próximo semestre.
+  function atualizarGradeContagem(){
+    var sem=(S.semestresTodos||[]).find(function(s){ return s.id===val('r8g-semestre'); });
+    var proximo=gradeEhProximo(sem);
+    if(el('r8g-contagem-wrap')) el('r8g-contagem-wrap').style.display = proximo ? '' : 'none';
+    if(!proximo && el('r8g-contagem')) el('r8g-contagem').value='ativos';
+  }
+
+  function gerarGradeProfessores(){
+    if(PAPEIS_GRADE.indexOf(S.papel)===-1){
+      alert('Este relatório não está disponível para o seu papel.');
+      return Promise.resolve();
+    }
+    var semestreId=val('r8g-semestre'), idiomaId=val('r8g-idioma');
+    if(!semestreId || !idiomaId){ alert('Escolha o semestre e o idioma.'); return Promise.resolve(); }
+    var contagem=val('r8g-contagem')||'ativos';
+    var sb=window._supabase;
+    if(!sb){ alert('Sessão não iniciada. Recarregue a página.'); return Promise.resolve(); }
+
+    S.ultimaGrade=null;
+    var btn=el('r8g-btn-gerar');
+    if(btn){ btn.disabled=true; btn.classList.add('loading'); }
+    var finalizar=function(){ if(btn){ btn.disabled=false; btn.classList.remove('loading'); } };
+
+    return sb.rpc('relatorio_grade_professores', { p_semestre_id:semestreId, p_idioma_id:idiomaId }).then(function(res){
+      finalizar();
+      if(res.error){
+        var msg=res.error.message||'erro desconhecido.';
+        if(/relatorio_grade_professores/.test(msg) && /(not find|does not exist|não existe)/i.test(msg)){
+          msg='a função do banco ainda não foi criada (rode o arquivo etapa28-relatorio-grade-professores.sql).';
+        }
+        throw new Error(msg);
+      }
+      montarGradeProfessores(res.data||{}, contagem);
+    }).catch(function(e){
+      finalizar();
+      console.error('Erro na grade por professor:', e);
+      mostrarEstadoVazio('Não foi possível gerar o relatório: '+(e&&e.message?e.message:'erro desconhecido.'));
+    });
+  }
+
+  function montarGradeProfessores(d, contagem){
+    var cols=gradeColunas();
+    var usarIntencoes = contagem==='intencoes' && d.semestre && d.semestre.proximo;
+    var idiomaId = d.idioma ? d.idioma.id : '';
+    var temDisp = !!d.tem_disponibilidade;
+
+    // 1) Linhas: professores + "a definir"
+    var linhas={}, ordem=[];
+    (d.professores||[]).forEach(function(p){
+      var linha={p:p, celulas:{}, fora:[], disp:{}, ant:{}};
+      (p.disponivel||[]).forEach(function(s){
+        gradeColunasDoHorario(Number(s.dia), gradeIntervalo(s)).forEach(function(k){ linha.disp[k]=true; });
+      });
+      (p.anteriores||[]).forEach(function(t){
+        var iv=gradeIntervalo(t);
+        (t.dias||[]).forEach(function(dia){
+          gradeColunasDoHorario(Number(dia), iv).forEach(function(k){ linha.ant[k]=true; });
+        });
+      });
+      linhas[p.id]=linha; ordem.push(linha);
+    });
+    var linhaSem=null;
+
+    // 2) Turmas nas células
+    (d.turmas||[]).forEach(function(t){
+      var linha;
+      if(t.professor_id){ linha=linhas[t.professor_id]; }
+      else {
+        if(!linhaSem) linhaSem={p:{id:'', nome:'A definir', papel:'', previsto:null, dep:null, semProfessor:true}, celulas:{}, fora:[], disp:{}, ant:{}};
+        linha=linhaSem;
+      }
+      if(!linha) return;
+      var doIdioma = t.idioma_id===idiomaId;
+      var qtd = usarIntencoes ? (t.intencoes===null||t.intencoes===undefined ? 0 : t.intencoes) : (t.alunos||0);
+      var item={t:t, doIdioma:doIdioma, qtd:qtd};
+      var iv=gradeIntervalo(t);
+      var dias=(t.dias||[]).map(Number);
+      if(!dias.length) linha.fora.push({item:item, dia:null});
+      dias.forEach(function(dia){
+        var ks=gradeColunasDoHorario(dia, iv);
+        if(!ks.length){ linha.fora.push({item:item, dia:dia}); return; }
+        ks.forEach(function(k){ (linha.celulas[k]=linha.celulas[k]||[]).push(item); });
+      });
+    });
+
+    // 3) Ordem: professores (A–Z), coordenação (A–Z), a definir
+    function ocupadoDe(l){ return Object.keys(l.celulas).length + l.fora.length; }
+    var profs=ordem.filter(function(l){ return l.p.papel!=='coordenacao'; });
+    var coords=ordem.filter(function(l){ return l.p.papel==='coordenacao'; });
+    var porNomeP=function(a,b){ return compararNomes(a.p.nome, b.p.nome); };
+    profs.sort(porNomeP); coords.sort(porNomeP);
+
+    var nomesDia={}; GRADE_DIAS.forEach(function(x){ nomesDia[x.d]=x.abrev; });
+
+    // 4) HTML
+    var thDias='', thHoras='';
+    GRADE_DIAS.forEach(function(dia){
+      thDias+='<th class="r8g-ini" colspan="'+dia.horarios.length+'">'+esc(dia.nome)+'</th>';
+      dia.horarios.forEach(function(h,i){ thHoras+='<th'+(i===0?' class="r8g-ini"':'')+'>'+esc(h.k)+'</th>'; });
+    });
+    var cabecalho='<thead><tr class="r8g-dias"><th class="r8g-prof" rowspan="2">Professor</th>'+
+      '<th class="r8g-num" rowspan="2" title="Turmas das matrículas funcionais">Prev.</th>'+
+      '<th class="r8g-num" rowspan="2" title="Horários da grade com turma (qualquer idioma)">Ocup.</th>'+
+      '<th class="r8g-num" rowspan="2" title="Horários de departamento das matrículas funcionais">DEP</th>'+
+      thDias+'</tr><tr>'+thHoras+'</tr></thead>';
+
+    var linhasXlsx=[], foraTxt=[];
+    function renderLinha(l){
+      var p=l.p, ocup=ocupadoDe(l);
+      var prev=(p.previsto===null||p.previsto===undefined)?null:Number(p.previsto);
+      var clsNome = (prev===null||p.semProfessor) ? '' : (ocup===prev ? 'r8g-ok' : (ocup<prev ? 'r8g-falta' : 'r8g-excede'));
+      var notas=[];
+      if(p.ativo===false) notas.push('inativo');
+      if(!p.semProfessor && prev===null) notas.push('sem matrícula funcional');
+      if(!p.semProfessor && temDisp && !p.enviou_disponibilidade) notas.push('sem disponibilidade');
+      var tr='<tr><td class="r8g-prof '+clsNome+'">'+esc(p.nome||'—')+
+        (notas.length?'<br><span class="r8g-aviso">'+esc(notas.join(' · '))+'</span>':'')+'</td>'+
+        '<td class="r8g-num">'+(prev===null?'—':prev)+'</td>'+
+        '<td class="r8g-num">'+ocup+'</td>'+
+        '<td class="r8g-num">'+((p.dep===null||p.dep===undefined)?'—':Number(p.dep))+'</td>';
+      var linhaX=[p.nome||'', prev===null?'':prev, ocup, (p.dep===null||p.dep===undefined)?'':Number(p.dep)];
+      cols.forEach(function(c){
+        var itens=l.celulas[c.chave]||[];
+        var ini=c.primeiro?' r8g-ini':'';
+        if(!itens.length){
+          var cls='';
+          if(temDisp && !p.semProfessor && p.enviou_disponibilidade){
+            cls = l.disp[c.chave] ? (l.ant[c.chave] ? 'r8g-dispant' : '') : 'r8g-indisp';
+          }
+          tr+='<td class="r8g-cel'+ini+(cls?' '+cls:'')+'"></td>';
+          linhaX.push(cls==='r8g-indisp' ? '–' : '');
+          return;
+        }
+        var principal=null;
+        itens.forEach(function(it){ if(!principal && it.doIdioma) principal=it; });
+        var cls2;
+        if(!principal) cls2='r8g-outro';
+        else if(principal.qtd===0) cls2='r8g-zero';
+        else {
+          var ead=gradeModalidadeSufixo(principal.t.modalidade)!=='';
+          cls2 = gradeEstagio1(principal.t) ? (ead?'r8g-t1e':'r8g-t1p') : (ead?'r8g-te':'r8g-tp');
+        }
+        if(itens.length>1) cls2+=' r8g-conf';
+        var conteudo='', titulos=[], txtX=[];
+        itens.forEach(function(it){
+          var t=it.t, rot=gradeRotulo(t);
+          if(it.doIdioma){
+            conteudo+='<span class="r8g-sig">'+esc(rot)+'</span><span class="r8g-qtd">('+it.qtd+')</span>';
+            txtX.push(rot+' ('+it.qtd+')');
+          } else {
+            var abrevId=String(t.idioma_nome||'').substring(0,3);
+            conteudo+='<span class="r8g-sig">'+esc(rot)+'</span><span class="r8g-qtd">'+esc(abrevId)+'</span>';
+            txtX.push(rot+' ('+it.qtd+') ['+(t.idioma_nome||'outro idioma')+']');
+          }
+          titulos.push((t.external_id||'')+' · '+(t.dia_semana||'')+' '+(t.horario||'')+
+            (it.doIdioma?'':' · '+(t.idioma_nome||'outro idioma')));
+        });
+        if(itens.length>1) titulos.push('Atenção: mais de uma turma neste horário');
+        tr+='<td class="r8g-cel'+ini+' '+cls2+'" title="'+esc(titulos.join('\n'))+'">'+conteudo+'</td>';
+        linhaX.push(txtX.join(' / '));
+      });
+      tr+='</tr>';
+      l.fora.forEach(function(f){
+        foraTxt.push((p.nome||'A definir')+': '+gradeRotulo(f.item.t)+' ('+f.item.qtd+') — '+
+          (f.dia?nomesDia[f.dia]+' ':'')+(f.item.t.horario||'sem horário')+' ['+(f.item.t.external_id||'')+']');
+      });
+      linhasXlsx.push(linhaX);
+      return tr;
+    }
+
+    var nCols=4+cols.length;
+    var corpo='';
+    profs.forEach(function(l){ corpo+=renderLinha(l); });
+    if(coords.length){
+      corpo+='<tr class="r8g-sep"><td colspan="'+nCols+'">Coordenação</td></tr>';
+      linhasXlsx.push(['Coordenação']);
+      coords.forEach(function(l){ corpo+=renderLinha(l); });
+    }
+    if(linhaSem){
+      corpo+='<tr class="r8g-sep"><td colspan="'+nCols+'">Turmas sem professor</td></tr>';
+      linhasXlsx.push(['Turmas sem professor']);
+      corpo+=renderLinha(linhaSem);
+    }
+
+    if(!profs.length && !coords.length && !linhaSem){
+      mostrarEstadoVazio('Nenhum professor ou turma deste idioma no semestre escolhido.');
+      return;
+    }
+
+    var semRot=(d.semestre&&(d.semestre.rotulo||d.semestre.external_id))||'';
+    var idiomaNome=(d.idioma&&d.idioma.nome)||'';
+    var geradoEm='';
+    try{
+      geradoEm=new Date(d.gerado_em||Date.now()).toLocaleString('pt-BR',{timeZone:'America/Fortaleza',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    }catch(e){ geradoEm=fmtData(hoje()); }
+    var txtContagem = usarIntencoes ? 'intenções de rematrícula e de novatos' : 'alunos ativos';
+
+    var sw=function(cls, txt, extra){ return '<span><i class="'+cls+'"'+(extra||'')+'></i>'+esc(txt)+'</span>'; };
+    var legenda='<div class="r8g-legenda">'+
+      sw('r8g-t1p','Estágio 1 presencial')+sw('r8g-t1e','Estágio 1 EAD/híbrido')+
+      sw('r8g-tp','Demais estágios presencial')+sw('r8g-te','Demais estágios EAD/híbrido')+
+      sw('r8g-zero','Turma sem alunos')+sw('r8g-outro','Turma de outro idioma',' style="border-style:dashed;"')+
+      sw('r8g-conf','Duas turmas no mesmo horário')+
+      (temDisp ? sw('','Disponível, livre')+sw('r8g-dispant','Disponível, teve turma no '+((d.anterior&&d.anterior.rotulo)||'semestre anterior'))+sw('r8g-indisp','Não marcado na disponibilidade') : '')+
+      '<span><strong>e</strong>&nbsp;EAD · <strong>h</strong>&nbsp;híbrido</span>'+
+      '<span>Nome: '+'<i class="r8g-ok"></i> ocupado = previsto · <i class="r8g-falta"></i> falta · <i class="r8g-excede"></i> passa</span>'+
+    '</div>';
+
+    var obs='<div class="r8g-obs">Número entre parênteses: '+esc(txtContagem)+'. '+
+      (temDisp ? '' : 'Sem disponibilidade registrada no SGE para este semestre: os horários vazios aparecem em branco. ')+
+      'Turma que começa fora dos horários fixos entra na coluna de início mais próximo.'+
+      (foraTxt.length ? '<br><strong>Fora da grade (contadas em Ocupado):</strong> '+esc(foraTxt.join('; '))+'.' : '')+
+    '</div>';
+
+    var html='<style>@media print{@page{size:A4 landscape;margin:0;}}</style>'+
+      '<div class="r8-folha paisagem r8g-folha">'+headerInstitucional('Grade de turmas por professor', semRot)+
+      '<h2 class="r8-titulo-rel">Grade de turmas por professor — '+esc(idiomaNome)+' · '+esc(semRot)+'</h2>'+
+      '<div class="r8-subtitulo-rel">Dados de '+esc(geradoEm)+' · Número entre parênteses: '+esc(txtContagem)+'</div>'+
+      '<table class="r8g-tab">'+cabecalho+'<tbody>'+corpo+'</tbody></table>'+
+      legenda+obs+'</div>';
+
+    var cab=['Professor','Previsto','Ocupado','DEP'].concat(cols.map(function(c){ return c.abrev+' '+c.k; }));
+    var seguro=function(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9_-]+/g,'_'); };
+    S.ultimaGrade={
+      aba:'Grade '+idiomaNome, cabecalho:cab, linhas:linhasXlsx,
+      nomeArquivo:'grade_professores_'+seguro(idiomaNome)+'_'+seguro((d.semestre&&d.semestre.external_id)||semRot)+'_'+hoje()+'.xlsx'
+    };
+    mostrarPreview('Grade por professor — '+idiomaNome+' · '+semRot, html);
+  }
+
   // ── 10) CONTROLE DE REGISTROS ───────────────────────────────────────────
   var NOMES_DIA_CR_R8=['Domingo','Segunda-Feira','Terça-Feira','Quarta-Feira','Quinta-Feira','Sexta-Feira','Sábado'];
 
@@ -2522,7 +2993,8 @@
     el('btn-r8-novo') && el('btn-r8-novo').addEventListener('click', function(){
       el('r8-preview-wrap').classList.remove('show');
       // Alunos com faltas tem painel próprio
-      el(S.tipoAtual==='alunos-faltas' ? 'r8f-painel' : S.tipoAtual==='evasao' ? 'r8e-painel' : 'r8-params').classList.add('show');
+      el(S.tipoAtual==='alunos-faltas' ? 'r8f-painel' : S.tipoAtual==='evasao' ? 'r8e-painel'
+        : S.tipoAtual==='grade-professores' ? 'r8g-painel' : 'r8-params').classList.add('show');
     });
     el('btn-r8-imprimir') && el('btn-r8-imprimir').addEventListener('click', function(){
       imprimirConteudo(el('r8-preview-conteudo').innerHTML);
@@ -2535,6 +3007,10 @@
     el('r8cr-btn-imprimir') && el('r8cr-btn-imprimir').addEventListener('click', function(){
       imprimirConteudo('<div class="r8-folha">'+(el('r8cr-resultado-titulo')?'<h2 class="r8-titulo-rel">'+esc(el('r8cr-resultado-titulo').textContent)+'</h2>':'')+el('r8cr-corpo').innerHTML+'</div>');
     });
+
+    el('r8g-btn-gerar') && el('r8g-btn-gerar').addEventListener('click', gerarGradeProfessores);
+    el('r8g-btn-cancelar') && el('r8g-btn-cancelar').addEventListener('click', fecharTudo);
+    el('r8g-semestre') && el('r8g-semestre').addEventListener('change', atualizarGradeContagem);
 
     el('r8e-btn-gerar') && el('r8e-btn-gerar').addEventListener('click', gerarEvasao);
     el('r8e-btn-cancelar') && el('r8e-btn-cancelar').addEventListener('click', fecharTudo);
