@@ -372,6 +372,99 @@ function carregarShell() {
 }
 
 // =========================================================
+// COMPROVANTE DE DISPONIBILIDADE (etapa 27)
+// =========================================================
+// window.SGE_comprovanteDisp(promessa): abre a janela do comprovante NA HORA
+// do clique (senão o navegador bloqueia a janela) e preenche quando os dados
+// chegam. `promessa` resolve em { sucesso, dados, mensagem } com os dados de
+// disp_comprovante_json. Devolve a mesma resposta.
+var DIA_COMPROVANTE = ['', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+
+function htmlComprovanteDisp(d) {
+  var e = escIdx;
+  var esc = d.escola || {}, prof = d.professor || {};
+  var quando = function(iso) {
+    var x = new Date(iso); if (isNaN(x)) return '';
+    return x.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' }) + ' às ' +
+           x.toLocaleTimeString('pt-BR', { timeZone: 'America/Fortaleza', hour: '2-digit', minute: '2-digit' });
+  };
+  var logo = '';
+  if (esc.logo_url) {
+    try { logo = new URL(esc.logo_url, window.location.href).href; } catch (x) { logo = ''; }
+  }
+  var porDia = {};
+  (d.slots || []).forEach(function(s) { (porDia[s.dia] = porDia[s.dia] || []).push(s); });
+  var linhasDias = Object.keys(porDia).sort().map(function(dia) {
+    return '<tr><th>' + e(DIA_COMPROVANTE[dia] || dia) + '</th><td>' +
+      porDia[dia].map(function(s) { return e(s.horario) + ' <small>(' + e(s.turno) + ')</small>'; }).join('<br>') + '</td></tr>';
+  }).join('');
+  var mats = (d.matriculas || []).map(function(m) {
+    return '<tr><td>' + e(m.matricula) + '</td><td>' + e(m.vinculo || '') + '</td><td>' +
+      (m.turmas == null ? '—' : e(m.turmas)) + '</td><td>' + (m.departamento == null ? '—' : e(m.departamento)) + '</td><td>' +
+      (m.reducao ? 'Sim' : 'Não') + '</td></tr>';
+  }).join('');
+  var confirmacao = d.confirmado_senha
+    ? '<div class="selo ok">✔ Disponibilidade confirmada pelo(a) próprio(a) docente com a sua senha pessoal de acesso ao SGE.</div>'
+    : '<div class="selo coord">Disponibilidade registrada por ' + e(d.registrado_por || 'a coordenação') + ' (coordenação), em nome do(a) docente, sem confirmação por senha.</div>';
+  return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Comprovante de disponibilidade — ' + e(prof.nome || '') + '</title>' +
+    '<style>' +
+      'body{font-family:Arial,Helvetica,sans-serif;color:#1A1A2E;margin:0;padding:28px;font-size:13px;}' +
+      '.cab{display:flex;align-items:center;gap:16px;border-bottom:2px solid #1A1A2E;padding-bottom:12px;margin-bottom:16px;}' +
+      '.cab img{height:64px;width:auto;}.cab h1{font-size:16px;margin:0;}.cab p{margin:2px 0 0;color:#5C5C7A;font-size:12px;}' +
+      'h2{font-size:15px;margin:0 0 12px;text-transform:uppercase;letter-spacing:0.5px;}' +
+      'h3{font-size:12px;margin:18px 0 6px;text-transform:uppercase;color:#5C5C7A;letter-spacing:0.4px;}' +
+      'table{border-collapse:collapse;width:100%;}td,th{border:1px solid #C8C7C2;padding:6px 8px;text-align:left;vertical-align:top;}' +
+      'th{background:#F5F4F0;width:180px;}.mats th{width:auto;}small{color:#5C5C7A;}' +
+      '.dados td{border:none;padding:2px 0;}.dados td:first-child{color:#5C5C7A;width:170px;}' +
+      '.selo{margin:16px 0;padding:10px 12px;border-radius:6px;font-weight:bold;}' +
+      '.selo.ok{background:#E6F4F1;border:1px solid #2A9D8F;color:#1A6E65;}' +
+      '.selo.coord{background:#FAEEDA;border:1px solid #D4A843;color:#5C4200;}' +
+      '.rodape{margin-top:24px;font-size:11px;color:#9898B0;border-top:1px solid #E8E7E2;padding-top:8px;}' +
+      '.barra{margin-bottom:16px;}.barra button{font-size:14px;padding:8px 16px;cursor:pointer;}' +
+      '@media print{.barra{display:none;}body{padding:0;}}' +
+    '</style></head><body>' +
+    '<div class="barra"><button onclick="window.print()">Imprimir / salvar em PDF</button></div>' +
+    '<div class="cab">' + (logo ? '<img src="' + e(logo) + '" alt="">' : '') +
+      '<div><h1>' + e(esc.nome || 'Centro Estadual de Línguas da Paraíba') + (esc.sigla ? ' — ' + e(esc.sigla) : '') + '</h1>' +
+      '<p>' + e([esc.endereco, esc.telefone, esc.email].filter(Boolean).join(' · ')) + '</p></div></div>' +
+    '<h2>Comprovante de disponibilidade — ' + e(d.semestre || '') + '</h2>' +
+    '<table class="dados"><tr><td>Docente</td><td><strong>' + e(prof.nome || '') + '</strong> (' + e(prof.codigo || '') + ')</td></tr>' +
+      '<tr><td>Envio</td><td>nº ' + e(d.numero) + (d.total_envios > 1 ? ' de ' + e(d.total_envios) : '') + ' — ' + e(quando(d.enviado_em)) + '</td></tr>' +
+      '<tr><td>Horários marcados</td><td>' + (d.slots || []).length + ' (mínimo pedido: ' + e(d.minimo) +
+        (d.minimo_sabado ? ', sendo ' + e(d.minimo_sabado) + ' no sábado' : '') + ')</td></tr>' +
+      '<tr><td>Deseja turmas EAD?</td><td><strong>' + (d.ead ? 'Sim' : 'Não') + '</strong></td></tr></table>' +
+    confirmacao +
+    '<h3>Horários disponíveis</h3>' + (linhasDias ? '<table>' + linhasDias + '</table>' : '<p>Nenhum horário marcado.</p>') +
+    '<h3>Comentários e pedidos</h3><p>' + (d.comentario ? e(d.comentario).replace(/\n/g, '<br>') : '<small>(sem comentários)</small>') + '</p>' +
+    '<h3>Matrículas funcionais</h3>' + (mats
+      ? '<table class="mats"><tr><th>Matrícula</th><th>Vínculo</th><th>Turmas</th><th>Departamento</th><th>Redução</th></tr>' + mats + '</table>'
+      : '<p><small>Nenhuma matrícula funcional cadastrada.</small></p>') +
+    '<div class="rodape">Comprovante gerado pelo SGE · ' + e(esc.sigla || 'CELINPB') + ' em ' + e(quando(new Date().toISOString())) +
+      '. Vale o último envio registrado no sistema.</div>' +
+    '</body></html>';
+}
+
+window.SGE_comprovanteDisp = function(promessa) {
+  var w = null;
+  try { w = window.open('', '_blank'); } catch (x) { w = null; }
+  if (w) { try { w.document.write('<p style="font-family:sans-serif;padding:24px;">Carregando comprovante…</p>'); } catch (x) {} }
+  return Promise.resolve(promessa).then(function(res) {
+    if (!res || !res.sucesso || !res.dados) {
+      if (w) w.close();
+      return res;
+    }
+    var html = htmlComprovanteDisp(res.dados);
+    if (w) {
+      w.document.open(); w.document.write(html); w.document.close();
+      setTimeout(function() { try { w.focus(); w.print(); } catch (x) {} }, 600);
+    } else {
+      toast('O navegador bloqueou a janela do comprovante. Permita janelas para este site, ou use "Ver comprovante".', 'error', 8000);
+    }
+    return res;
+  });
+};
+
+// =========================================================
 // PEDIDO DE COMPLETAR CADASTRO (etapa 26)
 // =========================================================
 // Admin/coordenação pedem; no acesso seguinte aparece este aviso. A pessoa
@@ -604,6 +697,9 @@ function navegarPara(moduloId, titulo) {
     titulo = 'Meu cadastro';
   }
   if (App.modulo === moduloId) return;
+  // Tela com alterações não enviadas (ex.: disponibilidade no Início — etapa 27)
+  if (typeof window.SGE_ANTES_DE_SAIR === 'function' && !window.SGE_ANTES_DE_SAIR()) return;
+  window.SGE_ANTES_DE_SAIR = null;
   App.modulo = moduloId;
 
   document.querySelectorAll('.nav-item').forEach(function(el) {
