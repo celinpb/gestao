@@ -611,7 +611,8 @@
     if (window.__xlsxCarregando) return window.__xlsxCarregando;
     window.__xlsxCarregando = new Promise(function(resolve, reject) {
       var sc = document.createElement('script');
-      sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      sc.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      sc.integrity='sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw'; sc.crossOrigin='anonymous';
       sc.onload = function() { resolve(window.XLSX); };
       sc.onerror = function() { window.__xlsxCarregando = null; reject(new Error('Não foi possível carregar a biblioteca da planilha. Verifique a conexão e tente novamente.')); };
       document.head.appendChild(sc);
