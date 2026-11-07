@@ -662,6 +662,8 @@
 </div>
 
 <script>
+// Protege texto vindo do banco antes de pôr na página (não deixa virar código).
+function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 (function () {
   'use strict';
 
@@ -727,7 +729,7 @@
 
   function campo(label, valor) {
     var v=(valor!==null&&valor!==undefined&&valor!==''&&valor!==false)?String(valor):null;
-    return '<div class="ficha-campo"><span class="ficha-campo-label">'+label+'</span><span class="ficha-campo-valor'+(v?'':' vazio')+'">'+(v||'—')+'</span></div>';
+    return '<div class="ficha-campo"><span class="ficha-campo-label">'+escTxt(label)+'</span><span class="ficha-campo-valor'+(escTxt(v?'':' vazio'))+'">'+(escTxt(v||'—'))+'</span></div>';
   }
 
   // Converte registro do banco (snake_case) para o formato usado no módulo
@@ -915,7 +917,7 @@
 
   function mostrarEstadoTabela(icone, msg) {
     el('alunos-estado').style.display='block';
-    el('alunos-estado').innerHTML='<span class="material-icons-round">'+icone+'</span><p>'+msg+'</p>';
+    el('alunos-estado').innerHTML='<span class="material-icons-round">'+escTxt(icone)+'</span><p>'+escTxt(msg)+'</p>';
     el('alunos-tabela').style.display='none';
     el('alunos-paginacao').style.display='none';
   }
@@ -930,12 +932,12 @@
       tr.dataset.id = a.AlunoID;
       if (state.alunoSelecionado && state.alunoSelecionado.AlunoID===a.AlunoID) tr.classList.add('selecionado');
       tr.innerHTML=
-        '<td class="aluno-nome-cel">'+(a.NomeExibicao||'—')+'</td>'+
-        '<td class="aluno-id-cel">'+(a.AlunoID||'—')+'</td>'+
-        '<td>'+fmtTel(a.Telefone)+'</td>'+
-        '<td>'+(a.email||'—')+'</td>'+
-        '<td><span class="badge-situacao '+(ativo?'ativo':'inativo')+'">'+
-          '<span class="material-icons-round">'+(ativo?'check_circle':'cancel')+'</span>'+(ativo?'Ativo':'Inativo')+
+        '<td class="aluno-nome-cel">'+(escTxt(a.NomeExibicao||'—'))+'</td>'+
+        '<td class="aluno-id-cel">'+(escTxt(a.AlunoID||'—'))+'</td>'+
+        '<td>'+escTxt(fmtTel(a.Telefone))+'</td>'+
+        '<td>'+(escTxt(a.email||'—'))+'</td>'+
+        '<td><span class="badge-situacao '+(escTxt(ativo?'ativo':'inativo'))+'">'+
+          '<span class="material-icons-round">'+(escTxt(ativo?'check_circle':'cancel'))+'</span>'+(escTxt(ativo?'Ativo':'Inativo'))+
         '</span></td>';
       tr.addEventListener('click', function(){ selecionarAluno(a); });
       tbody.appendChild(tr);
@@ -1035,11 +1037,11 @@
     var cores=['#1A1A2E','#E63946','#2A9D8F','#457B9D'];
     var cor=cores[nomeExib.charCodeAt(0)%cores.length];
     var html='<div class="painel-avatar-wrap">'+
-      '<div class="painel-avatar" style="background:'+cor+'">'+iniciais(nomeExib)+'</div>'+
+      '<div class="painel-avatar" style="background:'+escTxt(cor)+'">'+escTxt(iniciais(nomeExib))+'</div>'+
       '<div class="painel-avatar-info">'+
-        '<div class="painel-nome">'+nomeExib+'</div>'+
-        (temNomeSocial?'<div class="painel-nome-legal">Nome legal: '+a.NomeCompleto+'</div>':'')+
-        '<div class="painel-id">'+(a.AlunoID||'')+'</div>'+
+        '<div class="painel-nome">'+escTxt(nomeExib)+'</div>'+
+        (temNomeSocial?'<div class="painel-nome-legal">Nome legal: '+escTxt(a.NomeCompleto)+'</div>':'')+
+        '<div class="painel-id">'+(escTxt(a.AlunoID||''))+'</div>'+
       '</div></div>';
     html+='<div class="ficha-secao"><div class="ficha-secao-titulo">Dados pessoais</div>';
     html+=campo('Nascimento',fmtData(a.Nascimento))+campo('Gênero',a.Genero)+campo('Raça/Cor',a.Raca)+campo('Estado civil',a.EstadoCivil)+campo('Estrangeiro',a.Estrangeiro?'Sim':'Não')+'</div>';
@@ -1053,7 +1055,11 @@
     }
     if (a.PcDBoolean) {
       html+='<div class="ficha-secao"><div class="ficha-secao-titulo">Acessibilidade</div>'+campo('Deficiência',a.PcDTipo||'Não especificado');
-      if (a.PcDLaudoURL) html+=campo('Laudo','<a href="'+a.PcDLaudoURL+'" target="_blank">Ver laudo</a>');
+      // Laudo: só abre links http(s); o campo() protege o texto, então o link é montado aqui.
+      if (a.PcDLaudoURL) html+='<div class="ficha-campo"><span class="ficha-campo-label">Laudo</span><span class="ficha-campo-valor">'+
+        (/^https?:\/\//i.test(String(a.PcDLaudoURL).trim())
+          ? '<a href="'+escTxt(String(a.PcDLaudoURL).trim())+'" target="_blank" rel="noopener">Ver laudo</a>'
+          : escTxt(a.PcDLaudoURL))+'</span></div>';
       html+='</div>';
     }
     if (a.MenorBoolean) {
@@ -1126,7 +1132,7 @@
     var estaEntreAtivos = ativos.some(function(t){ return t.nome === valorAtual; });
     if (valorAtual && !estaEntreAtivos) {
       var inativo = state.tiposPublico.some(function(t){ return t.nome === valorAtual; });
-      html += '<option value="'+escHtml(valorAtual)+'">'+escHtml(valorAtual)+(inativo ? ' (tipo inativo)' : ' (fora da lista atual)')+'</option>';
+      html += '<option value="'+escHtml(valorAtual)+'">'+escHtml(valorAtual)+(escTxt(inativo ? ' (tipo inativo)' : ' (fora da lista atual)'))+'</option>';
     }
     sel.innerHTML = html;
     sel.value = valorAtual;
@@ -1197,21 +1203,21 @@
     if (!lista.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
     var editando = state.modoModal === 'editar';
     var html = '<div class="cpf-existente-titulo"><span class="material-icons-round">person_search</span>' +
-      (editando ? 'Este CPF já está no cadastro de outro aluno' : 'Já existe cadastro com este CPF') + '</div>';
+      (escTxt(editando ? 'Este CPF já está no cadastro de outro aluno' : 'Já existe cadastro com este CPF')) + '</div>';
     lista.forEach(function(a) {
       var n = normalizar(a);
       html += '<div class="cpf-existente-item"><div>' +
         '<div class="cpf-existente-nome">' + escHtml(n.NomeExibicao || '—') + '</div>' +
         '<div class="cpf-existente-meta">Código ' + escHtml(n.AlunoID || '—') +
         (n.Nascimento ? ' · nasc. ' + escHtml(fmtDataBR(n.Nascimento)) : '') +
-        ' · <strong>' + (n.SituacaoAluno ? 'Ativo' : 'Inativo') + '</strong></div></div>' +
+        ' · <strong>' + (escTxt(n.SituacaoAluno ? 'Ativo' : 'Inativo')) + '</strong></div></div>' +
         '<button type="button" class="btn-cpf-abrir" data-id="' + escHtml(a.id) + '">' +
         '<span class="material-icons-round">open_in_new</span>Abrir cadastro existente</button></div>';
     });
     var menor = el('f-menor') && el('f-menor').checked;
-    html += '<div class="cpf-existente-dica">' + (editando
+    html += '<div class="cpf-existente-dica">' + (escTxt(editando
       ? 'Confira o número: dois alunos não podem ter o mesmo CPF. Se for a mesma pessoa, use o cadastro existente.'
-      : 'Se for um aluno que está voltando, continue pelo cadastro existente (ele mantém o código; se estiver inativo, use "Ativar" na ficha). Se o CPF foi digitado errado, corrija-o.') +
+      : 'Se for um aluno que está voltando, continue pelo cadastro existente (ele mantém o código; se estiver inativo, use "Ativar" na ficha). Se o CPF foi digitado errado, corrija-o.')) +
       (menor
         ? '<br><strong>Aluno menor de idade:</strong> se este for o CPF do responsável (ex.: irmãos com o mesmo responsável), é possível salvar mesmo assim — o sistema pede confirmação.'
         : ' <em>Exceção: aluno menor de idade sem CPF próprio pode usar o CPF do responsável — marque "Menor de idade" para poder salvar.</em>') +
@@ -1430,11 +1436,11 @@
   // =========================================================
   function ocoBadgeTipo(tipo) {
     var mapaClass = { 'Ausencia avisada':'ausencia','Contato com responsavel':'contato','Observacao pedagogica':'pedagogica','Ocorrencia disciplinar':'disciplinar','Comunicado interno':'comunicado','Outro':'outro' };
-    return '<span class="oco-badge-tipo '+(mapaClass[tipo]||'outro')+'">'+tipo+'</span>';
+    return '<span class="oco-badge-tipo '+(escTxt(mapaClass[tipo]||'outro'))+'">'+escTxt(tipo)+'</span>';
   }
   function ocoBadgeStatus(status) {
     var ic = status === 'RESOLVIDA' ? 'check_circle' : 'schedule';
-    return '<span class="oco-badge-status '+status+'"><span class="material-icons-round">'+ic+'</span>'+status+'</span>';
+    return '<span class="oco-badge-status '+escTxt(status)+'"><span class="material-icons-round">'+escTxt(ic)+'</span>'+escTxt(status)+'</span>';
   }
   function ocoFmtData(d) {
     if (!d) return '---';
@@ -1494,9 +1500,9 @@
       html += '<div class="oco-vazio"><span class="material-icons-round">forum</span>Nenhuma ocorrencia registrada.</div>';
     } else {
       state.ocoLista.forEach(function(o) {
-        html += '<div class="oco-card" data-oco-id="'+o.OcorrenciaID+'">'+
-          '<div class="oco-card-header"><span class="oco-card-titulo">'+o.Titulo+'</span>'+ocoBadgeTipo(o.Tipo)+'</div>'+
-          '<div class="oco-card-meta">'+ocoBadgeStatus(o.Status)+'<span>'+ocoFmtData(o.DataCriacao)+'</span></div>'+
+        html += '<div class="oco-card" data-oco-id="'+escTxt(o.OcorrenciaID)+'">'+
+          '<div class="oco-card-header"><span class="oco-card-titulo">'+escTxt(o.Titulo)+'</span>'+ocoBadgeTipo(o.Tipo)+'</div>'+
+          '<div class="oco-card-meta">'+ocoBadgeStatus(o.Status)+'<span>'+escTxt(ocoFmtData(o.DataCriacao))+'</span></div>'+
         '</div>';
       });
     }
@@ -1535,9 +1541,9 @@
       acoesHtml += '<button class="btn-oco-acao excluir" id="btn-oco-excluir"><span class="material-icons-round">delete</span>Excluir</button>';
     }
     detalhe.innerHTML =
-      '<div class="oco-detalhe-header"><button class="btn-oco-voltar" id="btn-oco-voltar"><span class="material-icons-round">arrow_back</span>Voltar</button><span class="oco-detalhe-titulo">'+oco.Titulo+'</span></div>'+
-      '<div class="oco-detalhe-meta">'+ocoBadgeTipo(oco.Tipo)+ocoBadgeStatus(oco.Status)+'<span>'+ocoFmtData(oco.DataCriacao)+'</span></div>'+
-      '<div class="oco-detalhe-desc">'+oco.Descricao+'</div>'+
+      '<div class="oco-detalhe-header"><button class="btn-oco-voltar" id="btn-oco-voltar"><span class="material-icons-round">arrow_back</span>Voltar</button><span class="oco-detalhe-titulo">'+escTxt(oco.Titulo)+'</span></div>'+
+      '<div class="oco-detalhe-meta">'+ocoBadgeTipo(oco.Tipo)+ocoBadgeStatus(oco.Status)+'<span>'+escTxt(ocoFmtData(oco.DataCriacao))+'</span></div>'+
+      '<div class="oco-detalhe-desc">'+escTxt(oco.Descricao)+'</div>'+
       (acoesHtml?'<div class="oco-acoes-detalhe">'+acoesHtml+'</div>':'')+
       '<div class="oco-thread-titulo">Respostas</div>'+
       '<div id="oco-thread-corpo"><div class="oco-spinner"></div></div>'+
@@ -1582,9 +1588,9 @@
     var corpo = el('oco-thread-corpo'); if(!corpo) return;
     if (!respostas.length) { corpo.innerHTML='<p style="font-size:12.5px;color:var(--c-text-3,#9898B0);text-align:center;padding:12px 0;">Nenhuma resposta ainda.</p>'; return; }
     corpo.innerHTML = respostas.map(function(r) {
-      return '<div class="oco-msg'+(r.EhMinha?' minha':'')+'">'+
-        '<div class="oco-msg-bubble">'+r.Texto+'</div>'+
-        '<div class="oco-msg-autor">'+(r.EhMinha?'Você':r.AutorNome)+' - '+ocoFmtData(r.DataCriacao)+'</div>'+
+      return '<div class="oco-msg'+(escTxt(r.EhMinha?' minha':''))+'">'+
+        '<div class="oco-msg-bubble">'+escTxt(r.Texto)+'</div>'+
+        '<div class="oco-msg-autor">'+(escTxt(r.EhMinha?'Você':r.AutorNome))+' - '+escTxt(ocoFmtData(r.DataCriacao))+'</div>'+
       '</div>';
     }).join('');
     corpo.scrollTop = corpo.scrollHeight;
