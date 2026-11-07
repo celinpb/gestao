@@ -274,6 +274,8 @@
 </div>
 
 <script>
+// Protege texto vindo do banco antes de pôr na página (não deixa virar código).
+function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 (function(){
   'use strict';
   var S={turmas:[],turmaSel:null,matriculas:[],avaliacoes:[],notas:{},notasSalvas:{},comentarios:{},medias:{},papel:'',usuarioId:'',matComentario:null,etapaAtual:'1',enc:null,cursos:[],matSug:null};
@@ -313,8 +315,8 @@
     if(!estado)return;
     estado.style.display='block';
     var icone=tipo==='erro'?'error_outline':'assignment';
-    estado.innerHTML=(tipo==='carregando'?'<div class="n7-spinner"></div>':'<span class="material-icons-round">'+icone+'</span>')+
-      '<p>'+(msg||(tipo==='carregando'?'Carregando notas…':tipo==='erro'?'Erro ao carregar dados da turma.':'Nenhum aluno matriculado nesta turma.'))+'</p>';
+    estado.innerHTML=(tipo==='carregando'?'<div class="n7-spinner"></div>':'<span class="material-icons-round">'+escTxt(icone)+'</span>')+
+      '<p>'+(escTxt(msg||(tipo==='carregando'?'Carregando notas…':tipo==='erro'?'Erro ao carregar dados da turma.':'Nenhum aluno matriculado nesta turma.')))+'</p>';
   }
 
   // ── TURMAS ─────────────────────────────────────────────────────────────
@@ -327,7 +329,7 @@
       if(el('n7-turmas-loading'))el('n7-turmas-loading').style.display='none';
       var grid=el('n7-turma-grid');
       if(!res.sucesso){
-        if(grid){grid.style.display='grid';grid.innerHTML='<p style="color:#E63946;font-size:13px;grid-column:1/-1;">Erro: '+(res.mensagem||'Falha ao carregar turmas.')+'</p>';}
+        if(grid){grid.style.display='grid';grid.innerHTML='<p style="color:#E63946;font-size:13px;grid-column:1/-1;">Erro: '+(escTxt(res.mensagem||'Falha ao carregar turmas.'))+'</p>';}
         return;
       }
       // _turmasListar devolve um array plano em res.dados (não paginado)
@@ -340,7 +342,7 @@
       }
       S.turmas.forEach(function(t){
         var card=document.createElement('div');card.className='n7-turma-card';card.dataset.turmaId=String(t.TurmaID);
-        card.innerHTML='<div class="n7-turma-id">'+t.TurmaID+'</div><div class="n7-turma-estagio">'+(t.Estagio||t.CursoSigla||'—')+'</div>';
+        card.innerHTML='<div class="n7-turma-id">'+escTxt(t.TurmaID)+'</div><div class="n7-turma-estagio">'+(escTxt(t.Estagio||t.CursoSigla||'—'))+'</div>';
         card.addEventListener('click',function(){selecionarTurma(t);});
         grid.appendChild(card);
       });
@@ -411,7 +413,7 @@
     cont.innerHTML='';
     S.avaliacoes.forEach(function(av,idx){
       var span=document.createElement('span');span.className='n7-legenda-item';
-      span.innerHTML='<span class="n7-legenda-dot" style="background:'+corComponente(idx)+';"></span>'+(av.ComponenteNota||'—')+' · aprovação: '+fmtNum(av.NotaAprovacao);
+      span.innerHTML='<span class="n7-legenda-dot" style="background:'+escTxt(corComponente(idx))+';"></span>'+(escTxt(av.ComponenteNota||'—'))+' · aprovação: '+escTxt(fmtNum(av.NotaAprovacao));
       cont.appendChild(span);
     });
     renderizarEscala();
@@ -430,9 +432,9 @@
     var txt;
     if(uniforme){
       var a=S.avaliacoes[0];
-      txt='<strong>Escala de notas: '+fmtNum(a.NotaMinima)+' a '+fmtNum(a.NotaMaxima)+'.</strong> Para aprovação, o aluno precisa de média mínima <strong>'+fmtNum(a.NotaAprovacao)+'</strong> em <strong>cada</strong> componente'+(nomes.length?' ('+nomes.join(', ')+')':'')+'.';
+      txt='<strong>Escala de notas: '+escTxt(fmtNum(a.NotaMinima))+' a '+escTxt(fmtNum(a.NotaMaxima))+'.</strong> Para aprovação, o aluno precisa de média mínima <strong>'+escTxt(fmtNum(a.NotaAprovacao))+'</strong> em <strong>cada</strong> componente'+(escTxt(nomes.length?' ('+nomes.join(', ')+')':''))+'.';
     } else {
-      txt='<strong>Escala de notas por componente:</strong> '+S.avaliacoes.map(function(av){return av.ComponenteNota+': '+fmtNum(av.NotaMinima)+' a '+fmtNum(av.NotaMaxima)+', aprovação '+fmtNum(av.NotaAprovacao);}).join(' · ')+'. A aprovação exige a média mínima em <strong>cada</strong> componente.';
+      txt='<strong>Escala de notas por componente:</strong> '+escTxt(S.avaliacoes.map(function(av){return av.ComponenteNota+': '+fmtNum(av.NotaMinima)+' a '+fmtNum(av.NotaMaxima)+', aprovação '+fmtNum(av.NotaAprovacao);}).join(' · '))+'. A aprovação exige a média mínima em <strong>cada</strong> componente.';
     }
     box.innerHTML='<span class="material-icons-round">info</span><span>'+txt+'</span>';
     box.style.display='flex';
@@ -481,7 +483,7 @@
     S.matriculas.forEach(function(m){
       var tr=document.createElement('tr');
       var tdNome=document.createElement('td');
-      tdNome.innerHTML='<div class="n7-nome">'+(m.NomeExibicao||m.AlunoID||'—')+'</div><div class="n7-mat-id">'+(m.MatriculaID||'—')+'</div>';
+      tdNome.innerHTML='<div class="n7-nome">'+(escTxt(m.NomeExibicao||m.AlunoID||'—'))+'</div><div class="n7-mat-id">'+(escTxt(m.MatriculaID||'—'))+'</div>';
       tr.appendChild(tdNome);
       colunas.forEach(function(col){
         var td=document.createElement('td');
@@ -540,9 +542,9 @@
     var medias=media.componentes.map(function(c){return c.Media!==null?c.Media:'—';}).join(' / ');
     var sit= temPendente ? 'PENDENTE' : (media.aprovado?'APROVADO':'REPROVADO');
     var classeMedia = temPendente?'pend':(media.aprovado?'ap':'rep');
-    tdM.innerHTML='<span class="n7-media '+classeMedia+'">'+medias+'</span>';
+    tdM.innerHTML='<span class="n7-media '+escTxt(classeMedia)+'">'+escTxt(medias)+'</span>';
     // Nomenclatura da escola: nota abaixo da média = RETIDO (a frequência é vista no Diário/encerramento).
-    tdS.innerHTML='<span class="badge-n7 '+sit+'">'+(sit==='REPROVADO'?'RETIDO':sit)+'</span>';
+    tdS.innerHTML='<span class="badge-n7 '+escTxt(sit)+'">'+(escTxt(sit==='REPROVADO'?'RETIDO':sit))+'</span>';
   }
 
   function salvarNotas(){
@@ -689,17 +691,17 @@
     var st, txt;
     if(t.concluida_em){
       st='<span class="n7-enc-st concluida"><span class="material-icons-round">verified</span>Concluída</span>';
-      txt='Concluída pela coordenação em <b>'+fmtDataHora(t.concluida_em)+'</b>'+(t.concluida_por?' ('+escN(t.concluida_por)+')':'')+'. Notas e frequência estão travadas; para corrigir, peça à coordenação para reabrir.';
+      txt='Concluída pela coordenação em <b>'+escTxt(fmtDataHora(t.concluida_em))+'</b>'+(t.concluida_por?' ('+escN(t.concluida_por)+')':'')+'. Notas e frequência estão travadas; para corrigir, peça à coordenação para reabrir.';
     } else if(t.entregue_em){
       st='<span class="n7-enc-st entregue"><span class="material-icons-round">outbox</span>Entregue</span>';
-      txt='Entregue em <b>'+fmtDataHora(t.entregue_em)+'</b>'+(t.entregue_por?' ('+escN(t.entregue_por)+')':'')+'. Ainda é possível corrigir até a coordenação concluir a turma.'+
-        (faltas.length?' <span class="falta">Atenção: '+faltas.join('; ')+'.</span>':'');
+      txt='Entregue em <b>'+escTxt(fmtDataHora(t.entregue_em))+'</b>'+(t.entregue_por?' ('+escN(t.entregue_por)+')':'')+'. Ainda é possível corrigir até a coordenação concluir a turma.'+
+        (faltas.length?' <span class="falta">Atenção: '+escTxt(faltas.join('; '))+'.</span>':'');
     } else {
       st='<span class="n7-enc-st aberta"><span class="material-icons-round">edit_note</span>Em aberto</span>';
-      txt=faltas.length?'Para entregar: <span class="falta">'+faltas.join('; ')+'</span>.':'Notas e frequência completas: a turma já pode ser entregue.';
+      txt=faltas.length?'Para entregar: <span class="falta">'+escTxt(faltas.join('; '))+'</span>.':'Notas e frequência completas: a turma já pode ser entregue.';
     }
     var btn=(!t.concluida_em&&podeEntregar())
-      ? '<button class="btn-n7-entregar" id="btn-n7-entregar"><span class="material-icons-round">outbox</span>'+(t.entregue_em?'Entregar de novo':'Entregar turma')+'</button>' : '';
+      ? '<button class="btn-n7-entregar" id="btn-n7-entregar"><span class="material-icons-round">outbox</span>'+(escTxt(t.entregue_em?'Entregar de novo':'Entregar turma'))+'</button>' : '';
     box.innerHTML=st+'<div class="n7-enc-txt">'+txt+'</div>'+btn;
     box.style.display='flex';
     if(el('btn-n7-entregar'))el('btn-n7-entregar').addEventListener('click',abrirEntrega);
@@ -718,7 +720,7 @@
       var semNota=(S.enc.alunos||[]).filter(function(a){return a.situacao==='ATIVA'&&a.falta_nota;}).map(function(a){return escN(a.aluno);});
       corpo.innerHTML='<p class="n7-aviso-box erro">A turma só pode ser entregue com <b>notas e frequência completas</b>. Falta:</p><ul class="n7-pend-lista">'+
         (semNota.length?'<li><b>Notas</b> de: '+semNota.join(', ')+'</li>':'')+
-        (aulas.length?'<li><b>Frequência</b> nas aulas de: '+aulas.map(function(a){return a.data.split('-').reverse().slice(0,2).join('/')+(a.alunos>1?' ('+a.alunos+' alunos)':' (1 aluno)');}).join(', ')+'</li>':'')+
+        (aulas.length?'<li><b>Frequência</b> nas aulas de: '+escTxt(aulas.map(function(a){return a.data.split('-').reverse().slice(0,2).join('/')+(a.alunos>1?' ('+a.alunos+' alunos)':' (1 aluno)');}).join(', '))+'</li>':'')+
         '</ul><p class="n7-aviso-box" style="margin-top:10px;">Lance o que falta (Diário de aula e Notas) e tente de novo.</p>';
       ok.style.display='none';
     } else {
@@ -745,8 +747,8 @@
     if(!S.enc){ b.style.display='none'; return b; }
     if(sg){
       b.className='btn-n7-sug '+sg.status;
-      b.innerHTML='<span class="material-icons-round">'+(sg.status==='aprovada'?'check_circle':sg.status==='recusada'?'cancel':'schedule')+'</span>'+
-        escN(NOME_SUG[sg.tipo]||'')+' → '+escN(sg.curso?sg.curso.sigla:'')+(sg.status==='pendente'?' (aguardando)':sg.status==='aprovada'?' (aprovada)':' (recusada)');
+      b.innerHTML='<span class="material-icons-round">'+(escTxt(sg.status==='aprovada'?'check_circle':sg.status==='recusada'?'cancel':'schedule'))+'</span>'+
+        escN(NOME_SUG[sg.tipo]||'')+' → '+escN(sg.curso?sg.curso.sigla:'')+(escTxt(sg.status==='pendente'?' (aguardando)':sg.status==='aprovada'?' (aprovada)':' (recusada)'));
       b.title=(sg.motivo||'')+(sg.decisao_motivo?'\nCoordenação: '+sg.decisao_motivo:'');
     } else if(dest){
       b.className='btn-n7-sug aprovada';
