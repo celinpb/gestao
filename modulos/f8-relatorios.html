@@ -1507,7 +1507,8 @@
     if(window.__xlsxCarregando) return window.__xlsxCarregando;
     window.__xlsxCarregando = new Promise(function(resolve, reject){
       var script=document.createElement('script');
-      script.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      script.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      script.integrity='sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw'; script.crossOrigin='anonymous';
       script.onload=function(){ resolve(window.XLSX); };
       script.onerror=function(){ window.__xlsxCarregando=null; reject(new Error('Não foi possível carregar a biblioteca de exportação XLSX. Verifique a conexão e tente novamente.')); };
       document.head.appendChild(script);
