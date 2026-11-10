@@ -2,6 +2,7 @@
   F7_Notas.html
   Lançamento de notas: seleciona turma → tabela com todos os alunos,
   campos por componente/subcomponente, média automática, situação e comentários.
+  Frequência do aluno até hoje ao lado da matrícula (10/11/2026).
 -->
 <style>
   /* =========================================================
@@ -51,7 +52,16 @@
   .n7-tabela td:first-child{text-align:left;padding:8px 14px;border-right:1px solid var(--c-border,#E8E7E2);}
   .n7-tabela td:last-child{border-right:none;}
   .n7-nome{font-weight:500;font-size:13px;color:var(--c-text-1,#1A1A2E);}
-  .n7-mat-id{font-size:10.5px;font-family:var(--font-mono,monospace);color:var(--c-text-3,#9898B0);}
+  .n7-mat-id{font-size:10.5px;font-family:var(--font-mono,monospace);color:var(--c-text-3,#9898B0);display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+
+  /* Frequência do aluno até hoje (ao lado da matrícula) */
+  .n7-freq{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:99px;font-family:var(--font-sans,sans-serif);font-size:10.5px;font-weight:600;white-space:nowrap;cursor:help;}
+  .n7-freq .material-icons-round{font-size:12px;}
+  .n7-freq.ok{background:rgba(42,157,143,0.12);color:#1A6E65;}
+  .n7-freq.atencao{background:rgba(233,196,106,0.30);color:#7A5600;}
+  .n7-freq.critico{background:rgba(230,57,70,0.14);color:#A32D2D;}
+  .n7-freq.sem{background:#F5F4F0;color:var(--c-text-3,#9898B0);font-weight:500;}
+  .n7-legenda-item.n7-legenda-freq{gap:8px;}
 
   /* Aviso de escala de notas */
   .n7-escala{display:flex;align-items:flex-start;gap:8px;background:rgba(69,123,157,0.08);border:1px solid rgba(69,123,157,0.30);color:#1D4E6E;border-radius:8px;padding:10px 14px;font-size:13px;line-height:1.5;margin-bottom:12px;}
@@ -278,7 +288,7 @@
 function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 (function(){
   'use strict';
-  var S={turmas:[],turmaSel:null,matriculas:[],avaliacoes:[],notas:{},notasSalvas:{},comentarios:{},medias:{},papel:'',usuarioId:'',matComentario:null,etapaAtual:'1',enc:null,cursos:[],matSug:null};
+  var S={turmas:[],turmaSel:null,matriculas:[],avaliacoes:[],freq:{},notas:{},notasSalvas:{},comentarios:{},medias:{},papel:'',usuarioId:'',matComentario:null,etapaAtual:'1',enc:null,cursos:[],matSug:null};
   // Escala oficial de notas (10/2026): 0 a 100, aprovação com média 70 em
   // CADA componente. Os valores vêm da tabela `avaliacoes` (já cadastrados
   // assim); estes números só valem se algum campo estiver vazio no banco.
@@ -353,7 +363,7 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
   }
 
   function selecionarTurma(t){
-    S.turmaSel=t;S.matriculas=[];S.notas={};S.notasSalvas={};S.comentarios={};S.medias={};S.avaliacoes=[];
+    S.turmaSel=t;S.matriculas=[];S.freq={};S.notas={};S.notasSalvas={};S.comentarios={};S.medias={};S.avaliacoes=[];
     document.querySelectorAll('.n7-turma-card').forEach(function(c){c.classList.toggle('sel',c.dataset.turmaId===String(t.TurmaID));});
     if(el('n7-header-id'))el('n7-header-id').textContent=t.TurmaID;
     if(el('n7-header-titulo'))el('n7-header-titulo').textContent=t.Estagio||t.CursoSigla||'—';
@@ -369,6 +379,7 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
       postApi('cursos.listar',{}),
       postApi('avaliacoes.listar',{}),
       carregarEncerramento(t),
+      postApi('frequencias.listar',{turma_id:t.id}),
     ]).then(function(results){
       if(!results[0].sucesso){mostrarEstado('erro');return;}
       // Ativas; e, com a turma concluída pela coordenação, as concluídas (só leitura).
@@ -384,6 +395,7 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
       var idsAvCurso=cursoRaw&&cursoRaw.curso_avaliacoes?(cursoRaw.curso_avaliacoes.map(function(ca){return ca.avaliacao_id;})):[];
       S.avaliacoes=todasAv.filter(function(a){return idsAvCurso.indexOf(a.id)!==-1;});
       if(!S.avaliacoes.length) S.avaliacoes=todasAv; // fallback: mostrar todas
+      S.freq=resumirFrequencias((results[4]&&results[4].sucesso&&results[4].dados)?results[4].dados:[]);
       renderizarLegenda();
 
       if(!S.matriculas.length){ mostrarEstado('vazio'); return; }
@@ -416,7 +428,43 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
       span.innerHTML='<span class="n7-legenda-dot" style="background:'+escTxt(corComponente(idx))+';"></span>'+(escTxt(av.ComponenteNota||'—'))+' · aprovação: '+escTxt(fmtNum(av.NotaAprovacao));
       cont.appendChild(span);
     });
+    var lf=document.createElement('span');lf.className='n7-legenda-item n7-legenda-freq';
+    lf.innerHTML='Frequência até hoje: <span class="n7-freq ok">85% ou mais</span><span class="n7-freq atencao">75% a 84%</span><span class="n7-freq critico">abaixo de 75%</span>';
+    cont.appendChild(lf);
     renderizarEscala();
+  }
+
+  // ── FREQUÊNCIA DO ALUNO ATÉ HOJE ─────────────────────────────────────────
+  // Mesma regra dos relatórios: frequência = (presenças + justificadas) ÷
+  // aulas registradas, contando só as datas até hoje. Abaixo de 75% =
+  // retido por faltas; de 75% a 84%, aviso amarelo para o professor
+  // acompanhar o aluno.
+  function hojeISO(){
+    try{ return new Date().toLocaleDateString('sv-SE',{timeZone:'America/Fortaleza'}); }
+    catch(e){ return new Date().toISOString().substring(0,10); }
+  }
+  function resumirFrequencias(lista){
+    var hj=hojeISO(), mapa={};
+    lista.forEach(function(f){
+      var iso=String(f.data_aula||'').substring(0,10);
+      if(!iso||iso>hj)return;
+      var r=mapa[f.matricula_id]=mapa[f.matricula_id]||{p:0,f:0,j:0,total:0};
+      if(f.frequencia==='P')r.p++; else if(f.frequencia==='F')r.f++; else if(f.frequencia==='J')r.j++; else return;
+      r.total++;
+    });
+    return mapa;
+  }
+  function seloFrequencia(matId){
+    var r=S.freq[matId];
+    if(!r||!r.total) return '<span class="n7-freq sem" title="Nenhuma aula com frequência registrada para este aluno até hoje.">sem frequência</span>';
+    var pct=Math.round((r.p+r.j)/r.total*100);
+    var cls=pct<75?'critico':(pct<85?'atencao':'ok');
+    var icone=pct<75?'warning':(pct<85?'error_outline':'check_circle');
+    var dica='Frequência até hoje: '+pct+'% · '+r.total+' aula(s) registrada(s): '+r.p+' presença(s), '+r.f+' falta(s)'+
+      (r.j?', '+r.j+' justificada(s)':'')+'. Justificadas contam como presença.'+
+      (pct<75?' Abaixo de 75%: retido por faltas.':(pct<85?' Perto do limite de 75%.':''));
+    return '<span class="n7-freq '+cls+'" title="'+escTxt(dica)+'"><span class="material-icons-round">'+icone+'</span>'+pct+'%'+
+      (r.f?' · '+r.f+(r.f===1?' falta':' faltas'):'')+'</span>';
   }
 
   function fmtNum(v){return String(v).replace('.',',');}
@@ -483,7 +531,7 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
     S.matriculas.forEach(function(m){
       var tr=document.createElement('tr');
       var tdNome=document.createElement('td');
-      tdNome.innerHTML='<div class="n7-nome">'+(escTxt(m.NomeExibicao||m.AlunoID||'—'))+'</div><div class="n7-mat-id">'+(escTxt(m.MatriculaID||'—'))+'</div>';
+      tdNome.innerHTML='<div class="n7-nome">'+(escTxt(m.NomeExibicao||m.AlunoID||'—'))+'</div><div class="n7-mat-id"><span>'+(escTxt(m.MatriculaID||'—'))+'</span>'+seloFrequencia(m.id)+'</div>';
       tr.appendChild(tdNome);
       colunas.forEach(function(col){
         var td=document.createElement('td');
