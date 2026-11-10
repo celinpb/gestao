@@ -5,6 +5,7 @@
   Frequência por turma, Resultados por turma, Alunos por turma com campos selecionados,
   Alunos com faltas (admin/coordenação/secretaria).
   Grade de turmas por professor (admin/coordenação — etapa 28).
+  Notas por turma (admin/coordenação/professor — 10/11/2026).
 -->
 <style>
   /* =========================================================
@@ -150,6 +151,17 @@
   .r8-folha.paisagem{width:297mm;min-height:210mm;}
   .r8-grade-freq th,.r8-grade-freq td{padding:3px 4px;font-size:7.5pt;}
   .r8-grade-freq td.c{text-align:center;}
+  /* Grade de frequência: na impressão, a tabela ocupa toda a largura da
+     folha paisagem, sem barra de rolagem (10/11/2026). */
+  .r8-grade-freq-wrap{overflow-x:auto;}
+  @media print{
+    .r8-grade-freq-wrap{overflow:visible !important;}
+    .r8-grade-freq.r8-grade-freq-cal{table-layout:fixed;width:100%;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .r8-grade-freq.r8-grade-freq-cal th,.r8-grade-freq.r8-grade-freq-cal td{padding:2px 1px;font-size:inherit;}
+    .r8-grade-freq.r8-grade-freq-cal th.r8gf-nome{width:42mm;}
+    .r8-grade-freq.r8-grade-freq-cal td.r8gf-nome{white-space:normal !important;padding:2px 4px;}
+    .r8-grade-freq.r8-grade-freq-cal tr{break-inside:avoid;page-break-inside:avoid;}
+  }
   .r8-preview-wrap{overflow-x:auto;}
 
   /* Cabeçalho institucional */
@@ -240,6 +252,32 @@
   .r8g-obs{font-size:7pt;color:#5C5C7A;margin-top:6px;line-height:1.4;}
 
   /* =========================================================
+     NOTAS POR TURMA (10/11/2026)
+  ========================================================= */
+  .r8n-tab{width:100%;border-collapse:collapse;font-size:7.5pt;margin-bottom:8px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .r8n-tab th,.r8n-tab td{border:1px solid #D8D7D2;padding:3px 4px;text-align:center;vertical-align:middle;}
+  .r8n-tab thead th{background:#1A1A2E;color:#fff;font-weight:600;font-size:7pt;}
+  .r8n-tab thead tr.r8n-comp th{font-size:7.5pt;}
+  .r8n-tab th.r8n-nome,.r8n-tab td.r8n-nome{text-align:left;}
+  .r8n-tab td.r8n-nome{white-space:nowrap;}
+  .r8n-tab .r8n-ini{border-left:2px solid #1A1A2E;}
+  .r8n-tab td.r8n-media{font-weight:700;background:#F8F7F3;}
+  .r8n-tab td.r8n-abaixo{color:#A32D2D;}
+  .r8n-tab td.r8n-media.r8n-abaixo{background:rgba(230,57,70,0.12);}
+  .r8n-tab td.r8n-media.r8n-ok{color:#1A6E65;background:rgba(42,157,143,0.12);}
+  .r8n-tab td.r8n-vazio{color:#C8C7C2;}
+  .r8n-tab tbody tr:nth-child(even) td{background-color:#FBFAF7;}
+  .r8n-tab tbody tr:nth-child(even) td.r8n-media.r8n-ok{background:rgba(42,157,143,0.12);}
+  .r8n-tab tbody tr:nth-child(even) td.r8n-media.r8n-abaixo{background:rgba(230,57,70,0.12);}
+  .r8n-tab tfoot td{background:#F0EEE8;font-weight:600;font-size:7pt;}
+  .r8n-tab tfoot td.r8n-nome{text-transform:uppercase;letter-spacing:0.3px;color:#5C5C7A;}
+  .r8n-tab tr{break-inside:avoid;page-break-inside:avoid;}
+  .r8n-sit{display:inline-block;padding:1px 6px;border-radius:8px;font-size:6.5pt;font-weight:700;white-space:nowrap;}
+  .r8n-sit.APROVADO{background:rgba(42,157,143,0.15);color:#1A6E65;}
+  .r8n-sit.REPROVADO{background:rgba(230,57,70,0.12);color:#A32D2D;}
+  .r8n-sit.PENDENTE{background:#F0EEE8;color:#5C5C7A;}
+
+  /* =========================================================
      CSS DE IMPRESSÃO
   ========================================================= */
   @media print {
@@ -280,6 +318,11 @@
     <div class="r8-tipo-icone"><span class="material-icons-round">grade</span></div>
     <div class="r8-tipo-nome">Resultados por turma</div>
     <div class="r8-tipo-desc">Médias, aprovados, retidos e retidos por faltas</div>
+  </div>
+  <div class="r8-tipo-card" data-tipo="notas-turma">
+    <div class="r8-tipo-icone"><span class="material-icons-round">format_list_numbered</span></div>
+    <div class="r8-tipo-nome">Notas por turma</div>
+    <div class="r8-tipo-desc">Cada nota lançada e a média de cada componente do curso, aluno por aluno (paisagem)</div>
   </div>
   <div class="r8-tipo-card" data-tipo="alunos-turma-campos">
     <div class="r8-tipo-icone"><span class="material-icons-round">table_chart</span></div>
@@ -706,12 +749,17 @@
     turmas: [], semestres: [], semestreAtual: null, config: {},
     avaliacoes: [], cursos: [], calendario: [], papel: '', usuarioId: '',
     tipoAtual: '', alunosTodos: null, ultimoAlunosTurmaCampos: null,
-    ultimoAlunosFaltas: null, ultimoEvasao: null, ultimaGrade: null
+    ultimoAlunosFaltas: null, ultimoEvasao: null, ultimaGrade: null, ultimasNotasTurma: null
   };
 
   // "Grade por professor" (etapa 28): só admin e coordenação. O card fica
   // escondido para os demais papéis, e o banco recusa do mesmo jeito.
   var PAPEIS_GRADE = ['admin', 'coordenacao'];
+
+  // "Notas por turma" (10/11/2026): admin, coordenação e professor. O
+  // professor só vê as próprias turmas, porque a lista de turmas já vem
+  // filtrada pelo banco (RLS de `turmas`).
+  var PAPEIS_NOTAS_TURMA = ['admin', 'coordenacao', 'professor'];
 
   // "Alunos com faltas": só admin, coordenação e secretaria (o card fica
   // escondido para qualquer outro papel, e o gerador recusa).
@@ -734,6 +782,10 @@
   var TIPOS_OCULTOS_PROFESSOR = ['alunos-geral', 'condensado'];
 
   function aplicarRestricoesPapel(){
+    if(PAPEIS_NOTAS_TURMA.indexOf(S.papel) === -1){
+      var cardNotas = document.querySelector('.r8-tipo-card[data-tipo="notas-turma"]');
+      if(cardNotas) cardNotas.style.display = 'none';
+    }
     if(PAPEIS_GRADE.indexOf(S.papel) === -1){
       var cardGrade = document.querySelector('.r8-tipo-card[data-tipo="grade-professores"]');
       if(cardGrade) cardGrade.style.display = 'none';
@@ -994,10 +1046,11 @@
     'alunos-turma-campos':'Alunos por turma (campos)','conteudo-turma':'Conteúdos da turma',
     'grade-frequencia':'Grade de frequência','alunos-faltas':'Alunos com faltas',
     'evasao':'Transferências, desistência e evasão',
-    'grade-professores':'Grade por professor'
+    'grade-professores':'Grade por professor',
+    'notas-turma':'Notas por turma'
   };
-  var TIPOS_COM_TURMA=['boletim','turmas-alunos','frequencia-turma','resultados-turma','alunos-turma-campos','conteudo-turma','grade-frequencia'];
-  var TIPOS_OUTRAS_SIT=['boletim','alunos-turma-campos','turmas-alunos','frequencia-turma','resultados-turma','grade-frequencia'];
+  var TIPOS_COM_TURMA=['boletim','turmas-alunos','frequencia-turma','resultados-turma','notas-turma','alunos-turma-campos','conteudo-turma','grade-frequencia'];
+  var TIPOS_OUTRAS_SIT=['boletim','alunos-turma-campos','turmas-alunos','frequencia-turma','resultados-turma','notas-turma','grade-frequencia'];
 
   function configurarParametrosPadrao(tipo){
     var precisaTurma = TIPOS_COM_TURMA.indexOf(tipo)!==-1;
@@ -1119,6 +1172,11 @@
     var win=window.open('','_blank');
     if(!win){ alert('Permita pop-ups neste site para imprimir/gerar PDF.'); return; }
     var estilos=Array.prototype.map.call(document.querySelectorAll('style'), function(s){return s.textContent;}).join('\n');
+    // Relatórios montados em folha paisagem (297 mm de largura) saem em A4
+    // deitado; antes a página saía em retrato e a tabela ficava cortada ou
+    // reduzida. Vale para Grade de frequência e os demais relatórios em
+    // paisagem.
+    if(/class="r8-folha paisagem/.test(htmlConteudo)) estilos+='\n@media print{@page{size:A4 landscape;margin:0;} .r8-folha.paisagem{min-height:0;}}';
     win.document.open();
     win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório</title><style>'+estilos+'</style></head><body>'+htmlConteudo+'</body></html>');
     win.document.close();
@@ -1180,7 +1238,8 @@
       ((S.tipoAtual==='alunos-turma-campos' && S.ultimoAlunosTurmaCampos) ||
        (S.tipoAtual==='alunos-faltas' && S.ultimoAlunosFaltas) ||
        (S.tipoAtual==='evasao' && S.ultimoEvasao) ||
-       (S.tipoAtual==='grade-professores' && S.ultimaGrade)) ? 'inline-flex' : 'none';
+       (S.tipoAtual==='grade-professores' && S.ultimaGrade) ||
+       (S.tipoAtual==='notas-turma' && S.ultimasNotasTurma)) ? 'inline-flex' : 'none';
   }
   function mostrarEstadoVazio(msg){
     mostrarPreview(TITULOS_TIPO[S.tipoAtual]||'Relatório', '<p class="r8-estado">'+esc(msg)+'</p>');
@@ -1206,6 +1265,11 @@
     // — evita o botão "Baixar XLSX" reaparecer com dados de uma turma/tipo
     // anterior depois que o usuário troca de relatório.
     if(tipo!=='alunos-turma-campos') S.ultimoAlunosTurmaCampos=null;
+    S.ultimasNotasTurma=null;
+    if(tipo==='notas-turma' && PAPEIS_NOTAS_TURMA.indexOf(S.papel)===-1){
+      alert('Este relatório não está disponível para o seu papel.');
+      return;
+    }
 
     var turmaId=val('r8-param-turma');
     var alunoFiltro=val('r8-param-aluno');
@@ -1230,6 +1294,7 @@
     else if(tipo==='alunos-geral')    promessa=gerarAlunosGeral(incluirInativos);
     else if(tipo==='frequencia-turma')promessa=gerarFrequenciaTurma(turmaId, incluirOutras);
     else if(tipo==='resultados-turma')promessa=gerarResultadosTurma(turmaId, incluirOutras);
+    else if(tipo==='notas-turma')     promessa=gerarNotasTurma(turmaId, incluirOutras);
     else if(tipo==='alunos-turma-campos') promessa=gerarAlunosTurmaCampos(turmaId, camposSel, incluirOutras);
     else if(tipo==='conteudo-turma')  promessa=gerarConteudoTurma(turmaId);
     else if(tipo==='grade-frequencia')promessa=gerarGradeFrequencia(turmaId, incluirOutras);
@@ -1522,6 +1587,171 @@
     });
   }
 
+  // ── 5b) NOTAS POR TURMA (10/11/2026) ────────────────────────────────────
+  // Uma linha por aluno e, para cada componente de nota do curso da turma
+  // (curso_avaliacoes, na ordem cadastrada), uma coluna por nota lançada e a
+  // média. Mesmo cálculo do Boletim e de Resultados por turma
+  // (calcularResultadoComponente): média só quando todas as notas do
+  // componente estão lançadas; abaixo da nota de aprovação = vermelho.
+  // Rodapé: média da turma, quantos ficaram abaixo e quantos estão sem nota.
+  // Situação = só pelas notas (Aprovado / Retido / Pendente); a frequência
+  // fica nos relatórios de frequência e de resultados.
+  function fmtNota(v){
+    if(v===null || v===undefined || v==='') return '';
+    var n=parseFloat(v);
+    if(isNaN(n)) return String(v);
+    return (Math.round(n*10)/10).toLocaleString('pt-BR');
+  }
+
+  function gerarNotasTurma(turmaId, incluirOutras){
+    var turma=S.turmas.find(function(t){return t.id===turmaId;});
+    return postApi('matriculas.listar',{turma_id:turmaId}).then(function(r){
+      var matriculas=(r.sucesso&&r.dados)?r.dados.map(normM).sort(porNome):[];
+      if(!incluirOutras) matriculas=matriculas.filter(ehMatriculaCorrente);
+      if(!matriculas.length){ mostrarEstadoVazio('Nenhum aluno encontrado nesta turma.'); return; }
+      var avals=avaliacoesDaTurma(turma);
+      if(!avals.length){ mostrarEstadoVazio('O curso desta turma não tem componentes de nota cadastrados.'); return; }
+      return Promise.all(matriculas.map(function(m){ return postApi('notas.listar',{matricula_id:m.id}); })).then(function(dados){
+        var rotSit={APROVADO:'Aprovado', REPROVADO:'Retido', PENDENTE:'Pendente'};
+        var cont={APROVADO:0, REPROVADO:0, PENDENTE:0};
+
+        // Colunas: por componente, as notas (1…n) e a média; com uma nota só, só "Nota".
+        var colunas=[];
+        avals.forEach(function(av, ia){
+          var n=Math.max(1, av.QntNotas||1);
+          if(n===1){
+            colunas.push({ia:ia, tipo:'media', rot:'Nota', ini:true});
+          } else {
+            for(var i=0;i<n;i++) colunas.push({ia:ia, tipo:'sub', idx:i, rot:String(i+1), ini:i===0});
+            colunas.push({ia:ia, tipo:'media', rot:'Média', ini:false});
+          }
+        });
+
+        var linhas=matriculas.map(function(m, idx){
+          var notas=(dados[idx].sucesso&&dados[idx].dados)?dados[idx].dados.map(normNota):[];
+          var comps=avals.map(function(av){ return calcularResultadoComponente(av, notas); });
+          var pend=comps.some(function(c){return c.situacao==='PENDENTE';});
+          var rep=comps.some(function(c){return c.situacao==='REPROVADO';});
+          var sit= pend ? 'PENDENTE' : (rep ? 'REPROVADO' : 'APROVADO');
+          cont[sit]++;
+          return {m:m, comps:comps, sit:sit};
+        });
+
+        // Valor de uma coluna para um aluno
+        function valorColuna(l, c){
+          var comp=l.comps[c.ia];
+          if(c.tipo==='media'){
+            if(comp.media!==null) return comp.media;
+            // componente de uma nota só ainda sem média: mostra a nota, se houver
+            if(comp.subs.length===1 && comp.subs[0].valor!==null) return parseFloat(comp.subs[0].valor);
+            return null;
+          }
+          var s=comp.subs[c.idx];
+          return (s && s.valor!==null) ? parseFloat(s.valor) : null;
+        }
+        function abaixo(c, v){
+          var ap=avals[c.ia].NotaAprovacao;
+          return v!==null && ap!==null && ap!==undefined && v<ap;
+        }
+
+        var thComp='', thSub='';
+        avals.forEach(function(av, ia){
+          var cols=colunas.filter(function(c){return c.ia===ia;});
+          var ap=(av.NotaAprovacao!==null && av.NotaAprovacao!==undefined)?' (mín. '+fmtNota(av.NotaAprovacao)+')':'';
+          thComp+='<th class="r8n-ini" colspan="'+cols.length+'">'+esc(av.ComponenteNota)+esc(ap)+'</th>';
+          cols.forEach(function(c){ thSub+='<th'+(c.ini?' class="r8n-ini"':'')+'>'+esc(c.rot)+'</th>'; });
+        });
+        var mostrarSitMat = incluirOutras;
+        var cab='<thead><tr class="r8n-comp"><th rowspan="2">#</th><th class="r8n-nome" rowspan="2">Aluno</th>'+
+          thComp+'<th class="r8n-ini" rowspan="2">Situação</th></tr><tr>'+thSub+'</tr></thead>';
+
+        var corpo='', linhasXlsx=[];
+        linhas.forEach(function(l, i){
+          var badge=(mostrarSitMat && !ehMatriculaCorrente(l.m))
+            ? ' <span class="r8n-sit PENDENTE">'+esc(l.m.SituacaoMatricula)+'</span>' : '';
+          var tr='<tr><td>'+(i+1)+'</td><td class="r8n-nome">'+esc(l.m.NomeExibicao||l.m.AlunoID)+badge+'</td>';
+          var lx=[i+1, l.m.AlunoID||'', l.m.NomeExibicao||''];
+          colunas.forEach(function(c){
+            var v=valorColuna(l, c);
+            var cls=[];
+            if(c.ini) cls.push('r8n-ini');
+            if(c.tipo==='media') cls.push('r8n-media');
+            if(v===null) cls.push('r8n-vazio');
+            else if(abaixo(c, v)) cls.push('r8n-abaixo');
+            else if(c.tipo==='media' && l.comps[c.ia].media!==null) cls.push('r8n-ok');
+            tr+='<td class="'+cls.join(' ')+'">'+(v===null?'–':fmtNota(v))+'</td>';
+            lx.push(v===null?'':v);
+          });
+          tr+='<td class="r8n-ini"><span class="r8n-sit '+l.sit+'">'+rotSit[l.sit]+'</span></td></tr>';
+          lx.push(rotSit[l.sit]);
+          if(mostrarSitMat) lx.push(l.m.SituacaoMatricula);
+          corpo+=tr; linhasXlsx.push(lx);
+        });
+
+        // Rodapé: média da turma / abaixo / sem nota
+        var rodMedia='', rodAbaixo='', rodSem='';
+        var xMedia=['','','Média da turma'], xAbaixo=['','','Abaixo do mínimo'], xSem=['','','Sem nota'];
+        colunas.forEach(function(c){
+          var vals=[], nAb=0, nSem=0;
+          linhas.forEach(function(l){
+            var v=valorColuna(l, c);
+            if(v===null){ nSem++; return; }
+            vals.push(v);
+            if(abaixo(c, v)) nAb++;
+          });
+          var med=vals.length ? vals.reduce(function(a,b){return a+b;},0)/vals.length : null;
+          var ini=c.ini?' class="r8n-ini"':'';
+          rodMedia+='<td'+ini+'>'+(med===null?'–':fmtNota(med))+'</td>';
+          rodAbaixo+='<td'+ini+'>'+nAb+'</td>';
+          rodSem+='<td'+ini+'>'+nSem+'</td>';
+          xMedia.push(med===null?'':Math.round(med*10)/10); xAbaixo.push(nAb); xSem.push(nSem);
+        });
+        var rodape='<tfoot>'+
+          '<tr><td></td><td class="r8n-nome">Média da turma</td>'+rodMedia+'<td class="r8n-ini"></td></tr>'+
+          '<tr><td></td><td class="r8n-nome">Abaixo do mínimo</td>'+rodAbaixo+'<td class="r8n-ini"></td></tr>'+
+          '<tr><td></td><td class="r8n-nome">Sem nota</td>'+rodSem+'<td class="r8n-ini"></td></tr>'+
+          '</tfoot>';
+
+        var resumo='<div style="display:flex;gap:16px;margin-bottom:8px;font-size:8.5pt;flex-wrap:wrap;">'+
+          '<span>Aprovados nas notas: <strong style="color:#2A9D8F">'+cont.APROVADO+'</strong></span>'+
+          '<span>Retidos: <strong style="color:#E63946">'+cont.REPROVADO+'</strong></span>'+
+          '<span>Com nota pendente: <strong style="color:#9898B0">'+cont.PENDENTE+'</strong></span>'+
+          '<span>Total: <strong>'+linhas.length+'</strong></span>'+
+        '</div>';
+
+        var subtitulo=(turma?turma.TurmaID:'')+' · '+(turma?(turma.Estagio||turma.CursoSigla):'')+
+          (turma&&turma.ProfessorNome?' · Prof. '+turma.ProfessorNome:'')+
+          (turma&&turma.DiaSemana?' · '+turma.DiaSemana:'')+(turma&&turma.Horario?' '+turma.Horario:'')+
+          (turma&&turma.Modalidade?' · '+turma.Modalidade:'');
+        var semTurma=S.semestres.find(function(s){ return turma && s.id===turma.semestre_id; });
+
+        var html='<div class="r8-folha paisagem">'+headerInstitucional('Notas por turma', semTurma?semTurma.rotulo:'')+
+          '<h2 class="r8-titulo-rel">Notas por turma</h2>'+
+          '<div class="r8-subtitulo-rel">'+esc(subtitulo)+' · '+linhas.length+' aluno(s)</div>'+
+          resumo+
+          '<table class="r8n-tab">'+cab+'<tbody>'+corpo+'</tbody>'+rodape+'</table>'+
+          '<p style="font-size:7.5pt;color:#9898B0;margin-top:4px;">Em vermelho: abaixo da nota mínima de aprovação do componente. '+
+          '– = nota ainda não lançada. A média aparece quando todas as notas do componente estão lançadas. '+
+          'Situação considera só as notas; a frequência está nos relatórios de frequência e de resultados.</p>'+
+          '</div>';
+
+        var cabX=['#','ID do aluno','Aluno'];
+        colunas.forEach(function(c){
+          var nomeC=avals[c.ia].ComponenteNota;
+          cabX.push(c.tipo==='media' ? nomeC+(c.rot==='Nota'?'':' — Média') : nomeC+' '+c.rot);
+        });
+        cabX.push('Situação (notas)');
+        if(mostrarSitMat) cabX.push('Situação da matrícula');
+        var nomeTurma=String(turma?turma.TurmaID:'turma').replace(/[^A-Za-z0-9_-]+/g,'_');
+        S.ultimasNotasTurma={
+          aba:'Notas', cabecalho:cabX, linhas:linhasXlsx.concat([[]], [xMedia, xAbaixo, xSem]),
+          nomeArquivo:'notas_'+nomeTurma+'_'+hoje()+'.xlsx'
+        };
+        mostrarPreview('Notas por turma — '+(turma?turma.TurmaID:''), html);
+      });
+    });
+  }
+
   // ── 6) ALUNOS POR TURMA (CAMPOS) ────────────────────────────────────────
   // Busca dados de responsável (alunos_sensiveis) para os alunos de uma
   // turma. Não existe endpoint em lote nesta Edge Function — só
@@ -1622,6 +1852,7 @@
     var dados = (S.tipoAtual==='alunos-faltas') ? S.ultimoAlunosFaltas
               : (S.tipoAtual==='evasao') ? S.ultimoEvasao
               : (S.tipoAtual==='grade-professores') ? S.ultimaGrade
+              : (S.tipoAtual==='notas-turma') ? S.ultimasNotasTurma
               : S.ultimoAlunosTurmaCampos;
     // Uma ou várias abas: { abas:[{nome, cabecalho, linhas}] } ou { aba, cabecalho, linhas }
     var abas = (dados && dados.abas) ? dados.abas : (dados ? [{nome:dados.aba||'Alunos', cabecalho:dados.cabecalho, linhas:dados.linhas}] : []);
@@ -1793,7 +2024,8 @@
       });
       var thMeses=gruposMes.map(function(g){ return '<th class="c" colspan="'+g.qtd+'" style="background:#2D2D4A;">'+g.label+'</th>'; }).join('');
       var thDatas=datasCalendario.map(function(d){
-        return '<th class="c" style="white-space:nowrap;">'+fmtData(d.iso).substring(0,5)+'<br><span style="font-weight:400;opacity:0.85;">'+DIAS_ABREV_R8[d.weekday]+'</span></th>';
+        // Só o dia: o mês já está na linha de cima (cabe mais datas na folha)
+        return '<th class="c" style="white-space:nowrap;">'+d.iso.substring(8,10)+'<br><span style="font-weight:400;opacity:0.85;">'+DIAS_ABREV_R8[d.weekday]+'</span></th>';
       }).join('');
 
       var CORES_FREQ={
@@ -1806,7 +2038,7 @@
         var badgeSituacao=(incluirOutras && !ehMatriculaCorrente(m))
           ? ' <span style="font-size:6.5pt;font-weight:700;padding:1px 6px;border-radius:8px;background:#F0EEE8;color:#5C5C7A;white-space:nowrap;">'+esc(m.SituacaoMatricula)+'</span>'
           : '';
-        var tdNome='<td style="white-space:nowrap;">'+esc(m.NomeExibicao||m.AlunoID)+badgeSituacao+'</td>';
+        var tdNome='<td class="r8gf-nome" style="white-space:nowrap;">'+esc(m.NomeExibicao||m.AlunoID)+badgeSituacao+'</td>';
         var tds=datasCalendario.map(function(d){
           var f=mapaFreq[m.id+'|'+d.iso];
           if(!f) return '<td class="c" style="color:#C8C7C2;">–</td>';
@@ -1827,8 +2059,12 @@
       html+='<h2 class="r8-titulo-rel">Grade de frequência</h2>';
       html+='<div class="r8-subtitulo-rel">'+esc(subtitulo)+' · '+matriculas.length+' aluno(s) · '+datasCalendario.length+' data(s)</div>';
       html+=legenda;
-      html+='<div style="overflow-x:auto;"><table class="r8-table r8-grade-freq"><thead>'+
-        '<tr><th rowspan="2" style="vertical-align:bottom;">Aluno</th>'+thMeses+'</tr>'+
+      // Fonte proporcional ao nº de datas, para caber na largura da folha
+      // paisagem (≈ 227 mm para as datas): 40 datas ≈ 7 pt; 60 ≈ 5 pt.
+      var mmPorData=227/Math.max(1,datasCalendario.length);
+      var fonteGrade=Math.max(4.5, Math.min(7.5, (mmPorData-0.8)/0.6));
+      html+='<div class="r8-grade-freq-wrap"><table class="r8-table r8-grade-freq r8-grade-freq-cal" style="font-size:'+fonteGrade.toFixed(1)+'pt;"><thead>'+
+        '<tr><th class="r8gf-nome" rowspan="2" style="vertical-align:bottom;">Aluno</th>'+thMeses+'</tr>'+
         '<tr>'+thDatas+'</tr>'+
         '</thead><tbody>'+linhas+'</tbody></table></div>';
       html+='</div>';
