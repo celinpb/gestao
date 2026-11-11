@@ -1198,6 +1198,23 @@ async function _matriculasListar(sb, dados) {
   linhas.forEach(function(m) {
     m.cancelado_por = m.cancelado_por_id ? { nome: (mapaNomes[m.cancelado_por_id] || {}).nome || '' } : null;
   });
+  // Código da turma de onde o aluno veio, para as telas sinalizarem a
+  // transferência (etapa 30). Só consulta quando há transferidos na lista.
+  var idsOrigem = linhas.map(function(m) { return m.turma_origem_id; })
+    .filter(function(v, i, arr) { return !!v && arr.indexOf(v) === i; });
+  if (idsOrigem.length) {
+    var mapaTurmas = {};
+    var gruposT = _pedacos(idsOrigem, 100);
+    for (var gt = 0; gt < gruposT.length; gt++) {
+      var rt = await sb.from('turmas').select('id, external_id, curso_id').in('id', gruposT[gt]);
+      (rt.data || []).forEach(function(t) { mapaTurmas[t.id] = t; });
+    }
+    linhas.forEach(function(m) {
+      if (!m.turma_origem_id) return;
+      var to = mapaTurmas[m.turma_origem_id] || {};
+      m.turma_origem = { external_id: to.external_id || '', curso_id: to.curso_id || null };
+    });
+  }
   return _ok(linhas);
 }
 
@@ -1348,27 +1365,41 @@ async function _matriculasTransferir(sb, dados) {
   var checagem = await _checarVagaTurma(sb, dados.turma_destino_id, dados.forcar_vaga);
   if (checagem) return checagem;
 
-  // Criar nova matrícula na turma destino
-  var nova = await sb.from('matriculas').insert({
-    aluno_id:           orig.data.aluno_id,
-    turma_id:           dados.turma_destino_id,
-    semestre_id:        orig.data.semestre_id,
-    situacao:           'ATIVA',
-    turma_origem_id:    orig.data.turma_id,
-    matricula_origem_id: orig.data.id,
-  }).select().single();
-  if (nova.error) {
-    if (nova.error.code === '23505') return _err('Aluno já matriculado na turma de destino.', 409);
-    return _err(nova.error.message);
+  // Etapa 30: a transferência inteira acontece no banco, de uma vez —
+  // matrícula nova + origem TRANSFERIDA + cópia das notas e da frequência
+  // (mesmo idioma). Se algo falhar, nada é gravado.
+  var res = await sb.rpc('matricula_transferir', {
+    p_matricula_origem_id: dados.matricula_origem_id,
+    p_turma_destino_id:    dados.turma_destino_id,
+  });
+  if (res.error) {
+    if (/já matriculado/i.test(res.error.message || '')) return _err('Aluno já matriculado na turma de destino.', 409);
+    return _err(res.error.message);
   }
-  // Marcar original como TRANSFERIDA
-  await sb.from('matriculas').update({
-    situacao:            'TRANSFERIDA',
-    turma_destino_id:    dados.turma_destino_id,
-    matricula_destino_id: nova.data.id,
-  }).eq('id', dados.matricula_origem_id);
+  var r = res.data || {};
+  return _ok(r.matricula || null, 'Transferência realizada.' + _resumoHistoricoTransferencia(r.historico));
+}
 
-  return _ok(nova.data, 'Transferência realizada.');
+// Texto que a tela mostra depois da transferência: o que veio da turma anterior.
+function _resumoHistoricoTransferencia(h) {
+  if (!h) return '';
+  if (!h.copiado) {
+    if (h.motivo === 'idiomas_diferentes') return ' Idiomas diferentes: as notas e a frequência da turma anterior não foram trazidas.';
+    if (h.motivo === 'turma_concluida')    return ' A turma de destino está concluída: notas e frequência não foram trazidas.';
+    return '';
+  }
+  var partes = [];
+  if (h.notas)       partes.push(h.notas + (h.notas === 1 ? ' nota' : ' notas'));
+  if (h.frequencias) partes.push(h.frequencias + (h.frequencias === 1 ? ' registro de frequência' : ' registros de frequência'));
+  var txt = partes.length
+    ? ' Trazidos da turma ' + (h.turma_origem || 'anterior') + ': ' + partes.join(' e ') + '.'
+    : ' A turma anterior não tinha notas nem frequência para trazer.';
+  if (!h.mesmo_curso) {
+    txt += ' Curso diferente (mesmo idioma): só as notas dos componentes em comum foram trazidas';
+    txt += (h.componentes_fora && h.componentes_fora.length)
+      ? ' — ficaram de fora: ' + h.componentes_fora.join(', ') + '.' : '.';
+  }
+  return txt;
 }
 
 // =============================================================================
@@ -1396,7 +1427,31 @@ async function _frequenciasListar(sb, dados) {
     return q;
   });
   if (res.error) return _err(res.error.message);
-  return _ok(res.data);
+  var linhas = res.data || [];
+
+  // Etapa 30: lista da turma inteira (sem data) → junta a frequência que os
+  // alunos TRANSFERIDOS PARA esta turma trouxeram da turma anterior. Essas
+  // linhas têm turma_id da turma da aula (a anterior) e transferencia_origem_id
+  // preenchido — entram no percentual do aluno, mas não são datas desta turma
+  // (os relatórios separam por turma_id).
+  if (dados && dados.turma_id && !dados.data_aula && !dados.matricula_id) {
+    var rm = await _buscarTodas(function(opcoes) {
+      return sb.from('matriculas').select('id', opcoes)
+        .eq('turma_id', dados.turma_id).not('matricula_origem_id', 'is', null).order('id');
+    });
+    var idsTransf = (rm.data || []).map(function(m) { return m.id; });
+    var grupos = _pedacos(idsTransf, 100);
+    for (var g = 0; g < grupos.length; g++) {
+      var rt = await _buscarTodas(function(opcoes) {
+        return sb.from('frequencias').select('*', opcoes)
+          .in('matricula_id', grupos[g]).not('transferencia_origem_id', 'is', null)
+          .neq('turma_id', dados.turma_id).order('matricula_id').order('data_aula');
+      });
+      if (rt.error) return _err(rt.error.message);
+      linhas = linhas.concat(rt.data || []);
+    }
+  }
+  return _ok(linhas);
 }
 
 async function _frequenciasSalvar(sb, dados) {
