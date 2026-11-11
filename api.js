@@ -327,6 +327,7 @@ async function postApi(acao, dados) {
     if (acao === 'ocorrencias.adicionarResposta')    return await _ocorrenciasResponder(sb, dados);
     if (acao === 'ocorrencias.atualizarStatus')      return await _ocorrenciasResolverStatus(sb, Object.assign({}, dados, { id: dados.ocorrenciaId, status: dados.novoStatus }));
     if (acao === 'ocorrencias.excluir')              return await _ocorrenciasExcluir(sb, dados);
+    if (acao === 'ocorrencias.corrigir')             return await _ocorrenciasCorrigir(sb, dados);
     if (acao === 'ocorrencias.professoresDasTurmas') return await _ocorrenciasProfessoresDasTurmas(sb, dados);
     if (acao === 'ocorrencias.turmasAtivasDoAluno')  return await _ocorrenciasTurmasAtivasDoAluno(sb, dados);
 
@@ -1476,7 +1477,9 @@ async function _notasSalvar(sb, dados) {
 async function _ocorrenciasListar(sb, dados) {
   var res = await _buscarTodas(function(opcoes) {
     var query = sb.from('ocorrencias')
-      .select('*, alunos(nome_completo, nome_social), ocorrencia_destinatarios(usuario_id), ocorrencia_respostas(id, texto, criado_em, autor_id)', opcoes)
+      // oco_permissoes: campo calculado no banco (etapa 29) — o que quem está
+      // logado pode fazer com cada ocorrência (a tela mostra só esses botões).
+      .select('*, oco_permissoes, alunos(nome_completo, nome_social), ocorrencia_destinatarios(usuario_id), ocorrencia_respostas(id, texto, criado_em, autor_id)', opcoes)
       .order('criado_em', { ascending: false }).order('id');
     if (dados && dados.aluno_id)     query = query.eq('aluno_id', dados.aluno_id);
     if (dados && dados.status)       query = query.eq('status', dados.status);
@@ -1503,61 +1506,30 @@ async function _ocorrenciasListar(sb, dados) {
   return _ok(linhas);
 }
 
-// Papéis que podem ser usados como "destinatário" de uma ocorrência em vez
-// de um usuário específico (ex.: notificar toda a coordenação, não uma
-// pessoa só). O front-end manda o nome do papel sufixado com "-role"
-// (ex.: 'coordenacao-role'); aqui resolvemos para os IDs de todos os
-// usuários ativos com aquele papel.
-var PAPEIS_DESTINATARIO_VALIDOS = ['coordenacao', 'secretaria', 'admin'];
-
-async function _resolverDestinatarios(sb, destinatarios) {
-  destinatarios = destinatarios || [];
-  var usuarioIds = destinatarios.filter(function(d) { return typeof d === 'string' && !d.endsWith('-role'); });
-  var papeis = destinatarios
-    .filter(function(d) { return typeof d === 'string' && d.endsWith('-role'); })
-    .map(function(d) { return d.slice(0, -('-role'.length)); })
-    .filter(function(p) { return PAPEIS_DESTINATARIO_VALIDOS.indexOf(p) !== -1; });
-
-  if (papeis.length) {
-    // Não dá mais para consultar `usuarios` diretamente (tabela travada a
-    // admin/coordenação) — a resolução por papel passa por uma function
-    // SECURITY DEFINER que só devolve o id, nunca o restante do cadastro.
-    var res = await sb.rpc('usuarios_ids_por_papel', { papeis: papeis });
-    if (!res.error && res.data) {
-      res.data.forEach(function(u) { usuarioIds.push(u.id); });
-    }
-  }
-  // Remove duplicados (ex.: um usuário específico que também caiu no papel)
-  return usuarioIds.filter(function(id, i) { return usuarioIds.indexOf(id) === i; });
-}
-
 async function _ocorrenciasCriar(sb, dados) {
   if (!dados.aluno_id || !dados.tipo || !dados.titulo || !dados.descricao) {
     return _err('Aluno, tipo, título e descrição são obrigatórios.', 400);
   }
-  var usuario = Auth.getUsuario();
-  var res = await sb.from('ocorrencias').insert({
-    aluno_id:       dados.aluno_id,
-    semestre_ref_id: dados.semestre_ref_id || null,
-    turma_id:       dados.turma_id || null,
-    tipo:           dados.tipo,
-    titulo:         dados.titulo,
-    descricao:      dados.descricao,
-    status:         'PENDENTE',
-    criado_por_id:  usuario ? usuario.id : null,
-  }).select().single();
+  // Etapa 29: tudo pela função do banco, que grava a ocorrência e os
+  // destinatários juntos (se algo falhar, nada é gravado e o erro volta para
+  // a tela). Destinatários: 'coordenacao-role', 'secretaria-role',
+  // 'admin-role' ou id de usuário — o banco confere quem pode ser avisado.
+  // Na restrita, o banco avisa só a coordenação (destinatarios é ignorado).
+  var res = await sb.rpc('ocorrencia_criar', { p: {
+    aluno_id:              dados.aluno_id,
+    tipo:                  dados.tipo,
+    titulo:                dados.titulo,
+    descricao:             dados.descricao,
+    turma_id:              dados.turma_id || null,
+    semestre_ref_id:       dados.semestre_ref_id || null,
+    restrita:              !!dados.restrita,
+    escopo:                dados.escopo || 'coordenacao',
+    notificar_coordenacao: dados.notificar_coordenacao !== false,
+    destinatarios:         dados.restrita ? [] : (dados.destinatarios || []),
+    origem_ocorrencia_id:  dados.origem_ocorrencia_id || null,
+  } });
   if (res.error) return _err(res.error.message);
-
-  // Inserir destinatários — usuarios específicos e/ou papéis inteiros
-  // (ex.: 'coordenacao-role' notifica todos os usuários com papel=coordenacao)
-  var usuarioIds = await _resolverDestinatarios(sb, dados.destinatarios);
-  if (usuarioIds.length) {
-    var dests = usuarioIds.map(function(uid) {
-      return { ocorrencia_id: res.data.id, usuario_id: uid };
-    });
-    await sb.from('ocorrencia_destinatarios').insert(dests);
-  }
-  return _ok(res.data, 'Ocorrência registrada.');
+  return _ok(res.data, dados.restrita ? 'Ocorrência restrita registrada.' : 'Ocorrência registrada.');
 }
 
 async function _ocorrenciasResponder(sb, dados) {
@@ -1578,9 +1550,37 @@ async function _ocorrenciasResponder(sb, dados) {
 
 async function _ocorrenciasResolverStatus(sb, dados) {
   if (!dados.id || !dados.status) return _err('ID e status são obrigatórios.', 400);
-  var res = await sb.from('ocorrencias').update({ status: dados.status }).eq('id', dados.id);
+  // Reabrir: pela função do banco, que grava a justificativa como resposta e
+  // reabre junto (obrigatória para todos menos admin/coordenação).
+  if (dados.status === 'PENDENTE') {
+    var rr = await sb.rpc('ocorrencia_reabrir', {
+      p_ocorrencia_id: dados.id,
+      p_justificativa: dados.justificativa || dados.texto || null,
+    });
+    if (rr.error) return _err(rr.error.message);
+    return _ok(null, 'Ocorrência reaberta.');
+  }
+  // .select() para saber se mudou: quando o RLS barra um UPDATE, o Supabase
+  // não devolve erro — só zero linhas.
+  var res = await sb.from('ocorrencias').update({ status: dados.status }).eq('id', dados.id).select('id');
   if (res.error) return _err(res.error.message);
+  if (!res.data || !res.data.length) return _err('Você não tem permissão para alterar o status desta ocorrência.', 403);
   return _ok(null, 'Status atualizado.');
+}
+
+// Correção de tipo/título/descrição/turma — só admin e coordenação, com
+// motivo obrigatório (vai para a auditoria). Etapa 29.
+async function _ocorrenciasCorrigir(sb, dados) {
+  if (!dados.id) return _err('ID é obrigatório.', 400);
+  var campos = {};
+  ['tipo', 'titulo', 'descricao', 'turma_id'].forEach(function(k) {
+    if (dados[k] !== undefined) campos[k] = dados[k] === null ? '' : dados[k];
+  });
+  var res = await sb.rpc('ocorrencia_corrigir', {
+    p_ocorrencia_id: dados.id, p: campos, p_motivo: dados.motivo || '',
+  });
+  if (res.error) return _err(res.error.message);
+  return _ok(null, 'Ocorrência corrigida.');
 }
 
 // =============================================================================
@@ -1771,8 +1771,9 @@ async function _ocorrenciasListarRespostas(sb, dados) {
 async function _ocorrenciasExcluir(sb, dados) {
   var id = dados.ocorrenciaId || dados.id;
   if (!id) return _err('ID é obrigatório.', 400);
-  var res = await sb.from('ocorrencias').delete().eq('id', id);
+  var res = await sb.from('ocorrencias').delete().eq('id', id).select('id');
   if (res.error) return _err(res.error.message);
+  if (!res.data || !res.data.length) return _err('Somente o admin pode excluir ocorrências.', 403);
   return _ok(null, 'Ocorrência excluída.');
 }
 
