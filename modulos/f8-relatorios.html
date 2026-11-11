@@ -1424,6 +1424,8 @@
           html+='<div class="r8-freq-item">Frequência: <strong style="color:'+(retidoFalta?'#E63946':'#2A9D8F')+'">'+(freq.pct!==null?freq.pct+'%':'—')+'</strong>'+
             (retidoFalta?' ⚠ Retido por faltas':'')+'</div>';
           html+='</div>';
+          var nTrazidas=freqs.filter(function(f){return f.transferencia_origem_id;}).length;
+          if(nTrazidas) html+='<div style="font-size:8pt;color:#5C5C7A;margin-top:2px;">Inclui '+nTrazidas+' aula(s) da turma anterior (transferência).</div>';
 
           if(comentarios.length){
             comentarios.forEach(function(co){
@@ -1498,9 +1500,12 @@
       if(!incluirOutras) matriculas=matriculas.filter(ehMatriculaCorrente);
       var freqAll=(r[1].sucesso&&r[1].dados)?r[1].dados:[];
       if(!matriculas.length){ mostrarEstadoVazio('Nenhum aluno encontrado nesta turma.'); return; }
+      // Total de aulas = datas DESTA turma. A frequência que alunos transferidos
+      // trouxeram da turma anterior (etapa 30) entra só no percentual de cada um.
       var datasUnicas={};
-      freqAll.forEach(function(f){ if(f.data_aula) datasUnicas[String(f.data_aula).substring(0,10)]=true; });
+      freqAll.forEach(function(f){ if(f.data_aula && f.turma_id===turmaId) datasUnicas[String(f.data_aula).substring(0,10)]=true; });
       var totalAulas=Object.keys(datasUnicas).length;
+      var algumTrazido=false;
       var html='<div class="r8-folha">'+headerInstitucional('Frequência por turma');
       html+='<h2 class="r8-titulo-rel">Frequência — '+esc(turma?turma.TurmaID:'')+' · '+esc(turma?(turma.Estagio||turma.CursoSigla):'')+'</h2>';
       html+='<div class="r8-subtitulo-rel">Total de aulas: '+totalAulas+'</div>';
@@ -1510,13 +1515,16 @@
         var resumo=resumoFreq(fa);
         var pct=resumo.pct;
         var cor = pct===null ? '#9898B0' : (pct<75?'#E63946':(pct<85?'#D4A843':'#2A9D8F'));
-        html+='<tr><td class="c">'+(i+1)+'</td><td>'+esc(m.NomeExibicao||m.AlunoID)+'</td>';
+        var trazidas=fa.filter(function(f){return f.turma_id!==turmaId;}).length;
+        if(trazidas) algumTrazido=true;
+        html+='<tr><td class="c">'+(i+1)+'</td><td>'+esc(m.NomeExibicao||m.AlunoID)+(trazidas?' <span style="color:#185FA5;" title="Inclui '+trazidas+' aula(s) da turma anterior">†</span>':'')+'</td>';
         html+='<td class="c">'+resumo.presencas+'</td><td class="c">'+resumo.faltas+'</td><td class="c">'+resumo.justificadas+'</td>';
         html+='<td class="c"><strong style="color:'+cor+'">'+(pct!==null?pct+'%':'—')+'</strong></td>';
         html+='<td class="c">'+(pct!==null&&pct<75?'⚠ Retido por faltas':'—')+'</td></tr>';
       });
       html+='</tbody></table>';
-      html+='<p style="font-size:7.5pt;color:#9898B0;">⚠ Frequência abaixo de 75% = retido por faltas. Faltas justificadas contam como presença neste cálculo.</p>';
+      html+='<p style="font-size:7.5pt;color:#9898B0;">⚠ Frequência abaixo de 75% = retido por faltas. Faltas justificadas contam como presença neste cálculo.'+
+        (algumTrazido?' † Aluno transferido: inclui as aulas registradas na turma anterior.':'')+'</p>';
       html+='</div>';
       mostrarPreview('Frequência — '+(turma?turma.TurmaID:''), html);
     });
@@ -1967,7 +1975,23 @@
     ]).then(function(r){
       var matriculas=(r[0].sucesso&&r[0].dados)?r[0].dados.map(normM).sort(porNome):[];
       if(!incluirOutras) matriculas=matriculas.filter(ehMatriculaCorrente);
-      var freqAll=(r[1].sucesso&&r[1].dados)?r[1].dados:[];
+      var freqTodas=(r[1].sucesso&&r[1].dados)?r[1].dados:[];
+      // Células = só aulas DESTA turma. O que transferidos trouxeram da turma
+      // anterior (etapa 30) aparece como resumo ao lado do nome.
+      var freqAll=freqTodas.filter(function(f){ return f.turma_id===turmaId; });
+      var trazidasPorMat={};
+      freqTodas.forEach(function(f){
+        if(f.turma_id===turmaId) return;
+        var t=trazidasPorMat[f.matricula_id]=trazidasPorMat[f.matricula_id]||{P:0,F:0,J:0,turmas:{}};
+        if(t[f.frequencia]!==undefined) t[f.frequencia]++;
+        var tt=S.turmas.find(function(x){return x.id===f.turma_id;});
+        t.turmas[tt?tt.TurmaID:'turma anterior']=true;
+      });
+      function resumoTrazidas(matId){
+        var t=trazidasPorMat[matId]; if(!t) return '';
+        return '<div style="font-size:0.85em;font-weight:400;color:#185FA5;white-space:nowrap;">↪ '+esc(Object.keys(t.turmas).join(', '))+': '+
+          t.P+'P · '+t.F+'F · '+t.J+'J</div>';
+      }
       if(!matriculas.length){ mostrarEstadoVazio('Nenhum aluno encontrado nesta turma.'); return; }
       matriculas.sort(porNome);
 
@@ -1997,7 +2021,7 @@
         datasFallback.forEach(function(d){ htmlFb+='<th class="c">'+fmtData(d).substring(0,5)+'</th>'; });
         htmlFb+='</tr></thead><tbody>';
         matriculas.forEach(function(m){
-          htmlFb+='<tr><td>'+esc(m.NomeExibicao||m.AlunoID)+'</td>';
+          htmlFb+='<tr><td>'+esc(m.NomeExibicao||m.AlunoID)+resumoTrazidas(m.id)+'</td>';
           datasFallback.forEach(function(d){
             var v=mapaFb[m.id+'|'+d];
             htmlFb+='<td class="c">'+(v?esc(v):'<span style="color:#C8C7C2;">–</span>')+'</td>';
@@ -2038,7 +2062,7 @@
         var badgeSituacao=(incluirOutras && !ehMatriculaCorrente(m))
           ? ' <span style="font-size:6.5pt;font-weight:700;padding:1px 6px;border-radius:8px;background:#F0EEE8;color:#5C5C7A;white-space:nowrap;">'+esc(m.SituacaoMatricula)+'</span>'
           : '';
-        var tdNome='<td class="r8gf-nome" style="white-space:nowrap;">'+esc(m.NomeExibicao||m.AlunoID)+badgeSituacao+'</td>';
+        var tdNome='<td class="r8gf-nome" style="white-space:nowrap;">'+esc(m.NomeExibicao||m.AlunoID)+badgeSituacao+resumoTrazidas(m.id)+'</td>';
         var tds=datasCalendario.map(function(d){
           var f=mapaFreq[m.id+'|'+d.iso];
           if(!f) return '<td class="c" style="color:#C8C7C2;">–</td>';
@@ -2053,6 +2077,7 @@
         '<span><strong style="color:#A32D2D;">F</strong> Falta</span>'+
         '<span><strong style="color:#5C4200;">J</strong> Falta justificada</span>'+
         '<span><strong style="color:#9898B0;">–</strong> Sem registro</span>'+
+        (Object.keys(trazidasPorMat).length?'<span><strong style="color:#185FA5;">↪</strong> Aulas da turma anterior (aluno transferido)</span>':'')+
       '</div>';
 
       var html='<div class="r8-folha paisagem">'+headerInstitucional('Grade de frequência');
@@ -2503,7 +2528,10 @@
       var porId={}; mats.forEach(function(m){ porId[m.id]=m; });
       // Matrículas com pelo menos uma presença (P)
       var comPresenca={};
-      (r[1].dados||[]).forEach(function(f){ if(f.frequencia==='P' && porId[f.matricula_id]) comPresenca[f.matricula_id]=true; });
+      // Só presença registrada NA PRÓPRIA turma: a frequência copiada na
+      // transferência (etapa 30) não conta — a cadeia abaixo já procura a
+      // presença na turma de origem.
+      (r[1].dados||[]).forEach(function(f){ if(f.frequencia==='P' && !f.transferencia_origem_id && porId[f.matricula_id]) comPresenca[f.matricula_id]=true; });
 
       // 1) Eventos atribuídos a uma turma
       var eventos=[];           // {cat, m (matrícula de referência), turmaId, detalhe, data, motivo, por}
