@@ -88,6 +88,12 @@
   .n7-nota-input{width:56px;height:32px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:6px;text-align:center;font-family:var(--font-mono,monospace);font-size:13px;color:var(--c-text-1,#1A1A2E);background:#FAFAF8;outline:none;transition:border-color 150ms ease,background 150ms ease;}
   .n7-nota-input:focus{border-color:#E63946;background:#fff;box-shadow:0 0 0 2px rgba(230,57,70,0.10);}
   .n7-nota-input.modificado{border-color:#E9C46A;background:#FEFBF0;}
+  /* Transferência (etapa 30): aluno que veio de outra turma e notas trazidas de lá */
+  .n7-transf{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:99px;font-family:var(--font-sans,sans-serif);font-size:10.5px;font-weight:600;white-space:nowrap;background:rgba(69,123,157,0.12);color:#185FA5;cursor:help;}
+  .n7-transf .material-icons-round{font-size:12px;}
+  .n7-transf.outro-curso{background:rgba(233,196,106,0.25);color:#5C4200;}
+  .n7-nota-input.copiada{border-style:dashed;border-color:#457B9D;}
+  .n7-legenda-copiada{display:inline-block;width:18px;height:12px;border:1.5px dashed #457B9D;border-radius:3px;vertical-align:middle;margin-right:4px;}
   .n7-nota-input.salvo{border-color:#2A9D8F;background:rgba(42,157,143,0.05);}
   .n7-nota-input::placeholder{color:var(--c-text-3,#9898B0);font-size:11px;}
 
@@ -331,10 +337,11 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
   function el(id){return document.getElementById(id);}
   function normT(t){var c=t.cursos||{},p=t.professor||{};return{id:t.id,TurmaID:t.external_id||t.id,Estagio:t.estagio||'',CursoSigla:c.sigla||'',curso_id:t.curso_id,semestre_id:t.semestre_id,
     ProfessorNome:p.nome||'',DiaSemana:t.dia_semana||'',Horario:t.horario||'',Modalidade:t.modalidade||''};}
-  function normM(m){var al=m.alunos||{};var ns=al.nome_social||'';return{id:m.id,MatriculaID:m.external_id||m.id,AlunoID:al.external_id||m.aluno_id,NomeExibicao:ns||al.nome_completo||'',PcD:al.pcd||false,aluno_id:m.aluno_id};}
+  function normM(m){var al=m.alunos||{};var ns=al.nome_social||'';return{id:m.id,MatriculaID:m.external_id||m.id,AlunoID:al.external_id||m.aluno_id,NomeExibicao:ns||al.nome_completo||'',PcD:al.pcd||false,aluno_id:m.aluno_id,
+    Transferido:!!(m.matricula_origem_id||m.turma_origem_id),TurmaOrigem:(m.turma_origem&&m.turma_origem.external_id)||'',CursoOrigem:(m.turma_origem&&m.turma_origem.curso_id)||null};}
   function normAv(a){return{id:a.id,AvaliacaoID:a.external_id||a.id,ComponenteNota:a.componente_nota||'',Tipo:a.tipo||'',QntNotas:a.quantidade_notas||1,NotaMinima:numOu(a.nota_minima,ESCALA_MIN),NotaMaxima:numOu(a.nota_maxima,ESCALA_MAX),NotaAprovacao:numOu(a.nota_aprovacao,NOTA_APROVACAO)};}
   function numOu(v,padrao){return (v===null||v===undefined||v==='')?padrao:Number(v);}
-  function normNota(n){return{id:n.id,MatriculaID:n.matricula_id,ComponenteNota:n.componente_nota||'',SubcomponenteNota:n.subcomponente_nota||'',ValorNota:n.valor_nota};}
+  function normNota(n){return{id:n.id,MatriculaID:n.matricula_id,ComponenteNota:n.componente_nota||'',SubcomponenteNota:n.subcomponente_nota||'',ValorNota:n.valor_nota,Copiada:!!n.transferencia_origem_id};}
   function normCom(c){return{id:c.id,MatriculaID:c.matricula_id,Etapa:c.etapa||'',Comentario:c.comentario||''};}
 
   function init(){
@@ -479,7 +486,7 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
   }
 
   function selecionarTurma(t){
-    S.turmaSel=t;S.matriculas=[];S.freq={};S.notas={};S.notasSalvas={};S.comentarios={};S.medias={};S.avaliacoes=[];
+    S.turmaSel=t;S.matriculas=[];S.freq={};S.notas={};S.notasSalvas={};S.notasCopiadas={};S.comentarios={};S.medias={};S.avaliacoes=[];
     document.querySelectorAll('.n7-turma-card').forEach(function(c){c.classList.toggle('sel',c.dataset.turmaId===String(t.TurmaID));});
     if(el('n7-header-id'))el('n7-header-id').textContent=t.TurmaID;
     if(el('n7-header-titulo'))el('n7-header-titulo').textContent=t.Estagio||t.CursoSigla||'—';
@@ -523,7 +530,12 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
         resultados.forEach(function(r,idx){
           var m=S.matriculas[idx];
           S.notas[m.id]={};
-          if(r[0].sucesso&&r[0].dados){r[0].dados.map(normNota).forEach(function(n){S.notas[m.id][n.ComponenteNota+'|'+n.SubcomponenteNota]=n.ValorNota!==null&&n.ValorNota!==undefined?String(n.ValorNota):'';});}
+          S.notasCopiadas=S.notasCopiadas||{}; S.notasCopiadas[m.id]={};
+          if(r[0].sucesso&&r[0].dados){r[0].dados.map(normNota).forEach(function(n){
+            var ch=n.ComponenteNota+'|'+n.SubcomponenteNota;
+            S.notas[m.id][ch]=n.ValorNota!==null&&n.ValorNota!==undefined?String(n.ValorNota):'';
+            if(n.Copiada) S.notasCopiadas[m.id][ch]=true;
+          });}
           S.notasSalvas[m.id]=JSON.parse(JSON.stringify(S.notas[m.id]||{}));
           S.comentarios[m.id]={};
           if(r[1].sucesso&&r[1].dados){r[1].dados.map(normCom).forEach(function(c){S.comentarios[m.id][c.Etapa]=c.Comentario||'';});}
@@ -547,6 +559,11 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
     var lf=document.createElement('span');lf.className='n7-legenda-item n7-legenda-freq';
     lf.innerHTML='Frequência até hoje: <span class="n7-freq ok">85% ou mais</span><span class="n7-freq atencao">75% a 84%</span><span class="n7-freq critico">abaixo de 75%</span>';
     cont.appendChild(lf);
+    if(S.matriculas.some(function(m){return m.Transferido;})){
+      var lt=document.createElement('span');lt.className='n7-legenda-item';
+      lt.innerHTML='<span class="n7-legenda-copiada"></span>Nota trazida da turma anterior (transferência)';
+      cont.appendChild(lt);
+    }
     renderizarEscala();
   }
 
@@ -564,9 +581,10 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
     lista.forEach(function(f){
       var iso=String(f.data_aula||'').substring(0,10);
       if(!iso||iso>hj)return;
-      var r=mapa[f.matricula_id]=mapa[f.matricula_id]||{p:0,f:0,j:0,total:0};
+      var r=mapa[f.matricula_id]=mapa[f.matricula_id]||{p:0,f:0,j:0,total:0,trazidas:0};
       if(f.frequencia==='P')r.p++; else if(f.frequencia==='F')r.f++; else if(f.frequencia==='J')r.j++; else return;
       r.total++;
+      if(f.transferencia_origem_id) r.trazidas++;   // aula da turma anterior (transferência)
     });
     return mapa;
   }
@@ -578,9 +596,25 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
     var icone=pct<75?'warning':(pct<85?'error_outline':'check_circle');
     var dica='Frequência até hoje: '+pct+'% · '+r.total+' aula(s) registrada(s): '+r.p+' presença(s), '+r.f+' falta(s)'+
       (r.j?', '+r.j+' justificada(s)':'')+'. Justificadas contam como presença.'+
+      (r.trazidas?' Inclui '+r.trazidas+' aula(s) da turma anterior (transferência).':'')+
       (pct<75?' Abaixo de 75%: retido por faltas.':(pct<85?' Perto do limite de 75%.':''));
     return '<span class="n7-freq '+cls+'" title="'+escTxt(dica)+'"><span class="material-icons-round">'+icone+'</span>'+pct+'%'+
       (r.f?' · '+r.f+(r.f===1?' falta':' faltas'):'')+'</span>';
+  }
+
+  // Aluno que veio de outra turma (etapa 30): selo com a turma de origem.
+  // Amarelo quando a turma anterior era de OUTRO CURSO (mesmo idioma): só as
+  // notas dos componentes em comum foram trazidas.
+  function seloTransferencia(m){
+    if(!m.Transferido) return '';
+    var copiadas=Object.keys(S.notasCopiadas[m.id]||{}).length;
+    var outroCurso=!!(m.CursoOrigem&&S.turmaSel&&S.turmaSel.curso_id&&m.CursoOrigem!==S.turmaSel.curso_id);
+    var dica='Transferido(a)'+(m.TurmaOrigem?' da turma '+m.TurmaOrigem:' de outra turma')+'. '+
+      (copiadas?copiadas+' nota(s) trazida(s) da turma anterior (contorno tracejado). ':'')+
+      'A frequência da turma anterior entra no percentual.'+
+      (outroCurso?' A turma anterior era de outro curso: só vieram as notas dos componentes em comum com este curso — confira as demais.':'');
+    return '<span class="n7-transf'+(outroCurso?' outro-curso':'')+'" title="'+escTxt(dica)+'"><span class="material-icons-round">swap_horiz</span>'+
+      escTxt(m.TurmaOrigem?'Veio de '+m.TurmaOrigem:'Transferido(a)')+(outroCurso?' · outro curso':'')+'</span>';
   }
 
   function fmtNum(v){return String(v).replace('.',',');}
@@ -647,7 +681,7 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
     S.matriculas.forEach(function(m){
       var tr=document.createElement('tr');
       var tdNome=document.createElement('td');
-      tdNome.innerHTML='<div class="n7-nome">'+(escTxt(m.NomeExibicao||m.AlunoID||'—'))+'</div><div class="n7-mat-id"><span>'+(escTxt(m.MatriculaID||'—'))+'</span>'+seloFrequencia(m.id)+'</div>';
+      tdNome.innerHTML='<div class="n7-nome">'+(escTxt(m.NomeExibicao||m.AlunoID||'—'))+'</div><div class="n7-mat-id"><span>'+(escTxt(m.MatriculaID||'—'))+'</span>'+seloFrequencia(m.id)+seloTransferencia(m)+'</div>';
       tr.appendChild(tdNome);
       colunas.forEach(function(col){
         var td=document.createElement('td');
@@ -662,6 +696,10 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
         input.title='Nota de '+fmtNum(col.av.NotaMinima)+' a '+fmtNum(col.av.NotaMaxima);
         input.value=valorAtual!==undefined?valorAtual:'';
         if(valorAtual!==valorSalvo)input.classList.add('modificado');
+        if((S.notasCopiadas[m.id]||{})[col.chave]){
+          input.classList.add('copiada');
+          input.title='Nota trazida da turma anterior'+(m.TurmaOrigem?' ('+m.TurmaOrigem+')':'')+' na transferência. Pode ser alterada normalmente.';
+        }
         if(notaForaDaEscala(input.value,col.av))input.classList.add('invalido');
         input.dataset.mat=m.id;input.dataset.comp=col.componente;input.dataset.sub=col.subcomponente;input.dataset.chave=col.chave;
         input.addEventListener('change',function(){
