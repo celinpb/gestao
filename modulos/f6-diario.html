@@ -1,5 +1,6 @@
 <!--
   F6_DiarioAula.html — versão corrigida
+  Filtros de busca e professor nos cards das turmas (11/11/2026).
   postApi usa getSessaoAtiva() no back-end para obter o token,
   evitando dependência de variáveis globais entre iframes do Apps Script.
 -->
@@ -13,6 +14,21 @@
   .turma-card-id{font-size:11px;font-family:var(--font-mono,monospace);color:var(--c-text-3,#9898B0);margin-bottom:4px;}
   .turma-card-estagio{font-size:14.5px;font-weight:600;color:var(--c-text-1,#1A1A2E);margin-bottom:2px;}
   .turma-card-detalhe{font-size:12px;color:var(--c-text-2,#5C5C7A);}
+
+  /* Filtros de busca das turmas (11/11/2026) */
+  .d6-filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+  .d6-filtro-busca{flex:1;min-width:220px;position:relative;}
+  .d6-filtro-busca .material-icons-round{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--c-text-3,#9898B0);pointer-events:none;}
+  .d6-filtro-busca input{width:100%;height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:8px;padding:0 12px 0 34px;font-family:var(--font-sans,sans-serif);font-size:13.5px;color:var(--c-text-1,#1A1A2E);background:#fff;outline:none;box-sizing:border-box;}
+  .d6-filtro-busca input:focus,.d6-filtro-sel:focus{border-color:#E63946;box-shadow:0 0 0 3px rgba(230,57,70,0.09);}
+  .d6-filtro-sel{height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:8px;padding:0 10px;font-family:var(--font-sans,sans-serif);font-size:13px;color:var(--c-text-1,#1A1A2E);background:#fff;outline:none;cursor:pointer;max-width:220px;}
+  .d6-filtro-limpar{height:38px;padding:0 12px;border-radius:8px;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;font-family:var(--font-sans,sans-serif);font-size:12.5px;color:var(--c-text-2,#5C5C7A);cursor:pointer;display:none;align-items:center;gap:4px;}
+  .d6-filtro-limpar:hover{background:#F5F4F0;}
+  .d6-filtro-limpar .material-icons-round{font-size:15px;}
+  .d6-filtro-cont{font-size:12px;color:var(--c-text-3,#9898B0);white-space:nowrap;}
+  .d6-card-prof{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--c-text-1,#1A1A2E);margin-top:6px;padding-top:6px;border-top:1px solid #F0EEE8;}
+  .d6-card-prof .material-icons-round{font-size:14px;color:var(--c-text-3,#9898B0);}
+  .d6-card-prof.vazio{color:var(--c-text-3,#9898B0);font-style:italic;}
   /* Turmas encerradas/inativas: exibidas com tom avermelhado sombreado quando o filtro está ligado */
   .turma-card.turma-nao-ativa{background:rgba(230,57,70,0.045);border-color:rgba(230,57,70,0.28);}
   .turma-card.turma-nao-ativa:hover{border-color:rgba(230,57,70,0.45);box-shadow:0 3px 10px rgba(230,57,70,0.10);}
@@ -125,6 +141,24 @@
 <div class="diario-wrap">
   <div id="diario-step-turma">
     <div class="diario-secao-titulo">Selecione a turma</div>
+<div class="d6-filtros" id="d6-filtros" style="display:none;">
+    <div class="d6-filtro-busca">
+      <span class="material-icons-round">search</span>
+      <input type="text" id="d6-f-busca" placeholder="Buscar turma ou professor…" autocomplete="off">
+    </div>
+    <select class="d6-filtro-sel" id="d6-f-prof"><option value="">Todos os professores</option></select>
+    <select class="d6-filtro-sel" id="d6-f-dia">
+      <option value="">Todos os dias</option>
+      <option value="1">Segunda-feira</option><option value="2">Terça-feira</option><option value="3">Quarta-feira</option>
+      <option value="4">Quinta-feira</option><option value="5">Sexta-feira</option><option value="6">Sábado</option>
+    </select>
+    <select class="d6-filtro-sel" id="d6-f-mod">
+      <option value="">Todas as modalidades</option>
+      <option value="PRESENCIAL">Presencial</option><option value="EAD">EAD</option><option value="HIBRIDO">Híbrido</option>
+    </select>
+    <button type="button" class="d6-filtro-limpar" id="d6-f-limpar"><span class="material-icons-round">close</span>Limpar</button>
+    <span class="d6-filtro-cont" id="d6-f-cont"></span>
+  </div>
     <div class="diario-filtro-row" id="diario-filtro-row" style="display:none;">
       <label>
         <input type="checkbox" id="diario-chk-encerradas">
@@ -311,6 +345,8 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
       DataFimTurma:    t.data_fim || '',
       semestre_id:     t.semestre_id,
       professor_id:    t.professor_id,
+      ProfessorNome:   (t.professor && t.professor.nome) || '',
+      CursoSigla:      c.sigla || '',
     };
   }
 
@@ -363,6 +399,7 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
       }
       S.turmas=res.dados.map(normTurma);
       if(el('diario-filtro-row')) el('diario-filtro-row').style.display='flex';
+      prepararFiltros(S.turmas);
       renderizarTurmas();
     }).catch(function(){
       el('diario-turmas-loading').innerHTML='<span style="color:#E63946;">Erro ao carregar turmas.</span>';
@@ -379,10 +416,12 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
   function renderizarTurmas() {
     var grid=el('diario-turma-grid');
     var mostrarNaoAtivas=el('diario-chk-encerradas')&&el('diario-chk-encerradas').checked;
-    var lista=mostrarNaoAtivas?S.turmas:S.turmas.filter(turmaEstaAtiva);
+    var base=mostrarNaoAtivas?S.turmas:S.turmas.filter(turmaEstaAtiva);
+    var lista=aplicarFiltrosTurmas(base);
     grid.innerHTML='';
     if(lista.length===0){
-      grid.innerHTML='<p style="color:var(--c-text-3);font-size:13px;grid-column:1/-1;">Nenhuma turma ativa encontrada. Marque "Mostrar turmas encerradas/inativas" para ver todas.</p>';
+      grid.innerHTML='<p style="color:var(--c-text-3);font-size:13px;grid-column:1/-1;">'+
+        (base.length?'Nenhuma turma encontrada com estes filtros.':'Nenhuma turma ativa encontrada. Marque "Mostrar turmas encerradas/inativas" para ver todas.')+'</p>';
       grid.style.display='grid'; return;
     }
     lista.forEach(function(t){
@@ -395,11 +434,77 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
         '<div class="turma-card-estagio">'+(escTxt(t.Estagio||t.CursoID))+'</div>'+
         '<div class="turma-card-detalhe">'+(escTxt(t.DiaSemana||''))+(escTxt(t.Horario?' · '+t.Horario:''))+'</div>'+
         '<div class="turma-card-detalhe" style="margin-top:2px;">'+(escTxt(t.Modalidade||''))+'</div>'+
+        cardProfessor(t)+
         (!ativa?'<div class="turma-card-badge-status"><span class="material-icons-round">'+(escTxt(encerrada?'lock':'block'))+'</span>'+(escTxt(encerrada?'Encerrada':'Inativa'))+'</div>':'');
       card.addEventListener('click',function(){ selecionarTurma(t); });
       grid.appendChild(card);
     });
     grid.style.display='grid';
+  }
+
+
+  // ── FILTROS DE BUSCA DAS TURMAS (11/11/2026) ───────────────────────────
+  // Busca por texto (turma, estágio, curso ou professor, sem diferenciar
+  // acentos e maiúsculas) e filtros por professor, dia e modalidade. O
+  // filtro de professor só aparece para quem vê turmas de mais de um
+  // professor (o professor vê só as próprias).
+  var FILTRO_DIAS={SEGUNDA:1,TERCA:2,QUARTA:3,QUINTA:4,SEXTA:5,SABADO:6,DOMINGO:0};
+  function filtroNorm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();}
+  function filtroDias(txt){
+    return String(txt||'').split(',').map(function(d){return FILTRO_DIAS[filtroNorm(d).split('-')[0].trim()];})
+      .filter(function(n){return n!==undefined;});
+  }
+  function filtroModalidade(m){var x=filtroNorm(m);return x==='EAD'?'EAD':(x==='HIBRIDO'?'HIBRIDO':'PRESENCIAL');}
+  function prepararFiltros(lista){
+    var box=el('d6-filtros'); if(!box)return;
+    box.style.display=lista.length?'flex':'none';
+    var nomes={};
+    lista.forEach(function(t){ if(t.ProfessorNome) nomes[t.ProfessorNome]=true; });
+    var sel=el('d6-f-prof'), atual=sel.value;
+    sel.innerHTML='<option value="">Todos os professores</option>';
+    Object.keys(nomes).sort(function(a,b){return a.localeCompare(b,'pt-BR',{sensitivity:'base'});}).forEach(function(n){
+      var o=document.createElement('option'); o.value=n; o.textContent=n; sel.appendChild(o);
+    });
+    if(lista.some(function(t){return !t.ProfessorNome;})){
+      var o2=document.createElement('option'); o2.value='__sem__'; o2.textContent='Professor a definir'; sel.appendChild(o2);
+    }
+    sel.value=atual;
+    sel.style.display=(Object.keys(nomes).length>1)?'':'none';
+  }
+  function filtrosAtivos(){
+    return !!(val2('d6-f-busca')||val2('d6-f-prof')||val2('d6-f-dia')||val2('d6-f-mod'));
+  }
+  function val2(id){var e=el(id);return e?String(e.value||'').trim():'';}
+  function aplicarFiltrosTurmas(lista){
+    var busca=filtroNorm(val2('d6-f-busca')), prof=val2('d6-f-prof'), dia=val2('d6-f-dia'), mod=val2('d6-f-mod');
+    var res=lista.filter(function(t){
+      if(prof==='__sem__'&&t.ProfessorNome)return false;
+      if(prof&&prof!=='__sem__'&&t.ProfessorNome!==prof)return false;
+      if(dia&&filtroDias(t.DiaSemana).indexOf(parseInt(dia,10))===-1)return false;
+      if(mod&&filtroModalidade(t.Modalidade)!==mod)return false;
+      if(busca){
+        var alvo=filtroNorm([t.TurmaID,t.Estagio,t.CursoSigla,t.ProfessorNome].join(' '));
+        if(busca.split(/\s+/).some(function(p){return alvo.indexOf(p)===-1;}))return false;
+      }
+      return true;
+    });
+    if(el('d6-f-limpar'))el('d6-f-limpar').style.display=filtrosAtivos()?'inline-flex':'none';
+    if(el('d6-f-cont'))el('d6-f-cont').textContent=res.length+' de '+lista.length+' turma'+(lista.length!==1?'s':'');
+    return res;
+  }
+  function registrarFiltros(renderizar){
+    var t=null;
+    el('d6-f-busca')&&el('d6-f-busca').addEventListener('input',function(){clearTimeout(t);t=setTimeout(renderizar,150);});
+    ['d6-f-prof','d6-f-dia','d6-f-mod'].forEach(function(id){el(id)&&el(id).addEventListener('change',renderizar);});
+    el('d6-f-limpar')&&el('d6-f-limpar').addEventListener('click',function(){
+      ['d6-f-busca','d6-f-prof','d6-f-dia','d6-f-mod'].forEach(function(id){if(el(id))el(id).value='';});
+      renderizar();
+    });
+  }
+  function cardProfessor(t){
+    return t.ProfessorNome
+      ? '<div class="d6-card-prof"><span class="material-icons-round">person</span>'+escTxt(t.ProfessorNome)+'</div>'
+      : '<div class="d6-card-prof vazio"><span class="material-icons-round">person_outline</span>Professor a definir</div>';
   }
 
   function selecionarTurma(turma) {
@@ -904,6 +1009,7 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
     });
 
     el('diario-chk-encerradas')&&el('diario-chk-encerradas').addEventListener('change',renderizarTurmas);
+    registrarFiltros(renderizarTurmas);
 
     carregarTurmas();
   }
