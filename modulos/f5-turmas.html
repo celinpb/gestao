@@ -1051,7 +1051,7 @@ function abrirLinkSeguro(u){u=String(u||'').trim();if(!u)return;if(/^https?:\/\/
         if(el('trans-alerta')){el('trans-alerta').className='t5-alerta show erro';var sp=el('trans-alerta').querySelector('span:last-child');if(sp)sp.textContent=res.mensagem||'Erro ao transferir.';}
         return;
       }
-      if(typeof toast==='function')toast('Aluno transferido de turma.','success');
+      if(typeof toast==='function')toast(escTxt(res.mensagem||'Aluno transferido de turma.'),'success',9000); // inclui o que veio da turma anterior (etapa 30)
       if(el('modal-trans-overlay'))el('modal-trans-overlay').style.display='none';
       carregarMatriculas();
     });
