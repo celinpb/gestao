@@ -1,6 +1,7 @@
 <!--
   F5_Matriculas.html
   Listagem de matrículas com busca por nome/ID e filtros por situação e turma.
+  Coluna TurmaID com professor, dias, horário de início e modalidade (11/11/2026).
 -->
 <style>
   .m5-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
@@ -23,6 +24,15 @@
   .m5-mat-id{font-family:var(--font-mono,monospace);font-size:11.5px;color:var(--c-text-3,#9898B0);}
   .m5-nome{font-weight:500;}
   .m5-turma-id{font-family:var(--font-mono,monospace);font-size:12px;}
+  /* Detalhes da turma abaixo do TurmaID (11/11/2026) */
+  .m5-turma-det{font-family:var(--font-sans,sans-serif);font-size:11.5px;color:var(--c-text-2,#5C5C7A);margin-top:3px;line-height:1.45;}
+  .m5-turma-det .m5-td-prof{display:flex;align-items:center;gap:4px;color:var(--c-text-1,#1A1A2E);}
+  .m5-turma-det .m5-td-linha{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .m5-turma-det .material-icons-round{font-size:13px;color:var(--c-text-3,#9898B0);}
+  .m5-mod{display:inline-flex;padding:0 6px;border-radius:4px;font-size:10.5px;font-weight:600;}
+  .m5-mod.presencial{background:rgba(42,157,143,0.12);color:#1A6E65;}
+  .m5-mod.ead{background:rgba(69,123,157,0.14);color:#185FA5;}
+  .m5-mod.hibrido{background:rgba(233,196,106,0.25);color:#5C4200;}
   .badge-m5{display:inline-flex;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;}
   .badge-m5.ATIVA{background:rgba(42,157,143,0.12);color:#1A6E65;}
   .badge-m5.CANCELADA{background:rgba(230,57,70,0.10);color:#A32D2D;}
@@ -463,6 +473,37 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
     return '<span class="badge-m5 '+escTxt(sit)+'">'+escTxt(sit)+'</span>';
   }
 
+  // ── Detalhes da turma (professor, dia, horário de início, modalidade) ──
+  var DIAS_ABREV_M5={SEGUNDA:'Seg',TERCA:'Ter',QUARTA:'Qua',QUINTA:'Qui',SEXTA:'Sex',SABADO:'Sáb',DOMINGO:'Dom'};
+  function semAcento(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();}
+  function diasAbrev(txt){
+    var lista=String(txt||'').split(',').map(function(d){return DIAS_ABREV_M5[semAcento(d).split('-')[0].trim()]||'';}).filter(Boolean);
+    if(lista.length<2)return lista.join('');
+    return lista.slice(0,-1).join(', ')+' e '+lista[lista.length-1];
+  }
+  // "14h às 16h" → "14h"; "08h00 - 09h30" → "8h"; "18:30-20:30" → "18h30"
+  function horaInicio(txt){
+    var m=String(txt||'').match(/(\d{1,2})\s*[h:]\s*(\d{2})?/i);
+    if(!m)return String(txt||'');
+    var min=m[2]&&m[2]!=='00'?m[2]:'';
+    return parseInt(m[1],10)+'h'+min;
+  }
+  function detalhesTurma(turmaId){
+    var t=state.turmas.find(function(x){return x.id===turmaId;});
+    if(!t)return '';
+    var mod=semAcento(t.Modalidade);
+    var modCls=mod==='EAD'?'ead':(mod==='HIBRIDO'?'hibrido':'presencial');
+    var modTxt=mod==='EAD'?'EAD':(mod==='HIBRIDO'?'Híbrido':(t.Modalidade?'Presencial':''));
+    var partes=[];
+    var dias=diasAbrev(t.DiaSemana); if(dias)partes.push(escTxt(dias));
+    if(t.Horario)partes.push(escTxt(horaInicio(t.Horario)));
+    return '<div class="m5-turma-det">'+
+      '<div class="m5-td-prof"><span class="material-icons-round">person</span>'+escTxt(t.ProfessorNome||'Professor a definir')+'</div>'+
+      '<div class="m5-td-linha"><span class="material-icons-round">schedule</span>'+(partes.join(' · ')||'—')+
+        (modTxt?'<span class="m5-mod '+modCls+'">'+escTxt(modTxt)+'</span>':'')+'</div>'+
+    '</div>';
+  }
+
   function renderizar(){
     var lista=filtradas();
     var tbody=el('m5-tbody');if(!tbody)return;
@@ -491,7 +532,7 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
         '<td class="m5-mat-id">'+(escTxt(m.MatriculaID||'—'))+'</td>'+
         '<td><div class="m5-nome">'+(escTxt(m.NomeExibicao||m.AlunoID||'—'))+'</div>'+
             '<div style="font-size:11.5px;color:var(--c-text-3);">'+(escTxt(m.AlunoID||''))+'</div></td>'+
-        '<td class="m5-turma-id">'+(escTxt(m.TurmaID||'—'))+'</td>'+
+        '<td><div class="m5-turma-id">'+(escTxt(m.TurmaID||'—'))+'</div>'+detalhesTurma(m.turma_id)+'</td>'+
         '<td style="font-size:13px;">'+(escTxt(m.Estagio||'—'))+'</td>'+
         '<td>'+badgeSituacao(m)+'</td>'+
         '<td><div class="m5-acoes">'+acoes+'</div></td>';
