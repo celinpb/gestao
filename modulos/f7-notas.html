@@ -3,6 +3,7 @@
   Lançamento de notas: seleciona turma → tabela com todos os alunos,
   campos por componente/subcomponente, média automática, situação e comentários.
   Frequência do aluno até hoje ao lado da matrícula (10/11/2026).
+  Filtros de busca e professor nos cards das turmas (11/11/2026).
 -->
 <style>
   /* =========================================================
@@ -15,6 +16,21 @@
   .n7-turma-id{font-size:11px;font-family:var(--font-mono,monospace);color:var(--c-text-3,#9898B0);margin-bottom:3px;}
   .n7-turma-estagio{font-size:14px;font-weight:600;color:var(--c-text-1,#1A1A2E);margin-bottom:2px;}
   .n7-turma-det{font-size:12px;color:var(--c-text-2,#5C5C7A);}
+
+  /* Filtros de busca das turmas (11/11/2026) */
+  .n7-filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+  .n7-filtro-busca{flex:1;min-width:220px;position:relative;}
+  .n7-filtro-busca .material-icons-round{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--c-text-3,#9898B0);pointer-events:none;}
+  .n7-filtro-busca input{width:100%;height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:8px;padding:0 12px 0 34px;font-family:var(--font-sans,sans-serif);font-size:13.5px;color:var(--c-text-1,#1A1A2E);background:#fff;outline:none;box-sizing:border-box;}
+  .n7-filtro-busca input:focus,.n7-filtro-sel:focus{border-color:#E63946;box-shadow:0 0 0 3px rgba(230,57,70,0.09);}
+  .n7-filtro-sel{height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:8px;padding:0 10px;font-family:var(--font-sans,sans-serif);font-size:13px;color:var(--c-text-1,#1A1A2E);background:#fff;outline:none;cursor:pointer;max-width:220px;}
+  .n7-filtro-limpar{height:38px;padding:0 12px;border-radius:8px;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;font-family:var(--font-sans,sans-serif);font-size:12.5px;color:var(--c-text-2,#5C5C7A);cursor:pointer;display:none;align-items:center;gap:4px;}
+  .n7-filtro-limpar:hover{background:#F5F4F0;}
+  .n7-filtro-limpar .material-icons-round{font-size:15px;}
+  .n7-filtro-cont{font-size:12px;color:var(--c-text-3,#9898B0);white-space:nowrap;}
+  .n7-card-prof{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--c-text-1,#1A1A2E);margin-top:6px;padding-top:6px;border-top:1px solid #F0EEE8;}
+  .n7-card-prof .material-icons-round{font-size:14px;color:var(--c-text-3,#9898B0);}
+  .n7-card-prof.vazio{color:var(--c-text-3,#9898B0);font-style:italic;}
 
   /* =========================================================
      CABEÇALHO DA TURMA SELECIONADA
@@ -175,6 +191,24 @@
   <div id="n7-turmas-loading" style="display:flex;align-items:center;gap:10px;padding:32px 0;color:var(--c-text-3,#9898B0);font-size:13.5px;">
     <div class="n7-spinner" style="margin:0;"></div><span>Carregando turmas…</span>
   </div>
+<div class="n7-filtros" id="n7-filtros" style="display:none;">
+    <div class="n7-filtro-busca">
+      <span class="material-icons-round">search</span>
+      <input type="text" id="n7-f-busca" placeholder="Buscar turma ou professor…" autocomplete="off">
+    </div>
+    <select class="n7-filtro-sel" id="n7-f-prof"><option value="">Todos os professores</option></select>
+    <select class="n7-filtro-sel" id="n7-f-dia">
+      <option value="">Todos os dias</option>
+      <option value="1">Segunda-feira</option><option value="2">Terça-feira</option><option value="3">Quarta-feira</option>
+      <option value="4">Quinta-feira</option><option value="5">Sexta-feira</option><option value="6">Sábado</option>
+    </select>
+    <select class="n7-filtro-sel" id="n7-f-mod">
+      <option value="">Todas as modalidades</option>
+      <option value="PRESENCIAL">Presencial</option><option value="EAD">EAD</option><option value="HIBRIDO">Híbrido</option>
+    </select>
+    <button type="button" class="n7-filtro-limpar" id="n7-f-limpar"><span class="material-icons-round">close</span>Limpar</button>
+    <span class="n7-filtro-cont" id="n7-f-cont"></span>
+  </div>
   <div class="n7-turma-grid" id="n7-turma-grid" style="display:none;"></div>
 </div>
 
@@ -295,7 +329,8 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
   var ESCALA_MIN=0, ESCALA_MAX=100, NOTA_APROVACAO=70;
   function postApi(a,d){return window.postApi(a,d);}
   function el(id){return document.getElementById(id);}
-  function normT(t){var c=t.cursos||{};return{id:t.id,TurmaID:t.external_id||t.id,Estagio:t.estagio||'',CursoSigla:c.sigla||'',curso_id:t.curso_id,semestre_id:t.semestre_id};}
+  function normT(t){var c=t.cursos||{},p=t.professor||{};return{id:t.id,TurmaID:t.external_id||t.id,Estagio:t.estagio||'',CursoSigla:c.sigla||'',curso_id:t.curso_id,semestre_id:t.semestre_id,
+    ProfessorNome:p.nome||'',DiaSemana:t.dia_semana||'',Horario:t.horario||'',Modalidade:t.modalidade||''};}
   function normM(m){var al=m.alunos||{};var ns=al.nome_social||'';return{id:m.id,MatriculaID:m.external_id||m.id,AlunoID:al.external_id||m.aluno_id,NomeExibicao:ns||al.nome_completo||'',PcD:al.pcd||false,aluno_id:m.aluno_id};}
   function normAv(a){return{id:a.id,AvaliacaoID:a.external_id||a.id,ComponenteNota:a.componente_nota||'',Tipo:a.tipo||'',QntNotas:a.quantidade_notas||1,NotaMinima:numOu(a.nota_minima,ESCALA_MIN),NotaMaxima:numOu(a.nota_maxima,ESCALA_MAX),NotaAprovacao:numOu(a.nota_aprovacao,NOTA_APROVACAO)};}
   function numOu(v,padrao){return (v===null||v===undefined||v==='')?padrao:Number(v);}
@@ -350,16 +385,97 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
         grid.innerHTML='<p style="color:var(--c-text-3);font-size:13px;grid-column:1/-1;">Nenhuma turma encontrada.</p>';
         grid.style.display='grid'; return;
       }
-      S.turmas.forEach(function(t){
-        var card=document.createElement('div');card.className='n7-turma-card';card.dataset.turmaId=String(t.TurmaID);
-        card.innerHTML='<div class="n7-turma-id">'+escTxt(t.TurmaID)+'</div><div class="n7-turma-estagio">'+(escTxt(t.Estagio||t.CursoSigla||'—'))+'</div>';
-        card.addEventListener('click',function(){selecionarTurma(t);});
-        grid.appendChild(card);
-      });
-      grid.style.display='grid';
+      prepararFiltros(S.turmas);
+      renderizarCardsTurmas();
     }).catch(function(){
       if(el('n7-turmas-loading'))el('n7-turmas-loading').innerHTML='<span style="color:#E63946;">Erro ao carregar turmas.</span>';
     });
+  }
+
+  function renderizarCardsTurmas(){
+    var grid=el('n7-turma-grid'); if(!grid)return;
+    var lista=aplicarFiltrosTurmas(S.turmas);
+    grid.innerHTML='';
+    if(!lista.length){
+      grid.innerHTML='<p style="color:var(--c-text-3);font-size:13px;grid-column:1/-1;">Nenhuma turma encontrada com estes filtros.</p>';
+      grid.style.display='grid'; return;
+    }
+    lista.forEach(function(t){
+      var card=document.createElement('div');card.className='n7-turma-card';card.dataset.turmaId=String(t.TurmaID);
+      if(S.turmaSel&&S.turmaSel.id===t.id)card.classList.add('sel');
+      var det=[t.DiaSemana,t.Horario].filter(Boolean).join(' · ');
+      card.innerHTML='<div class="n7-turma-id">'+escTxt(t.TurmaID)+'</div><div class="n7-turma-estagio">'+(escTxt(t.Estagio||t.CursoSigla||'—'))+'</div>'+
+        (det?'<div class="n7-turma-det">'+escTxt(det)+'</div>':'')+
+        (t.Modalidade?'<div class="n7-turma-det" style="margin-top:2px;">'+escTxt(t.Modalidade)+'</div>':'')+
+        cardProfessor(t);
+      card.addEventListener('click',function(){selecionarTurma(t);});
+      grid.appendChild(card);
+    });
+    grid.style.display='grid';
+  }
+
+  // ── FILTROS DE BUSCA DAS TURMAS (11/11/2026) ───────────────────────────
+  // Busca por texto (turma, estágio, curso ou professor, sem diferenciar
+  // acentos e maiúsculas) e filtros por professor, dia e modalidade. O
+  // filtro de professor só aparece para quem vê turmas de mais de um
+  // professor (o professor vê só as próprias).
+  var FILTRO_DIAS={SEGUNDA:1,TERCA:2,QUARTA:3,QUINTA:4,SEXTA:5,SABADO:6,DOMINGO:0};
+  function filtroNorm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();}
+  function filtroDias(txt){
+    return String(txt||'').split(',').map(function(d){return FILTRO_DIAS[filtroNorm(d).split('-')[0].trim()];})
+      .filter(function(n){return n!==undefined;});
+  }
+  function filtroModalidade(m){var x=filtroNorm(m);return x==='EAD'?'EAD':(x==='HIBRIDO'?'HIBRIDO':'PRESENCIAL');}
+  function prepararFiltros(lista){
+    var box=el('n7-filtros'); if(!box)return;
+    box.style.display=lista.length?'flex':'none';
+    var nomes={};
+    lista.forEach(function(t){ if(t.ProfessorNome) nomes[t.ProfessorNome]=true; });
+    var sel=el('n7-f-prof'), atual=sel.value;
+    sel.innerHTML='<option value="">Todos os professores</option>';
+    Object.keys(nomes).sort(function(a,b){return a.localeCompare(b,'pt-BR',{sensitivity:'base'});}).forEach(function(n){
+      var o=document.createElement('option'); o.value=n; o.textContent=n; sel.appendChild(o);
+    });
+    if(lista.some(function(t){return !t.ProfessorNome;})){
+      var o2=document.createElement('option'); o2.value='__sem__'; o2.textContent='Professor a definir'; sel.appendChild(o2);
+    }
+    sel.value=atual;
+    sel.style.display=(Object.keys(nomes).length>1)?'':'none';
+  }
+  function filtrosAtivos(){
+    return !!(val2('n7-f-busca')||val2('n7-f-prof')||val2('n7-f-dia')||val2('n7-f-mod'));
+  }
+  function val2(id){var e=el(id);return e?String(e.value||'').trim():'';}
+  function aplicarFiltrosTurmas(lista){
+    var busca=filtroNorm(val2('n7-f-busca')), prof=val2('n7-f-prof'), dia=val2('n7-f-dia'), mod=val2('n7-f-mod');
+    var res=lista.filter(function(t){
+      if(prof==='__sem__'&&t.ProfessorNome)return false;
+      if(prof&&prof!=='__sem__'&&t.ProfessorNome!==prof)return false;
+      if(dia&&filtroDias(t.DiaSemana).indexOf(parseInt(dia,10))===-1)return false;
+      if(mod&&filtroModalidade(t.Modalidade)!==mod)return false;
+      if(busca){
+        var alvo=filtroNorm([t.TurmaID,t.Estagio,t.CursoSigla,t.ProfessorNome].join(' '));
+        if(busca.split(/\s+/).some(function(p){return alvo.indexOf(p)===-1;}))return false;
+      }
+      return true;
+    });
+    if(el('n7-f-limpar'))el('n7-f-limpar').style.display=filtrosAtivos()?'inline-flex':'none';
+    if(el('n7-f-cont'))el('n7-f-cont').textContent=res.length+' de '+lista.length+' turma'+(lista.length!==1?'s':'');
+    return res;
+  }
+  function registrarFiltros(renderizar){
+    var t=null;
+    el('n7-f-busca')&&el('n7-f-busca').addEventListener('input',function(){clearTimeout(t);t=setTimeout(renderizar,150);});
+    ['n7-f-prof','n7-f-dia','n7-f-mod'].forEach(function(id){el(id)&&el(id).addEventListener('change',renderizar);});
+    el('n7-f-limpar')&&el('n7-f-limpar').addEventListener('click',function(){
+      ['n7-f-busca','n7-f-prof','n7-f-dia','n7-f-mod'].forEach(function(id){if(el(id))el(id).value='';});
+      renderizar();
+    });
+  }
+  function cardProfessor(t){
+    return t.ProfessorNome
+      ? '<div class="n7-card-prof"><span class="material-icons-round">person</span>'+escTxt(t.ProfessorNome)+'</div>'
+      : '<div class="n7-card-prof vazio"><span class="material-icons-round">person_outline</span>Professor a definir</div>';
   }
 
   function selecionarTurma(t){
@@ -850,6 +966,7 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
   }
 
   function registrarEventos(){
+    registrarFiltros(renderizarCardsTurmas);
     el('btn-n7-entrega-ok')&&el('btn-n7-entrega-ok').addEventListener('click',confirmarEntrega);
     el('btn-n7-sug-ok')&&el('btn-n7-sug-ok').addEventListener('click',function(){enviarSugestao(false);});
     el('btn-n7-sug-retirar')&&el('btn-n7-sug-retirar').addEventListener('click',function(){ if(confirm('Retirar a sugestão?'))enviarSugestao(true); });
