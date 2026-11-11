@@ -121,6 +121,9 @@
   .dash-oco-corpo{flex:1;min-width:0;}
   .dash-oco-titulo{font-size:13px;font-weight:600;color:var(--c-text-1,#1A1A2E);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .dash-oco-aluno{font-size:12px;color:var(--c-text-2,#5C5C7A);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dash-oco-restrita{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:4px;font-size:10.5px;font-weight:600;background:#2E2A4A;color:#fff;white-space:nowrap;}
+  .dash-oco-restrita .material-icons-round{font-size:12px;}
+  .dash-oco-card.restrita{border-left:3px solid #2E2A4A;}
   .dash-oco-meta{font-size:11px;color:var(--c-text-3,#9898B0);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;}
   .dash-oco-tipo{display:inline-flex;padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:600;}
   .dash-oco-tipo.ausencia{background:rgba(233,196,106,0.22);color:#7A5C00;}
@@ -322,7 +325,17 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
       CriadoPorNome: (o.usuarios && o.usuarios.nome) || '',
       DataCriacao:   o.criado_em || '',
       TurmaID:       o.turma_id || '',
+      Restrita:      !!o.restrita,
+      Escopo:        o.restrita_escopo || 'coordenacao',
+      Permissoes:    o.oco_permissoes || {},   // calculadas no banco (etapa 29)
     };
+  }
+
+  // Selo "Restrita à coordenação" (só aparece para quem consegue ver a ocorrência)
+  function seloRestrita(o) {
+    if (!o || !o.Restrita) return '';
+    var rot = o.Escopo === 'coordenacao_idioma' ? 'Restrita à coordenação do idioma' : 'Restrita à coordenação';
+    return '<span class="dash-oco-restrita" title="'+escTxt(rot)+'"><span class="material-icons-round">lock</span>'+escTxt(rot)+'</span>';
   }
 
   function fmtData(d) {
@@ -396,13 +409,14 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
       var cls = TIPO_CLASS[o.Tipo] || 'outro';
       var icone = TIPO_ICONE[cls] || 'note';
       var card = document.createElement('div');
-      card.className = 'dash-oco-card' + (state.ocoSel && state.ocoSel.OcorrenciaID === o.OcorrenciaID ? ' selecionado' : '');
+      card.className = 'dash-oco-card' + (o.Restrita ? ' restrita' : '') + (state.ocoSel && state.ocoSel.OcorrenciaID === o.OcorrenciaID ? ' selecionado' : '');
       card.innerHTML =
         '<div class="dash-oco-icone '+escTxt(cls)+'"><span class="material-icons-round">'+escTxt(icone)+'</span></div>'+
         '<div class="dash-oco-corpo">'+
           '<div class="dash-oco-titulo">'+escTxt(o.Titulo)+'</div>'+
           '<div class="dash-oco-aluno">Aluno: '+(escTxt(o.AlunoNome||o.AlunoID||'—'))+'</div>'+
           '<div class="dash-oco-meta">'+
+            seloRestrita(o)+
             '<span class="dash-oco-tipo '+escTxt(cls)+'">'+escTxt(o.Tipo)+'</span>'+
             '<span>'+escTxt(fmtData(o.DataCriacao))+'</span>'+
             '<span>Por: '+(escTxt(o.CriadoPorNome||'—'))+'</span>'+
@@ -421,6 +435,7 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
 
     el('det-titulo').textContent = oco.Titulo;
     el('det-meta').innerHTML =
+      seloRestrita(oco)+
       '<span class="dash-oco-tipo '+escTxt(cls)+'">'+escTxt(oco.Tipo)+'</span>'+
       '<span>'+escTxt(fmtData(oco.DataCriacao))+'</span>'+
       '<span>Aluno: '+(escTxt(oco.AlunoNome||oco.AlunoID||'—'))+'</span>'+
@@ -432,9 +447,9 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
     // Botões de ação
     var acoes = el('det-acoes');
     acoes.innerHTML = '';
-    var ehCriador = oco.CriadoPor === state.usuarioId;
-    var temPrivil = state.papel === 'admin' || state.papel === 'coordenacao';
-    if (ehCriador || temPrivil) {
+    // Quem pode resolver vem do banco: admin/coordenação; secretaria só nas
+    // encaminhadas a ela; professor nas que registrou (etapa 29).
+    if (oco.Permissoes && oco.Permissoes.mudar_status) {
       var btnRes = document.createElement('button');
       btnRes.className = 'btn-oco-resolver';
       btnRes.innerHTML = '<span class="material-icons-round">check_circle</span>Marcar resolvida';
