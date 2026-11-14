@@ -682,8 +682,41 @@
 <script>
 // Protege texto vindo do banco antes de pôr na página (não deixa virar código).
 function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+// Completa o link como o professor digitou: "meet.google.com/abc" vira
+// "https://meet.google.com/abc" e "http://" vira "https://". Devolve '' para
+// campo vazio e null para o que não é endereço ("javascript:", texto solto…).
+function normalizarLink(u){
+  u=String(u||'').trim();
+  if(!u)return '';
+  if(/\s/.test(u))return null;
+  if(/^http:\/\//i.test(u))u='https://'+u.slice(7);
+  else if(!/^https:\/\//i.test(u)){
+    u=u.replace(/^\/\//,'');
+    if(!/^[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?([\/?#]|$)/i.test(u))return null;
+    u='https://'+u;
+  }
+  try{var p=new URL(u);return(p.protocol==='https:'&&p.hostname.indexOf('.')>0)?p.href:null;}catch(e){return null;}
+}
+// Lê os três campos de link, completa o https:// e devolve os valores prontos
+// para salvar; se algum não for um endereço válido, avisa e devolve null.
+function lerLinksTurma(ids){
+  var nomes={whatsapp:'WhatsApp',meet:'Google Meet',classroom:'Google Classroom'};
+  var out={};
+  for(var k in ids){
+    var inp=document.getElementById(ids[k]);
+    var v=normalizarLink(inp?inp.value:'');
+    if(v===null){
+      if(typeof toast==='function')toast('O link do '+nomes[k]+' não parece um endereço válido. Exemplo: meet.google.com/abc-defg-hij','error');
+      if(inp)inp.focus();
+      return null;
+    }
+    if(inp)inp.value=v; // mostra ao usuário como o link foi salvo
+    out[k]=v;
+  }
+  return out;
+}
 // Abre só links http(s): um endereço "javascript:" executaria código.
-function abrirLinkSeguro(u){u=String(u||'').trim();if(!u)return;if(/^https?:\/\//i.test(u))window.open(u,'_blank','noopener');else if(typeof toast==='function')toast('O link precisa começar com https://','error');}
+function abrirLinkSeguro(u){if(!String(u||'').trim())return;var n=normalizarLink(u);if(n)window.open(n,'_blank','noopener');else if(typeof toast==='function')toast('Este link não parece um endereço válido.','error');}
 (function(){
   'use strict';
   var S={turmas:[],turmaSel:null,matriculas:[],busca:'',papel:'',podeEditar:false,podeEditarMatricula:false,matriculaParaSit:null,matriculaParaTrans:null,turmaTransSelecionada:null,modoNovaTurma:false};
@@ -1083,6 +1116,8 @@ function abrirLinkSeguro(u){u=String(u||'').trim();if(!u)return;if(/^https?:\/\/
 
   function salvarEditarTurma(){
     if(!S.turmaSel)return;
+    var lk=lerLinksTurma({whatsapp:'et-whatsapp',meet:'et-meet',classroom:'et-classroom'});
+    if(!lk)return;
     var diasSel=[];
     document.querySelectorAll('#et-dias-check input[type=checkbox]:checked').forEach(function(chk){diasSel.push(chk.value);});
     var dados={
@@ -1093,9 +1128,9 @@ function abrirLinkSeguro(u){u=String(u||'').trim();if(!u)return;if(/^https?:\/\/
       horario:        val('et-horario'),
       turno:          el('et-turno')?el('et-turno').value:'',
       vagas_totais:   parseInt(val('et-vagas'))||S.turmaSel.VagasTotais,
-      grupo_whatsapp: val('et-whatsapp'),
-      link_meet:      val('et-meet'),
-      link_classroom: val('et-classroom'),
+      grupo_whatsapp: lk.whatsapp,
+      link_meet:      lk.meet,
+      link_classroom: lk.classroom,
     };
     var profId=el('et-professor')?el('et-professor').value:'';
     if(profId) dados.professor_id=profId;
@@ -1261,19 +1296,24 @@ function abrirLinkSeguro(u){u=String(u||'').trim();if(!u)return;if(/^https?:\/\/
   // ── SALVAR LINKS ────────────────────────────────────────────────────────
   function salvarLinks(){
     if(!S.turmaSel)return;
+    var lk=lerLinksTurma({whatsapp:'link-whatsapp',meet:'link-meet',classroom:'link-classroom'});
+    if(!lk)return;
     var btn=el('btn-salvar-links'); if(btn){btn.disabled=true;btn.classList.add('loading');}
     postApi('turmas.atualizar',{
       id:S.turmaSel.id,
-      grupo_whatsapp:val('link-whatsapp'),
-      link_meet:val('link-meet'),
-      link_classroom:val('link-classroom'),
+      grupo_whatsapp:lk.whatsapp,
+      link_meet:lk.meet,
+      link_classroom:lk.classroom,
     }).then(function(res){
       if(btn){btn.disabled=false;btn.classList.remove('loading');}
       if(!res.sucesso){if(typeof toast==='function')toast(res.mensagem||'Erro.','error');return;}
       if(typeof toast==='function')toast('Links salvos.','success');
-      S.turmaSel.GrupoWhatsapp=val('link-whatsapp');
-      S.turmaSel.LinkMeet=val('link-meet');
-      S.turmaSel.LinkClassroom=val('link-classroom');
+      S.turmaSel.GrupoWhatsapp=lk.whatsapp;
+      S.turmaSel.LinkMeet=lk.meet;
+      S.turmaSel.LinkClassroom=lk.classroom;
+    }).catch(function(){
+      if(btn){btn.disabled=false;btn.classList.remove('loading');}
+      if(typeof toast==='function')toast('Erro de comunicação.','error');
     });
   }
 
