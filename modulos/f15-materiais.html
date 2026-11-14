@@ -1,0 +1,1074 @@
+<!--
+  f15-materiais.html — etapa 31 (Materiais didáticos)
+  Admin e coordenação: cadastram materiais (livro/coleção), ligam a cursos,
+  incluem itens (livros, áudios, vídeos, links) e mantêm os domínios.
+  Professor: só leitura dos idiomas que leciona; liga/desliga a liberação
+  dos itens do aluno nas próprias turmas (aparece no Portal do Aluno).
+  Secretaria: sem acesso (o banco recusa).
+  Tudo é conferido no banco (funções materiais_* / material_*); a tela só
+  esconde o que o banco recusaria.
+-->
+<style>
+  .mt-raiz{max-width:1040px;}
+  .mt-raiz [hidden],.mt-overlay[hidden]{display:none !important;}
+  .mt-abas{display:flex;gap:4px;border-bottom:1px solid var(--c-border,#E8E7E2);margin-bottom:16px;flex-wrap:wrap;}
+  .mt-aba{height:38px;padding:0 14px;border:none;background:none;font-family:var(--font-sans,sans-serif);font-size:13.5px;font-weight:500;color:var(--c-text-2,#5C5C7A);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:inline-flex;align-items:center;gap:6px;}
+  .mt-aba .material-icons-round{font-size:17px;}
+  .mt-aba.ativa{color:var(--c-text-1,#1A1A2E);border-bottom-color:#E63946;}
+  .mt-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+  .mt-busca-wrap{flex:1;min-width:220px;position:relative;}
+  .mt-busca-wrap .material-icons-round{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--c-text-3,#9898B0);pointer-events:none;}
+  .mt-input{height:38px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:8px;padding:0 11px;font-family:var(--font-sans,sans-serif);font-size:13.5px;color:var(--c-text-1,#1A1A2E);background:#fff;outline:none;width:100%;box-sizing:border-box;}
+  textarea.mt-input{height:auto;min-height:70px;padding:8px 11px;resize:vertical;line-height:1.45;}
+  .mt-input:focus{border-color:#E63946;box-shadow:0 0 0 3px rgba(230,57,70,0.09);}
+  .mt-busca{padding-left:36px;}
+  .mt-sel{width:auto;min-width:170px;cursor:pointer;}
+  .mt-check{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--c-text-2,#5C5C7A);cursor:pointer;user-select:none;}
+  .mt-check input{width:15px;height:15px;accent-color:#457B9D;}
+  .mt-nota{font-size:12.5px;color:var(--c-text-3,#9898B0);line-height:1.5;margin:0 0 14px;display:flex;gap:6px;align-items:flex-start;}
+  .mt-nota .material-icons-round{font-size:16px;flex-shrink:0;}
+  .mt-nota:empty{display:none;}
+  .btn-mt{height:38px;padding:0 14px;border-radius:8px;font-family:var(--font-sans,sans-serif);font-size:13.5px;font-weight:500;cursor:pointer;border:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;text-decoration:none;}
+  .btn-mt .material-icons-round{font-size:17px;}
+  .btn-mt-pri{background:#E63946;color:#fff;}
+  .btn-mt-pri:hover{background:#C1121F;}
+  .btn-mt-sec{background:#fff;color:var(--c-text-1,#1A1A2E);border:1.5px solid var(--c-border,#E8E7E2);}
+  .btn-mt-sec:hover{background:#F5F4F0;}
+  .btn-mt-perigo{background:#fff;color:#A32D2D;border:1.5px solid rgba(230,57,70,0.35);}
+  .btn-mt-perigo:hover{background:rgba(230,57,70,0.06);}
+  .btn-mt:disabled{opacity:0.55;cursor:not-allowed;}
+  .btn-mt-mini{height:30px;padding:0 10px;border-radius:6px;font-size:12.5px;font-weight:500;cursor:pointer;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;color:var(--c-text-1,#1A1A2E);display:inline-flex;align-items:center;gap:4px;font-family:var(--font-sans,sans-serif);text-decoration:none;white-space:nowrap;}
+  .btn-mt-mini:hover{background:#F5F4F0;}
+  .btn-mt-mini .material-icons-round{font-size:16px;}
+  .btn-mt-mini.tocar{border-color:rgba(69,123,157,0.45);color:#1F4E6B;background:rgba(69,123,157,0.06);}
+  .btn-mt-mini.so-icone{width:30px;padding:0;justify-content:center;color:var(--c-text-2,#5C5C7A);}
+  .btn-mt-mini.perigo{color:#A32D2D;border-color:rgba(230,57,70,0.3);}
+
+  /* Acordeão */
+  .mt-sec{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:12px;margin-bottom:14px;overflow:hidden;}
+  .mt-sec > summary,.mt-curso > summary,.mt-mat > summary,.mt-uni > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none;}
+  .mt-sec > summary::-webkit-details-marker,.mt-curso > summary::-webkit-details-marker,.mt-mat > summary::-webkit-details-marker,.mt-uni > summary::-webkit-details-marker{display:none;}
+  .mt-sec > summary::before,.mt-curso > summary::before,.mt-mat > summary::before,.mt-uni > summary::before{content:'';width:7px;height:7px;margin:0 6px 0 3px;border-right:2px solid var(--c-text-3,#9898B0);border-bottom:2px solid var(--c-text-3,#9898B0);transform:rotate(-45deg);transition:transform 150ms ease;flex-shrink:0;}
+  .mt-sec[open] > summary::before,.mt-curso[open] > summary::before,.mt-mat[open] > summary::before,.mt-uni[open] > summary::before{transform:rotate(45deg);}
+  .mt-sec > summary{padding:14px 16px;font-size:15px;font-weight:600;color:var(--c-text-1,#1A1A2E);}
+  .mt-sec > summary .material-icons-round{font-size:19px;color:#457B9D;}
+  .mt-sec-corpo{padding:0 12px 12px;}
+  .mt-cont{margin-left:auto;font-size:12px;font-weight:500;color:var(--c-text-3,#9898B0);white-space:nowrap;}
+  .mt-curso{border:1px solid var(--c-border,#E8E7E2);border-radius:10px;margin-top:8px;background:#FCFCFA;}
+  .mt-curso > summary{padding:11px 12px;font-size:14px;font-weight:600;color:var(--c-text-1,#1A1A2E);}
+  .mt-curso > summary small{font-weight:400;color:var(--c-text-3,#9898B0);font-family:var(--font-mono,monospace);font-size:11.5px;}
+  .mt-curso-corpo{padding:0 10px 10px;}
+  .mt-mat{border:1px solid var(--c-border,#E8E7E2);border-radius:9px;background:#fff;margin-top:8px;}
+  .mt-mat > summary{padding:10px 12px;font-size:13.5px;font-weight:600;color:var(--c-text-1,#1A1A2E);}
+  .mt-mat > summary .material-icons-round{font-size:18px;color:#B8860B;}
+  .mt-parte{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:99px;background:rgba(69,123,157,0.12);color:#1F4E6B;font-size:11px;font-weight:600;}
+  .mt-mat-corpo{padding:0 12px 12px;}
+  .mt-mat-acoes{display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 10px;}
+  .mt-mat-desc{font-size:12.5px;color:var(--c-text-2,#5C5C7A);margin:0 0 10px;white-space:pre-line;}
+  .mt-uni{border-top:1px solid var(--c-border,#E8E7E2);}
+  .mt-uni > summary{padding:10px 2px;font-size:13.5px;font-weight:600;color:var(--c-text-1,#1A1A2E);}
+  .mt-uni-corpo{padding:0 0 8px 6px;}
+  .mt-livros{display:flex;flex-direction:column;gap:6px;margin-bottom:6px;}
+  .mt-uni-sws{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--c-text-2,#5C5C7A);background:#F8F7F3;border-radius:8px;padding:6px 10px;margin:0 0 6px;}
+  .mt-arquivado{opacity:0.55;}
+  .mt-selo{display:inline-flex;align-items:center;height:19px;padding:0 7px;border-radius:99px;font-size:10.5px;font-weight:600;white-space:nowrap;}
+  .mt-selo.prof{background:#F0EFEA;color:#5C5C7A;}
+  .mt-selo.aluno{background:rgba(42,157,143,0.14);color:#1A6E65;}
+  .mt-selo.libera{background:rgba(233,196,106,0.28);color:#7A5C00;}
+  .mt-selo.arq{background:#ECEAE5;color:#5C5C7A;}
+  .mt-selo.erro{background:rgba(230,57,70,0.12);color:#A32D2D;}
+
+  /* Item */
+  .mt-item{display:grid;grid-template-columns:34px 1fr auto;gap:4px 10px;align-items:center;padding:8px 6px;border-radius:8px;}
+  .mt-item + .mt-item{border-top:1px dashed var(--c-border,#E8E7E2);}
+  .mt-livros .mt-item{border:1px solid var(--c-border,#E8E7E2);background:#FCFCFA;}
+  .mt-ic{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;}
+  .mt-ic .material-icons-round{font-size:19px;}
+  .mt-ic.livro_professor{background:#1A1A2E;}
+  .mt-ic.livro_aluno{background:#E63946;}
+  .mt-ic.audio{background:#457B9D;}
+  .mt-ic.video{background:#B8860B;}
+  .mt-ic.outro{background:#2A9D8F;}
+  .mt-item-txt{min-width:0;}
+  .mt-item-tit{font-size:13.5px;font-weight:500;color:var(--c-text-1,#1A1A2E);word-break:break-word;}
+  .mt-item-sub{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--c-text-3,#9898B0);margin-top:2px;}
+  .mt-item-acoes{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;}
+  .mt-sws{grid-column:2 / -1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--c-text-2,#5C5C7A);}
+  .mt-sws-rot{font-weight:600;color:var(--c-text-3,#9898B0);font-size:11px;text-transform:uppercase;letter-spacing:0.4px;}
+
+  /* Switch */
+  .mt-sw{display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;font-size:12.5px;color:var(--c-text-1,#1A1A2E);padding:3px 8px 3px 4px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:99px;background:#fff;}
+  .mt-sw input{position:absolute;opacity:0;width:1px;height:1px;}
+  .mt-sw-trilho{position:relative;width:32px;height:18px;border-radius:99px;background:#D8D6CF;transition:background 150ms ease;flex-shrink:0;}
+  .mt-sw-trilho::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.25);transition:transform 150ms ease;}
+  .mt-sw input:checked + .mt-sw-trilho{background:#2A9D8F;}
+  .mt-sw input:checked + .mt-sw-trilho::after{transform:translateX(14px);}
+  .mt-sw input:focus-visible + .mt-sw-trilho{outline:2px solid #457B9D;outline-offset:2px;}
+  .mt-sw input:disabled + .mt-sw-trilho{opacity:0.5;}
+  .mt-sw:has(input:checked){border-color:rgba(42,157,143,0.45);background:rgba(42,157,143,0.06);}
+
+  .mt-estado{padding:48px 24px;text-align:center;color:var(--c-text-3,#9898B0);font-size:13.5px;background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:12px;}
+  .mt-estado .material-icons-round{font-size:34px;display:block;margin:0 auto 10px;}
+  .mt-spinner{width:22px;height:22px;border:2.5px solid var(--c-border,#E8E7E2);border-top-color:#E63946;border-radius:50%;animation:mt-giro 0.7s linear infinite;margin:0 auto 10px;}
+  @keyframes mt-giro{to{transform:rotate(360deg);}}
+  .mt-carregando{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--c-text-3,#9898B0);padding:8px 2px;}
+  .mt-carregando .mt-spinner{width:16px;height:16px;border-width:2px;margin:0;}
+  .mt-vazio{font-size:12.5px;color:var(--c-text-3,#9898B0);padding:8px 2px;margin:0;}
+  .mt-erro{font-size:12.5px;color:#A32D2D;padding:8px 2px;margin:0;}
+
+  /* Cartões das outras abas */
+  .mt-card{background:#fff;border:1px solid var(--c-border,#E8E7E2);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
+  .mt-card-titulo{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--c-text-1,#1A1A2E);margin-bottom:12px;}
+  .mt-card-titulo .material-icons-round{font-size:19px;color:#457B9D;}
+  .mt-tabela{width:100%;border-collapse:collapse;font-size:13px;}
+  .mt-tabela th{font-size:10.5px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--c-text-3,#9898B0);text-align:left;padding:8px 10px;background:#F8F7F3;border-bottom:1px solid var(--c-border,#E8E7E2);}
+  .mt-tabela td{padding:8px 10px;border-bottom:1px solid var(--c-border,#E8E7E2);vertical-align:top;}
+  .mt-tabela .mono{font-family:var(--font-mono,monospace);font-size:12.5px;}
+  .mt-tabela tr.erro td{background:rgba(230,57,70,0.05);}
+  .mt-tabela-wrap{overflow-x:auto;max-height:320px;overflow-y:auto;border:1px solid var(--c-border,#E8E7E2);border-radius:8px;}
+  .mt-linha-form{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:12px;}
+  .mt-linha-form .mt-campo{flex:1;min-width:180px;}
+
+  /* Modal */
+  .mt-overlay{position:fixed;inset:0;background:rgba(26,26,46,0.45);z-index:300;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;}
+  .mt-modal{background:#fff;border-radius:14px;width:100%;max-width:600px;margin:auto;box-shadow:0 12px 48px rgba(26,26,46,0.20);}
+  .mt-modal.largo{max-width:860px;}
+  .mt-modal-cab{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid var(--c-border,#E8E7E2);font-size:15px;}
+  .mt-modal-corpo{padding:18px;}
+  .mt-modal-rodape{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;padding:12px 18px;border-top:1px solid var(--c-border,#E8E7E2);background:#FAFAF8;border-radius:0 0 14px 14px;}
+  .mt-modal-rodape .esq{margin-right:auto;}
+  .mt-x{width:30px;height:30px;border-radius:6px;border:none;background:none;cursor:pointer;color:var(--c-text-3,#9898B0);display:flex;align-items:center;justify-content:center;}
+  .mt-x:hover{background:#F5F4F0;}
+  .mt-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;}
+  .mt-campo{display:flex;flex-direction:column;gap:5px;min-width:0;}
+  .mt-campo.s2{grid-column:span 2;}
+  .mt-campo > label,.mt-rot{font-size:11px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;color:var(--c-text-2,#5C5C7A);}
+  .mt-campo .req{color:#E63946;}
+  .mt-opcoes{display:flex;gap:8px;flex-wrap:wrap;}
+  .mt-opcao{display:inline-flex;align-items:center;gap:7px;border:1.5px solid var(--c-border,#E8E7E2);border-radius:8px;padding:7px 11px;font-size:13px;cursor:pointer;background:#fff;}
+  .mt-opcao:has(input:checked){border-color:#457B9D;background:rgba(69,123,157,0.06);}
+  .mt-opcao input{accent-color:#457B9D;margin:0;}
+  .mt-ajuda{font-size:12px;color:var(--c-text-3,#9898B0);line-height:1.45;}
+  .mt-cursos-lista{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;border:1px solid var(--c-border,#E8E7E2);border-radius:8px;padding:8px;}
+  .mt-curso-linha{display:grid;grid-template-columns:1fr 90px 160px;gap:8px;align-items:center;font-size:13px;}
+  .mt-curso-linha .mt-input{height:32px;font-size:12.5px;}
+  .mt-curso-linha label{display:flex;align-items:center;gap:7px;cursor:pointer;}
+  .mt-curso-linha input[type=checkbox]{accent-color:#457B9D;width:15px;height:15px;}
+  .mt-aviso{background:#FAEEDA;border:1px solid rgba(233,196,106,0.5);border-radius:8px;padding:10px 12px;font-size:12.5px;color:#5C4200;line-height:1.5;display:flex;gap:8px;align-items:flex-start;}
+  .mt-aviso .material-icons-round{font-size:16px;flex-shrink:0;}
+
+  /* Player */
+  .mt-player-caixa{background:#fff;border-radius:14px;width:100%;max-width:900px;margin:auto;overflow:hidden;box-shadow:0 12px 48px rgba(26,26,46,0.25);}
+  .mt-player-video{position:relative;width:100%;aspect-ratio:16/9;background:#111;}
+  .mt-player-video.audio{aspect-ratio:auto;height:200px;}
+  .mt-player-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+  .mt-player-barra{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;}
+  .mt-player-barra .tit{flex:1;min-width:180px;font-size:14px;font-weight:600;}
+  .mt-player-barra .tit small{display:block;font-weight:400;font-size:12px;color:var(--c-text-3,#9898B0);}
+
+  @media(max-width:640px){
+    .mt-item{grid-template-columns:30px 1fr;}
+    .mt-item-acoes{grid-column:1 / -1;justify-content:flex-start;}
+    .mt-sws{grid-column:1 / -1;}
+    .mt-grid{grid-template-columns:1fr;}
+    .mt-campo.s2{grid-column:span 1;}
+    .mt-curso-linha{grid-template-columns:1fr 80px;}
+    .mt-curso-linha .rot{grid-column:1 / -1;}
+  }
+</style>
+
+<div class="mt-raiz" id="mt-raiz">
+  <div class="mt-abas" id="mt-abas">
+    <button class="mt-aba ativa" type="button" data-aba="materiais"><span class="material-icons-round">library_books</span>Materiais</button>
+    <button class="mt-aba" type="button" data-aba="emails" id="mt-aba-emails" hidden><span class="material-icons-round">group</span>E-mails para compartilhar</button>
+    <button class="mt-aba" type="button" data-aba="dominios" id="mt-aba-dominios" hidden><span class="material-icons-round">verified_user</span>Domínios permitidos</button>
+  </div>
+
+  <div id="mt-painel-materiais">
+    <div class="mt-toolbar">
+      <div class="mt-busca-wrap">
+        <span class="material-icons-round">search</span>
+        <input type="search" class="mt-input mt-busca" id="mt-busca" placeholder="Buscar livro, unidade, lição ou faixa…" autocomplete="off">
+      </div>
+      <select class="mt-input mt-sel" id="mt-idioma" hidden></select>
+      <label class="mt-check" id="mt-arq-wrap" hidden><input type="checkbox" id="mt-arq"> Mostrar arquivados</label>
+      <button class="btn-mt btn-mt-pri" type="button" id="mt-novo" hidden><span class="material-icons-round">add</span>Novo material</button>
+    </div>
+    <p class="mt-nota" id="mt-info"></p>
+    <div id="mt-arvore"><div class="mt-estado"><div class="mt-spinner"></div><p>Carregando materiais…</p></div></div>
+  </div>
+
+  <div id="mt-painel-emails" hidden></div>
+  <div id="mt-painel-dominios" hidden></div>
+</div>
+
+<!-- Janela de cadastro (material, item, colar lista) -->
+<div class="mt-overlay" id="mt-modal" hidden>
+  <div class="mt-modal" id="mt-modal-caixa" role="dialog" aria-modal="true" aria-labelledby="mt-modal-titulo">
+    <div class="mt-modal-cab"><strong id="mt-modal-titulo"></strong><button class="mt-x" type="button" data-fechar title="Fechar"><span class="material-icons-round">close</span></button></div>
+    <div class="mt-modal-corpo" id="mt-modal-corpo"></div>
+    <div class="mt-modal-rodape" id="mt-modal-rodape"></div>
+  </div>
+</div>
+
+<!-- Player (Google Drive / YouTube) -->
+<div class="mt-overlay" id="mt-player" hidden>
+  <div class="mt-player-caixa" role="dialog" aria-modal="true" aria-labelledby="mt-pl-titulo">
+    <div class="mt-player-video" id="mt-pl-video"></div>
+    <div class="mt-player-barra">
+      <div class="tit" id="mt-pl-titulo"></div>
+      <button class="btn-mt btn-mt-sec" type="button" id="mt-pl-ant" title="Item anterior"><span class="material-icons-round">skip_previous</span></button>
+      <button class="btn-mt btn-mt-sec" type="button" id="mt-pl-prox" title="Próximo item"><span class="material-icons-round">skip_next</span></button>
+      <a class="btn-mt btn-mt-sec" id="mt-pl-abrir" href="#" target="_blank" rel="noopener noreferrer"><span class="material-icons-round">open_in_new</span>Abrir no site</a>
+      <button class="btn-mt btn-mt-pri" type="button" id="mt-pl-fechar"><span class="material-icons-round">close</span>Fechar</button>
+    </div>
+    <p class="mt-nota" style="padding:0 16px 12px;margin:0;"><span class="material-icons-round">info</span>Se o player pedir login ou não carregar, use "Abrir no site". Arquivos restritos aos professores só abrem com a conta Google que tem acesso à pasta.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var raiz = document.getElementById('mt-raiz');
+  if (!raiz) return;
+
+  var CATEGORIAS = [
+    ['livro_professor', 'Livro do professor', 'menu_book'],
+    ['livro_aluno', 'Livro do aluno', 'auto_stories'],
+    ['audio', 'Áudio', 'headphones'],
+    ['video', 'Vídeo', 'smart_display'],
+    ['outro', 'Link / atividade', 'link']
+  ];
+  var CAT = {}; CATEGORIAS.forEach(function (c) { CAT[c[0]] = { nome: c[1], icone: c[2] }; });
+  var DIAS_AB = { segunda: 'Seg', terca: 'Ter', quarta: 'Qua', quinta: 'Qui', sexta: 'Sex', sabado: 'Sáb', domingo: 'Dom' };
+
+  var S = {
+    d: null, gestor: false, admin: false,
+    itens: {}, carregando: {}, erroItens: {}, abertos: {}, pendentes: [],
+    busca: '', idioma: '', verArq: false, aba: 'materiais', primeira: true, rolar: null,
+    player: null, emails: null
+  };
+
+  // ── Utilidades ──────────────────────────────────────────────────────────
+  function el(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function aviso(msg, tipo) { if (typeof toast === 'function') toast(String(msg), tipo || 'success', tipo === 'error' ? 7000 : 5000); else alert(msg); }
+  function norm(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
+  function combina(txt) { return !S.busca || norm(txt).indexOf(S.busca) !== -1; }
+  function hora(iso) {
+    var d = new Date(iso); if (isNaN(d)) return '';
+    return d.toLocaleTimeString('pt-BR', { timeZone: 'America/Fortaleza', hour: '2-digit', minute: '2-digit' });
+  }
+  function dataHora(iso) {
+    var d = new Date(iso); if (isNaN(d)) return '';
+    return d.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza', day: '2-digit', month: '2-digit' }) + ' às ' + hora(iso);
+  }
+  function estado(icone, txt) { return '<div class="mt-estado"><span class="material-icons-round">' + esc(icone) + '</span><p>' + esc(txt) + '</p></div>'; }
+
+  // Chamada direta às funções do banco (como o card do Portal em Configurações).
+  function rpc(fn, args) {
+    var sb = window._supabase;
+    if (!sb) return Promise.reject(new Error('Conexão com o banco indisponível. Recarregue a página.'));
+    return sb.rpc(fn, args || {}).then(function (r) {
+      if (r.error) throw new Error(r.error.message || 'Erro ao falar com o banco.');
+      try { if (typeof Auth !== 'undefined' && Auth.renovar) Auth.renovar(); } catch (e) { /* nada */ }
+      return r.data;
+    });
+  }
+
+  // Link como foi digitado → https:// válido (ou null). Igual à tela de Turmas.
+  function normalizarLink(u) {
+    u = String(u || '').trim();
+    if (!u) return '';
+    if (/\s/.test(u)) return null;
+    if (/^http:\/\//i.test(u)) u = 'https://' + u.slice(7);
+    else if (!/^https:\/\//i.test(u)) {
+      u = u.replace(/^\/\//, '');
+      if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?([\/?#]|$)/i.test(u)) return null;
+      u = 'https://' + u;
+    }
+    try { var p = new URL(u); return (p.protocol === 'https:' && p.hostname.indexOf('.') > 0) ? p.href : null; } catch (e) { return null; }
+  }
+  // Mesma regra do banco (mat_url_ok): o domínio do link, ou um "pai" dele, está na lista.
+  function dominioPermitido(u) {
+    var h; try { h = new URL(u).hostname.toLowerCase(); } catch (e) { return false; }
+    return ((S.d && S.d.dominios) || []).some(function (d) { return h === d.dominio || h.slice(-(d.dominio.length + 1)) === '.' + d.dominio; });
+  }
+  function hrefSeguro(u) { try { var p = new URL(String(u || '')); return p.protocol === 'https:' ? p.href : null; } catch (e) { return null; } }
+
+  // Endereço do player incorporado: só Google Drive (arquivo) e YouTube.
+  function embedUrl(u) {
+    var x; try { x = new URL(String(u || '')); } catch (e) { return null; }
+    if (x.protocol !== 'https:') return null;
+    var h = x.hostname.replace(/^www\./, '').replace(/^m\./, '');
+    var id;
+    if (h === 'docs.google.com') {   // Documentos, Apresentações e Planilhas do Google
+      var g = x.pathname.match(/^\/(document|presentation|spreadsheets)\/d\/([A-Za-z0-9_-]+)/);
+      if (g) return 'https://docs.google.com/' + g[1] + '/d/' + g[2] + '/preview';
+    }
+    if (h === 'drive.google.com' || h === 'docs.google.com') {
+      var m = x.pathname.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
+      id = m ? m[1] : ((x.pathname === '/open' || x.pathname === '/uc') ? x.searchParams.get('id') : null);
+      return id && /^[A-Za-z0-9_-]+$/.test(id) ? 'https://drive.google.com/file/d/' + id + '/preview' : null;
+    }
+    if (h === 'youtube.com' || h === 'youtu.be' || h === 'youtube-nocookie.com') {
+      id = h === 'youtu.be' ? x.pathname.slice(1).split('/')[0]
+         : (x.searchParams.get('v') || (x.pathname.match(/^\/(?:embed|shorts|live)\/([A-Za-z0-9_-]+)/) || [])[1]);
+      return id && /^[A-Za-z0-9_-]{6,}$/.test(id) ? 'https://www.youtube-nocookie.com/embed/' + id : null;
+    }
+    return null;
+  }
+
+  // "Terça-Feira" + "14h00 – 15h30" → "Ter 14h00"
+  function rotuloTurma(t) {
+    var dias = String(t.dia_semana || '').split(',').map(function (d) { return norm(d).split('-')[0].trim(); })
+      .filter(Boolean).map(function (d) { return DIAS_AB[d] || (d.charAt(0).toUpperCase() + d.slice(1, 3)); }).join('/');
+    var h = String(t.horario || '').split(/\s*[-–—]\s*|\s+a\s+/)[0].trim();
+    return [dias, h].filter(Boolean).join(' ') || t.codigo || 'Turma';
+  }
+  function rotularTurmas(lista) {
+    var cont = {};
+    lista.forEach(function (t) { t._rot = rotuloTurma(t); cont[t._rot] = (cont[t._rot] || 0) + 1; });
+    lista.forEach(function (t) { if (cont[t._rot] > 1) t._rot += ' · ' + (t.codigo || ''); });
+    return lista;
+  }
+
+  function matById(id) { return (S.d.materiais || []).filter(function (m) { return m.id === id; })[0] || null; }
+  function cursoById(id) { return (S.d.cursos || []).filter(function (c) { return c.id === id; })[0] || null; }
+  function idiomaNome(id) { var i = (S.d.idiomas || []).filter(function (x) { return x.id === id; })[0]; return i ? i.nome : ''; }
+  function liberavel(it) { return it.destinatario === 'aluno' && it.liberacao === 'professor'; }
+  function ehLivro(it) { return it.categoria === 'livro_professor' || it.categoria === 'livro_aluno'; }
+
+  function materiaisDoCurso(c) {
+    return (c.materiais || []).map(function (mc) { return { mc: mc, m: matById(mc.material_id) }; })
+      .filter(function (x) { return x.m && (S.verArq || x.m.ativo); });
+  }
+  function semCurso() {
+    var ligados = {};
+    (S.d.cursos || []).forEach(function (c) { (c.materiais || []).forEach(function (mc) { ligados[mc.material_id] = true; }); });
+    return (S.d.materiais || []).filter(function (m) { return !ligados[m.id] && (S.verArq || m.ativo) && (!S.idioma || m.idioma_id === S.idioma); });
+  }
+
+  // Itens que aparecem, na ordem da tela: livros primeiro, depois por unidade
+  // (na ordem em que a unidade aparece pela primeira vez).
+  function itensVisiveis(c, m, data) {
+    var todosCombinam = combina(m.titulo) || combina(c.nome || '');
+    return (data.itens || []).filter(function (it) {
+      if (!S.verArq && !it.ativo) return false;
+      return todosCombinam || combina(it.titulo + ' ' + (it.unidade || '') + ' ' + (it.licao || '') + ' ' + CAT[it.categoria].nome);
+    });
+  }
+  function organizar(itens) {
+    var livros = itens.filter(ehLivro).sort(function (a, b) { return a.categoria === 'livro_professor' ? -1 : (b.categoria === 'livro_professor' ? 1 : 0); });
+    var grupos = [], idx = {};
+    itens.filter(function (it) { return !ehLivro(it); }).forEach(function (it) {
+      var u = it.unidade || '';
+      if (!(u in idx)) { idx[u] = grupos.length; grupos.push({ u: u, itens: [] }); }
+      grupos[idx[u]].itens.push(it);
+    });
+    return { livros: livros, grupos: grupos };
+  }
+
+  // ── Carregar ────────────────────────────────────────────────────────────
+  function carregar() {
+    return rpc('materiais_listar').then(function (d) {
+      S.d = d;
+      S.gestor = d.acesso === 'gestor';
+      S.admin = !!d.admin;
+      configurar();
+      if (S.primeira) { primeiraAbertura(); S.primeira = false; }
+      desenhar();
+      if (S.aba === 'dominios') desenharDominios();
+    }).catch(function (e) {
+      el('mt-arvore').innerHTML = estado('error_outline', e.message);
+    });
+  }
+
+  function carregarItens(mid) {
+    if (S.itens[mid] || S.carregando[mid]) return Promise.resolve();
+    S.carregando[mid] = true;
+    delete S.erroItens[mid];
+    return rpc('materiais_itens_listar', { p_material_id: mid })
+      .then(function (d) { S.itens[mid] = d; })
+      .catch(function (e) { S.erroItens[mid] = e.message; })
+      .then(function () { delete S.carregando[mid]; desenhar(); });
+  }
+  function recarregarItens(mid) { delete S.itens[mid]; return carregarItens(mid); }
+
+  function configurar() {
+    var d = S.d;
+    var sel = el('mt-idioma');
+    if ((d.idiomas || []).length > 1) {
+      sel.innerHTML = '<option value="">Todos os idiomas</option>' + d.idiomas.map(function (i) {
+        return '<option value="' + esc(i.id) + '"' + (i.id === S.idioma ? ' selected' : '') + '>' + esc(i.nome) + (i.ativo === false ? ' (inativo)' : '') + '</option>';
+      }).join('');
+      sel.hidden = false;
+    } else sel.hidden = true;
+    el('mt-arq-wrap').hidden = !S.gestor;
+    el('mt-novo').hidden = !S.gestor;
+    el('mt-aba-emails').hidden = !S.gestor;
+    el('mt-aba-dominios').hidden = !S.gestor;
+    el('mt-info').innerHTML = S.gestor
+      ? '<span class="material-icons-round">info</span><span>Os arquivos continuam no Google Drive (ou na plataforma). Aqui ficam só os links. Quem abre o arquivo é decidido pelo compartilhamento da pasta: material do professor só com os professores; material do aluno com "qualquer pessoa com o link".</span>'
+      : '<span class="material-icons-round">info</span><span>Materiais dos idiomas que você leciona. Os arquivos do professor só abrem com a conta Google com que a coordenação compartilhou as pastas. Os switches liberam os itens do aluno no Portal do Aluno, turma por turma.</span>';
+  }
+
+  function primeiraAbertura() {
+    var pc = window.SGE_MATERIAIS_CURSO || null;
+    window.SGE_MATERIAIS_CURSO = null;
+    var temMeus = (S.d.cursos || []).some(function (c) { return c.meu; });
+    if (temMeus) S.abertos['sec:meus'] = true;
+    else if ((S.d.idiomas || []).length) S.abertos['sec:' + S.d.idiomas[0].id] = true;
+    var c = pc ? cursoById(pc) : null;
+    if (c) {
+      S.abertos[c.meu ? 'sec:meus' : 'sec:' + c.idioma_id] = true;
+      S.abertos['c:' + c.id] = true;
+      materiaisDoCurso(c).forEach(function (x) { S.abertos['m:' + c.id + ':' + x.m.id] = true; });
+      S.rolar = 'c:' + c.id;
+    }
+  }
+
+  // ── Desenhar a árvore ───────────────────────────────────────────────────
+  function desenhar() {
+    var d = S.d; if (!d) return;
+    var box = el('mt-arvore');
+    S.pendentes = [];
+    if (!(d.idiomas || []).length) {
+      box.innerHTML = estado('translate', S.gestor ? 'Nenhum idioma cadastrado.'
+        : 'Ainda não há idiomas validados no seu cadastro. Fale com a coordenação para ter acesso aos materiais.');
+      return;
+    }
+    var idiomas = d.idiomas.filter(function (i) { return !S.idioma || i.id === S.idioma; });
+    var ids = idiomas.map(function (i) { return i.id; });
+    var cursos = (d.cursos || []).filter(function (c) {
+      return ids.indexOf(c.idioma_id) !== -1 && (S.verArq || c.ativo || c.meu);
+    });
+    var meus = cursos.filter(function (c) { return c.meu; });
+    var html = '';
+    if (meus.length) html += secaoHtml('sec:meus', 'Meus cursos neste semestre', 'school', meus, true);
+    idiomas.forEach(function (i) {
+      var lista = cursos.filter(function (c) { return !c.meu && c.idioma_id === i.id && (S.gestor || materiaisDoCurso(c).length); });
+      if (!lista.length) return;
+      html += secaoHtml('sec:' + i.id, (meus.length ? 'Outros cursos de ' : 'Cursos de ') + i.nome, 'translate', lista, false);
+    });
+    if (S.gestor) {
+      var sc = semCurso();
+      if (sc.length) {
+        var pseudo = { id: 'semcurso', nome: '' };
+        var corpo = sc.map(function (m) { return materialHtml(pseudo, { material_id: m.id, ordem: 1, rotulo: null }, m); }).filter(Boolean).join('');
+        if (corpo) {
+          html += '<details class="mt-sec" data-chave="sec:semcurso"' + ((S.busca || S.abertos['sec:semcurso']) ? ' open' : '') + '>' +
+            '<summary><span class="material-icons-round">inventory_2</span><span>Materiais ainda sem curso</span><span class="mt-cont">' + sc.length + '</span></summary>' +
+            '<div class="mt-sec-corpo"><p class="mt-vazio">Ligue estes materiais a um curso em "Editar material" para que apareçam para professores e alunos.</p>' + corpo + '</div></details>';
+        }
+      }
+    }
+    if (!html) {
+      html = S.busca ? estado('search_off', 'Nada encontrado para "' + el('mt-busca').value + '".')
+           : estado('library_books', S.gestor ? 'Nenhum material cadastrado ainda. Use "Novo material".'
+                                              : 'Ainda não há materiais cadastrados para os idiomas que você leciona.');
+    }
+    box.innerHTML = html;
+    S.pendentes.forEach(function (mid) { carregarItens(mid); });
+    if (S.rolar) {
+      var alvo = box.querySelector('[data-chave="' + S.rolar + '"]');
+      S.rolar = null;
+      if (alvo) setTimeout(function () { alvo.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
+    }
+  }
+
+  function secaoHtml(chave, titulo, icone, cursos, padraoAberto) {
+    var corpo = cursos.map(cursoHtml).filter(Boolean).join('');
+    if (S.busca && !corpo) return '';
+    var aberto = S.busca || (chave in S.abertos ? S.abertos[chave] : padraoAberto);
+    return '<details class="mt-sec" data-chave="' + esc(chave) + '"' + (aberto ? ' open' : '') + '>' +
+      '<summary><span class="material-icons-round">' + icone + '</span><span>' + esc(titulo) + '</span>' +
+      '<span class="mt-cont">' + cursos.length + ' curso' + (cursos.length === 1 ? '' : 's') + '</span></summary>' +
+      '<div class="mt-sec-corpo">' + (corpo || '<p class="mt-vazio">Nenhum curso.</p>') + '</div></details>';
+  }
+
+  function cursoHtml(c) {
+    var mats = materiaisDoCurso(c);
+    var corpo = mats.map(function (x) { return materialHtml(c, x.mc, x.m); }).filter(Boolean).join('');
+    if (S.busca && !corpo) return '';
+    var chave = 'c:' + c.id;
+    var aberto = S.busca || S.abertos[chave];
+    return '<details class="mt-curso' + (c.ativo ? '' : ' mt-arquivado') + '" data-chave="' + esc(chave) + '"' + (aberto ? ' open' : '') + '>' +
+      '<summary><span>' + esc(c.nome) + '</span>' + (c.sigla ? ' <small>' + esc(c.sigla) + '</small>' : '') +
+      (c.ativo ? '' : ' <span class="mt-selo arq">curso inativo</span>') +
+      '<span class="mt-cont">' + (mats.length ? mats.length + ' materia' + (mats.length === 1 ? 'l' : 'is') : 'sem material') + '</span></summary>' +
+      '<div class="mt-curso-corpo">' + (corpo || '<p class="mt-vazio">' + (S.gestor
+        ? 'Nenhum material ligado a este curso. Crie um em "Novo material" ou ligue um existente em "Editar material".'
+        : 'Nenhum material cadastrado para este curso.') + '</p>') + '</div></details>';
+  }
+
+  function materialHtml(c, mc, m) {
+    var chave = 'm:' + c.id + ':' + m.id;
+    var data = S.itens[m.id];
+    var visiveis = data ? itensVisiveis(c, m, data) : null;
+    if (S.busca && data && !visiveis.length) return '';
+    var aberto = S.abertos[chave] || (S.busca && data && visiveis.length);
+    if ((aberto || S.busca) && !data && !S.erroItens[m.id]) S.pendentes.push(m.id);
+    var corpo;
+    if (data) corpo = itensHtml(c, m, data, visiveis);
+    else if (S.erroItens[m.id]) corpo = '<p class="mt-erro">' + esc(S.erroItens[m.id]) + '</p>';
+    else corpo = '<div class="mt-carregando"><div class="mt-spinner"></div>Carregando itens…</div>';
+    var n = data ? visiveis.length : m.itens;
+    var acoes = S.gestor
+      ? '<div class="mt-mat-acoes">' +
+          '<button class="btn-mt-mini" type="button" data-acao="editar-material" data-material="' + esc(m.id) + '"><span class="material-icons-round">edit</span>Editar material</button>' +
+          '<button class="btn-mt-mini" type="button" data-acao="novo-item" data-material="' + esc(m.id) + '"><span class="material-icons-round">add</span>Adicionar item</button>' +
+          '<button class="btn-mt-mini" type="button" data-acao="colar" data-material="' + esc(m.id) + '"><span class="material-icons-round">content_paste</span>Colar lista</button>' +
+        '</div>' : '';
+    return '<details class="mt-mat' + (m.ativo ? '' : ' mt-arquivado') + '" data-chave="' + esc(chave) + '" data-material="' + esc(m.id) + '"' + (aberto ? ' open' : '') + '>' +
+      '<summary><span class="material-icons-round">collections_bookmark</span>' +
+      (mc.rotulo ? '<span class="mt-parte">' + esc(mc.rotulo) + '</span>' : '') +
+      '<span>' + esc(m.titulo) + '</span>' + (m.ativo ? '' : ' <span class="mt-selo arq">arquivado</span>') +
+      '<span class="mt-cont">' + n + ' ite' + (n === 1 ? 'm' : 'ns') + '</span></summary>' +
+      '<div class="mt-mat-corpo">' + acoes + (m.descricao ? '<p class="mt-mat-desc">' + esc(m.descricao) + '</p>' : '') + corpo + '</div></details>';
+  }
+
+  function itensHtml(c, m, data, itens) {
+    if (!itens.length) {
+      return '<p class="mt-vazio">' + (S.gestor ? 'Nenhum item ainda. Use "Adicionar item" ou "Colar lista".' : 'Nenhum item cadastrado.') + '</p>';
+    }
+    var ctx = { c: c, m: m, data: data, lib: {}, turmas: rotularTurmas((data.turmas || []).filter(function (t) { return t.curso_id === c.id; })) };
+    (data.liberacoes || []).forEach(function (l) { ctx.lib[l.turma_id + '|' + l.item_id] = l; });
+    var org = organizar(itens);
+    var html = '';
+    if (org.livros.length) html += '<div class="mt-livros">' + org.livros.map(function (it) { return itemHtml(ctx, it); }).join('') + '</div>';
+    if (org.grupos.length === 1 && org.grupos[0].u === '') {
+      html += org.grupos[0].itens.map(function (it) { return itemHtml(ctx, it); }).join('');
+    } else {
+      org.grupos.forEach(function (g) {
+        var chave = 'u:' + c.id + ':' + m.id + ':' + g.u;
+        var aberto = S.busca || S.abertos[chave];
+        html += '<details class="mt-uni" data-chave="' + esc(chave) + '"' + (aberto ? ' open' : '') + '>' +
+          '<summary><span>' + esc(g.u || 'Outros materiais') + '</span><span class="mt-cont">' + g.itens.length + ' ite' + (g.itens.length === 1 ? 'm' : 'ns') + '</span></summary>' +
+          '<div class="mt-uni-corpo">' + unidadeSwitches(ctx, g) + g.itens.map(function (it) { return itemHtml(ctx, it); }).join('') + '</div></details>';
+      });
+    }
+    if (ctx.turmas.length && itens.some(function (it) { return liberavel(it) && it.ativo; })) {
+      html += '<p class="mt-nota" style="margin:10px 0 0;"><span class="material-icons-round">schedule</span>Liberar ou esconder vale no Portal do Aluno na próxima atualização (até as ' + esc(hora(data.proxima_atualizacao)) + ').</p>';
+    }
+    return html;
+  }
+
+  function switchHtml(ctx, t, ids, ligado, dica) {
+    return '<label class="mt-sw" title="' + esc(dica) + '"><input type="checkbox" data-acao="liberar" data-turma="' + esc(t.id) +
+      '" data-material="' + esc(ctx.m.id) + '" data-itens="' + esc(ids.join(',')) + '"' + (ligado ? ' checked' : '') + '>' +
+      '<span class="mt-sw-trilho" aria-hidden="true"></span><span>' + esc(t._rot) + '</span></label>';
+  }
+  function dicaTurma(t) { return 'Turma ' + (t.codigo || '') + (S.gestor && t.professor ? ' · ' + t.professor : ''); }
+
+  function unidadeSwitches(ctx, g) {
+    var lib = g.itens.filter(function (it) { return liberavel(it) && it.ativo; });
+    if (lib.length < 2 || !ctx.turmas.length) return '';
+    var ids = lib.map(function (it) { return it.id; });
+    return '<div class="mt-uni-sws"><span>Liberar a unidade inteira:</span>' + ctx.turmas.map(function (t) {
+      var todos = ids.every(function (id) { return ctx.lib[t.id + '|' + id]; });
+      return switchHtml(ctx, t, ids, todos, dicaTurma(t) + ' — ' + (todos ? 'todos os itens liberados' : 'liga todos os itens desta unidade'));
+    }).join('') + '</div>';
+  }
+
+  function itemHtml(ctx, it) {
+    var ok = it.url_permitida !== false;
+    var href = ok ? hrefSeguro(it.url) : null;
+    var emb = href ? embedUrl(href) : null;
+    var cat = CAT[it.categoria] || CAT.outro;
+    var selos = [];
+    if (it.destinatario === 'professor') selos.push('<span class="mt-selo prof">Só professor</span>');
+    else if (it.liberacao === 'imediata') selos.push('<span class="mt-selo aluno" title="Aparece no Portal do Aluno sem precisar liberar">Aluno · aparece direto</span>');
+    else selos.push('<span class="mt-selo libera" title="Aparece no Portal do Aluno quando o professor liberar para a turma">Aluno · após liberação</span>');
+    if (!it.ativo) selos.push('<span class="mt-selo arq">arquivado</span>');
+    if (!ok) selos.push('<span class="mt-selo erro" title="O domínio deste link saiu da lista de domínios permitidos. Corrija o link ou peça ao admin para incluir o domínio.">link bloqueado</span>');
+    var verbo = it.categoria === 'audio' ? 'Ouvir' : it.categoria === 'video' ? 'Assistir' : 'Ver';
+    var acoes = '';
+    if (emb) acoes += '<button class="btn-mt-mini tocar" type="button" data-acao="tocar" data-item="' + esc(it.id) + '" data-material="' + esc(ctx.m.id) + '" data-curso="' + esc(ctx.c.id) + '"><span class="material-icons-round">' + (it.categoria === 'audio' ? 'play_circle' : 'visibility') + '</span>' + verbo + '</button>';
+    if (href) acoes += '<a class="btn-mt-mini" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer"><span class="material-icons-round">open_in_new</span>Abrir</a>';
+    if (S.gestor) {
+      acoes += '<button class="btn-mt-mini so-icone" type="button" data-acao="editar-item" data-item="' + esc(it.id) + '" data-material="' + esc(ctx.m.id) + '" title="Editar"><span class="material-icons-round">edit</span></button>';
+      acoes += '<button class="btn-mt-mini so-icone" type="button" data-acao="arquivar-item" data-item="' + esc(it.id) + '" data-material="' + esc(ctx.m.id) + '" title="' + (it.ativo ? 'Arquivar (some para professores e alunos)' : 'Reativar') + '"><span class="material-icons-round">' + (it.ativo ? 'archive' : 'unarchive') + '</span></button>';
+      if (S.admin) acoes += '<button class="btn-mt-mini so-icone perigo" type="button" data-acao="excluir-item" data-item="' + esc(it.id) + '" data-material="' + esc(ctx.m.id) + '" title="Excluir de vez"><span class="material-icons-round">delete</span></button>';
+    }
+    var sws = '';
+    if (liberavel(it) && it.ativo && ctx.turmas.length) {
+      sws = '<div class="mt-sws"><span class="mt-sws-rot">No portal:</span>' + ctx.turmas.map(function (t) {
+        var l = ctx.lib[t.id + '|' + it.id];
+        return switchHtml(ctx, t, [it.id], !!l, dicaTurma(t) + ' — ' + (l ? 'liberado em ' + dataHora(l.liberado_em) + (l.liberado_por ? ' por ' + l.liberado_por : '') : 'escondido dos alunos'));
+      }).join('') + '</div>';
+    }
+    return '<div class="mt-item' + (it.ativo ? '' : ' mt-arquivado') + '">' +
+      '<span class="mt-ic ' + esc(it.categoria) + '" title="' + esc(cat.nome) + '"><span class="material-icons-round">' + cat.icone + '</span></span>' +
+      '<div class="mt-item-txt"><div class="mt-item-tit">' + esc(it.titulo) + '</div>' +
+      '<div class="mt-item-sub">' + (it.licao ? '<span>' + esc(it.licao) + '</span>' : '') + (ehLivro(it) ? '<span>' + esc(cat.nome) + '</span>' : '') + selos.join('') + '</div></div>' +
+      '<div class="mt-item-acoes">' + acoes + '</div>' + sws + '</div>';
+  }
+
+  // ── Liberação (switch) ──────────────────────────────────────────────────
+  function alternar(inp) {
+    var turma = inp.getAttribute('data-turma'), mid = inp.getAttribute('data-material');
+    var ids = inp.getAttribute('data-itens').split(',').filter(Boolean);
+    var ligar = inp.checked, data = S.itens[mid];
+    if (!data) return;
+    if (!ligar) ids = ids.filter(function (id) { return (data.liberacoes || []).some(function (l) { return l.turma_id === turma && l.item_id === id; }); });
+    if (!ids.length) { desenhar(); return; }
+    var t = (data.turmas || []).filter(function (x) { return x.id === turma; })[0] || {};
+    var rot = t._rot || rotuloTurma(t);
+    raiz.querySelectorAll('input[data-acao="liberar"][data-turma="' + turma + '"]').forEach(function (x) { x.disabled = true; });
+    rpc('materiais_liberar', { p_turma_id: turma, p_item_ids: ids, p_liberar: ligar }).then(function (r) {
+      data.liberacoes = (data.liberacoes || []).filter(function (l) { return !(l.turma_id === turma && ids.indexOf(l.item_id) !== -1); })
+        .concat((r.liberacoes || []).map(function (x) { return { turma_id: turma, item_id: x.item_id, liberado_em: x.liberado_em, liberado_por: x.liberado_por }; }));
+      data.proxima_atualizacao = r.proxima_atualizacao;
+      var qt = ids.length > 1 ? ids.length + ' itens ' : '';
+      aviso((ligar ? qt + 'Liberado para ' : qt + 'Escondido para ') + rot + '. ' +
+            (ligar ? 'Aparece para os alunos' : 'Some do Portal do Aluno') + ' na próxima atualização, até as ' + hora(r.proxima_atualizacao) + '.');
+      desenhar();
+    }).catch(function (e) {
+      aviso(e.message, 'error');
+      desenhar();
+    });
+  }
+
+  // ── Player ──────────────────────────────────────────────────────────────
+  function tocar(mid, cid, itemId) {
+    var data = S.itens[mid], m = matById(mid), c = cid === 'semcurso' ? { id: 'semcurso', nome: '' } : cursoById(cid);
+    if (!data || !m || !c) return;
+    var org = organizar(itensVisiveis(c, m, data));
+    var lista = org.livros.concat([].concat.apply([], org.grupos.map(function (g) { return g.itens; })))
+      .filter(function (it) { return it.url_permitida !== false && embedUrl(hrefSeguro(it.url)); });
+    var i = 0;
+    lista.forEach(function (it, k) { if (it.id === itemId) i = k; });
+    S.player = { lista: lista, i: i, material: m.titulo };
+    mostrarPlayer();
+    el('mt-player').hidden = false;
+  }
+  function mostrarPlayer() {
+    var p = S.player, it = p.lista[p.i]; if (!it) return;
+    var href = hrefSeguro(it.url), emb = embedUrl(href);
+    var caixa = el('mt-pl-video');
+    caixa.className = 'mt-player-video' + (it.categoria === 'audio' && /youtube/.test(emb) === false ? ' audio' : '');
+    caixa.innerHTML = '';
+    var f = document.createElement('iframe');
+    f.src = emb;
+    f.title = it.titulo;
+    f.setAttribute('allow', 'autoplay; encrypted-media; fullscreen; picture-in-picture');
+    f.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+    f.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-presentation');
+    caixa.appendChild(f);
+    el('mt-pl-titulo').innerHTML = esc(it.titulo) + '<small>' + esc([p.material, it.unidade, it.licao].filter(Boolean).join(' · ')) +
+      (p.lista.length > 1 ? ' · ' + (p.i + 1) + ' de ' + p.lista.length : '') + '</small>';
+    el('mt-pl-abrir').href = href;
+    el('mt-pl-ant').disabled = p.i <= 0;
+    el('mt-pl-prox').disabled = p.i >= p.lista.length - 1;
+    el('mt-pl-ant').hidden = el('mt-pl-prox').hidden = p.lista.length < 2;
+  }
+  function fecharPlayer() {
+    el('mt-pl-video').innerHTML = '';   // para o som
+    el('mt-player').hidden = true;
+    S.player = null;
+  }
+  el('mt-pl-fechar').addEventListener('click', fecharPlayer);
+  el('mt-pl-ant').addEventListener('click', function () { if (S.player && S.player.i > 0) { S.player.i--; mostrarPlayer(); } });
+  el('mt-pl-prox').addEventListener('click', function () { if (S.player && S.player.i < S.player.lista.length - 1) { S.player.i++; mostrarPlayer(); } });
+  el('mt-player').addEventListener('click', function (e) { if (e.target === this) fecharPlayer(); });
+
+  // ── Janela (modal) ──────────────────────────────────────────────────────
+  function abrirModal(titulo, corpo, rodape, largo) {
+    el('mt-modal-titulo').textContent = titulo;
+    el('mt-modal-corpo').innerHTML = corpo;
+    el('mt-modal-rodape').innerHTML = rodape;
+    el('mt-modal-caixa').className = 'mt-modal' + (largo ? ' largo' : '');
+    el('mt-modal').hidden = false;
+    var f = el('mt-modal-corpo').querySelector('input:not([type=hidden]),select,textarea');
+    if (f) setTimeout(function () { f.focus(); }, 30);
+  }
+  function fecharModal() { el('mt-modal').hidden = true; el('mt-modal-corpo').innerHTML = ''; }
+  el('mt-modal').addEventListener('click', function (e) {
+    if (e.target === this || e.target.closest('[data-fechar]')) fecharModal();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !document.body.contains(raiz)) return;
+    if (!el('mt-player').hidden) fecharPlayer();
+    else if (!el('mt-modal').hidden) fecharModal();
+  });
+  function ocupado(btn, sim) { if (btn) btn.disabled = !!sim; }
+
+  // Material: título, idioma, descrição, cursos ligados (com ordem e rótulo)
+  function modalMaterial(m) {
+    var novo = !m;
+    m = m || { titulo: '', descricao: '', idioma_id: S.idioma || ((S.d.idiomas || [])[0] || {}).id, ativo: true };
+    var ligados = {};
+    if (!novo) (S.d.cursos || []).forEach(function (c) {
+      (c.materiais || []).forEach(function (x) { if (x.material_id === m.id) ligados[c.id] = { ordem: x.ordem, rotulo: x.rotulo || '' }; });
+    });
+    var corpo =
+      '<div class="mt-grid">' +
+        '<div class="mt-campo s2"><label for="mt-f-titulo">Título do material <span class="req">*</span></label>' +
+          '<input class="mt-input" id="mt-f-titulo" maxlength="150" value="' + esc(m.titulo) + '" placeholder="Ex.: Hola, ¿qué tal? 1"></div>' +
+        '<div class="mt-campo"><label for="mt-f-idioma">Idioma <span class="req">*</span></label><select class="mt-input" id="mt-f-idioma">' +
+          (S.d.idiomas || []).map(function (i) { return '<option value="' + esc(i.id) + '"' + (i.id === m.idioma_id ? ' selected' : '') + '>' + esc(i.nome) + '</option>'; }).join('') +
+        '</select></div>' +
+        '<div class="mt-campo"><label>&nbsp;</label>' + (novo ? '' : '<label class="mt-check" style="height:38px;text-transform:none;letter-spacing:0;font-weight:400;font-size:13px;"><input type="checkbox" id="mt-f-ativo"' + (m.ativo ? ' checked' : '') + '> Ativo (desmarque para arquivar)</label>') + '</div>' +
+        '<div class="mt-campo s2"><label for="mt-f-desc">Descrição (opcional)</label><textarea class="mt-input" id="mt-f-desc" maxlength="500" placeholder="Edição, editora, observações…">' + esc(m.descricao || '') + '</textarea></div>' +
+        '<div class="mt-campo s2"><span class="mt-rot">Cursos que usam este material</span><div class="mt-cursos-lista" id="mt-f-cursos"></div>' +
+          '<span class="mt-ajuda">Curso intensivo (dois semestres em um): ligue os dois materiais ao curso, com ordem 1 e 2 e os rótulos "1ª parte" e "2ª parte".</span></div>' +
+      '</div>';
+    var rodape = (S.admin && !novo ? '<button class="btn-mt btn-mt-perigo esq" type="button" id="mt-f-excluir"><span class="material-icons-round">delete_forever</span>Excluir de vez</button>' : '') +
+      '<button class="btn-mt btn-mt-sec" type="button" data-fechar>Cancelar</button>' +
+      '<button class="btn-mt btn-mt-pri" type="button" id="mt-f-salvar"><span class="material-icons-round">save</span>Salvar</button>';
+    abrirModal(novo ? 'Novo material' : 'Editar material', corpo, rodape);
+
+    function desenharCursos() {
+      var idi = el('mt-f-idioma').value;
+      var lista = (S.d.cursos || []).filter(function (c) { return c.idioma_id === idi; })
+        .sort(function (a, b) { return String(a.nome).localeCompare(String(b.nome), 'pt-BR'); });
+      el('mt-f-cursos').innerHTML = lista.length ? lista.map(function (c) {
+        var l = ligados[c.id];
+        return '<div class="mt-curso-linha" data-curso="' + esc(c.id) + '">' +
+          '<label><input type="checkbox" data-c="liga"' + (l ? ' checked' : '') + '><span>' + esc(c.nome) + (c.ativo ? '' : ' <small>(inativo)</small>') + '</span></label>' +
+          '<select class="mt-input" data-c="ordem" title="Ordem do material no curso">' + [1, 2, 3, 4].map(function (n) {
+            return '<option value="' + n + '"' + ((l ? l.ordem : 1) === n ? ' selected' : '') + '>' + n + 'º</option>'; }).join('') + '</select>' +
+          '<input class="mt-input rot" data-c="rotulo" maxlength="40" placeholder="Rótulo (opcional)" value="' + esc(l ? l.rotulo : '') + '">' +
+        '</div>';
+      }).join('') : '<p class="mt-vazio">Nenhum curso cadastrado para este idioma.</p>';
+    }
+    desenharCursos();
+    el('mt-f-idioma').addEventListener('change', desenharCursos);
+
+    el('mt-f-salvar').addEventListener('click', function () {
+      var btn = this;
+      var cursos = [];
+      el('mt-f-cursos').querySelectorAll('.mt-curso-linha').forEach(function (r) {
+        if (!r.querySelector('[data-c="liga"]').checked) return;
+        cursos.push({ curso_id: r.getAttribute('data-curso'), ordem: Number(r.querySelector('[data-c="ordem"]').value) || 1,
+                      rotulo: r.querySelector('[data-c="rotulo"]').value.trim() });
+      });
+      var p = { titulo: el('mt-f-titulo').value.trim(), descricao: el('mt-f-desc').value.trim(), idioma_id: el('mt-f-idioma').value, cursos: cursos };
+      if (!novo) { p.id = m.id; p.ativo = el('mt-f-ativo').checked; }
+      if (!p.titulo) { aviso('Informe o título do material.', 'error'); el('mt-f-titulo').focus(); return; }
+      ocupado(btn, true);
+      rpc('material_salvar', { p: p }).then(function (r) {
+        aviso(r.alterado === false ? 'Nenhuma alteração para salvar.' : (novo ? 'Material criado.' : 'Material salvo.'));
+        fecharModal();
+        if (novo && r.id) {   // mostra o material novo já aberto, onde ele foi ligado
+          cursos.forEach(function (x) {
+            var c = cursoById(x.curso_id);
+            if (c) S.abertos[c.meu ? 'sec:meus' : 'sec:' + c.idioma_id] = true;
+            S.abertos['c:' + x.curso_id] = true; S.abertos['m:' + x.curso_id + ':' + r.id] = true;
+          });
+          if (!cursos.length) { S.abertos['sec:semcurso'] = true; S.abertos['m:semcurso:' + r.id] = true; }
+          S.rolar = cursos.length ? 'm:' + cursos[0].curso_id + ':' + r.id : 'm:semcurso:' + r.id;
+        }
+        return carregar();
+      }).catch(function (e) { aviso(e.message, 'error'); ocupado(btn, false); });
+    });
+    if (el('mt-f-excluir')) el('mt-f-excluir').addEventListener('click', function () {
+      var btn = this;
+      if (!confirm('Excluir de vez o material "' + m.titulo + '", com todos os seus itens e liberações?\n\nIsso não pode ser desfeito. Para só tirar da lista, desmarque "Ativo".')) return;
+      ocupado(btn, true);
+      rpc('material_excluir', { p_id: m.id }).then(function () {
+        aviso('Material excluído.');
+        fecharModal(); delete S.itens[m.id];
+        return carregar();
+      }).catch(function (e) { aviso(e.message, 'error'); ocupado(btn, false); });
+    });
+  }
+
+  // Item: tipo, para quem, liberação, unidade, lição, título, link
+  function modalItem(mid, it) {
+    var novo = !it;
+    var data = S.itens[mid] || { itens: [] };
+    it = it || { categoria: 'audio', destinatario: 'professor', liberacao: 'professor', unidade: '', licao: '', titulo: '', url: '', ordem: null, ativo: true };
+    var unidades = [];
+    (data.itens || []).forEach(function (x) { if (x.unidade && unidades.indexOf(x.unidade) === -1) unidades.push(x.unidade); });
+    var m = matById(mid) || {};
+    var corpo =
+      '<div class="mt-grid">' +
+        '<div class="mt-campo s2"><span class="mt-rot">Tipo</span><div class="mt-opcoes">' + CATEGORIAS.map(function (c) {
+          return '<label class="mt-opcao"><input type="radio" name="mt-f-cat" value="' + c[0] + '"' + (it.categoria === c[0] ? ' checked' : '') + '>' + esc(c[1]) + '</label>'; }).join('') + '</div></div>' +
+        '<div class="mt-campo s2" id="mt-f-dest-box"><span class="mt-rot">Para quem</span><div class="mt-opcoes">' +
+          '<label class="mt-opcao"><input type="radio" name="mt-f-dest" value="professor"' + (it.destinatario === 'professor' ? ' checked' : '') + '>Só professores</label>' +
+          '<label class="mt-opcao"><input type="radio" name="mt-f-dest" value="aluno"' + (it.destinatario === 'aluno' ? ' checked' : '') + '>Professores e alunos (Portal do Aluno)</label></div></div>' +
+        '<div class="mt-campo s2" id="mt-f-lib-box"><span class="mt-rot">No Portal do Aluno</span><div class="mt-opcoes">' +
+          '<label class="mt-opcao"><input type="radio" name="mt-f-lib" value="professor"' + (it.liberacao !== 'imediata' ? ' checked' : '') + '>Só depois que o professor liberar para a turma</label>' +
+          '<label class="mt-opcao"><input type="radio" name="mt-f-lib" value="imediata"' + (it.liberacao === 'imediata' ? ' checked' : '') + '>Aparece direto</label></div>' +
+          '<span class="mt-ajuda">O compartilhamento do arquivo no Drive precisa ser "qualquer pessoa com o link", senão o aluno não consegue abrir.</span></div>' +
+        '<div class="mt-campo"><label for="mt-f-uni">Unidade</label><input class="mt-input" id="mt-f-uni" maxlength="60" list="mt-f-unis" value="' + esc(it.unidade || '') + '" placeholder="Ex.: Unidad 3">' +
+          '<datalist id="mt-f-unis">' + unidades.map(function (u) { return '<option value="' + esc(u) + '">'; }).join('') + '</datalist></div>' +
+        '<div class="mt-campo"><label for="mt-f-lic">Lição / atividade</label><input class="mt-input" id="mt-f-lic" maxlength="100" value="' + esc(it.licao || '') + '" placeholder="Ex.: Lección 2 · Actividad 3B"></div>' +
+        '<div class="mt-campo s2"><label for="mt-f-tit">Título <span class="req">*</span></label><input class="mt-input" id="mt-f-tit" maxlength="200" value="' + esc(it.titulo || '') + '" placeholder="Ex.: Pista 12"></div>' +
+        '<div class="mt-campo s2"><label for="mt-f-url">Link <span class="req">*</span></label><input class="mt-input" id="mt-f-url" maxlength="1000" value="' + esc(it.url || '') + '" placeholder="https://drive.google.com/file/d/…">' +
+          '<span class="mt-ajuda">Domínios aceitos: ' + esc((S.d.dominios || []).map(function (d) { return d.dominio; }).join(', ')) + '.</span></div>' +
+        '<div class="mt-campo"><label for="mt-f-ordem">Posição na lista</label><input class="mt-input" id="mt-f-ordem" type="number" step="1" value="' + esc(it.ordem == null ? '' : it.ordem) + '" placeholder="Automática (no fim)"></div>' +
+        '<div class="mt-campo"><label>&nbsp;</label>' + (novo ? '' : '<label class="mt-check" style="height:38px;text-transform:none;letter-spacing:0;font-weight:400;font-size:13px;"><input type="checkbox" id="mt-f-ativo"' + (it.ativo ? ' checked' : '') + '> Ativo (desmarque para arquivar)</label>') + '</div>' +
+      '</div>';
+    var rodape = '<button class="btn-mt btn-mt-sec" type="button" data-fechar>Cancelar</button>' +
+      '<button class="btn-mt btn-mt-pri" type="button" id="mt-f-salvar"><span class="material-icons-round">save</span>Salvar</button>';
+    abrirModal((novo ? 'Novo item' : 'Editar item') + (m.titulo ? ' — ' + m.titulo : ''), corpo, rodape);
+
+    function valor(nome) { var x = el('mt-modal-corpo').querySelector('input[name="' + nome + '"]:checked'); return x ? x.value : ''; }
+    function ajustar() {
+      var cat = valor('mt-f-cat');
+      var livro = cat === 'livro_professor' || cat === 'livro_aluno';
+      el('mt-f-dest-box').hidden = livro;
+      var dest = cat === 'livro_professor' ? 'professor' : cat === 'livro_aluno' ? 'aluno' : valor('mt-f-dest');
+      el('mt-f-lib-box').hidden = dest !== 'aluno';
+    }
+    el('mt-modal-corpo').querySelectorAll('input[type=radio]').forEach(function (r) { r.addEventListener('change', ajustar); });
+    el('mt-modal-corpo').querySelectorAll('input[name="mt-f-cat"]').forEach(function (r) {
+      r.addEventListener('change', function () {   // livro do aluno costuma aparecer direto
+        if (r.checked && r.value === 'livro_aluno') { var i = el('mt-modal-corpo').querySelector('input[name="mt-f-lib"][value="imediata"]'); if (i) i.checked = true; }
+      });
+    });
+    ajustar();
+
+    el('mt-f-salvar').addEventListener('click', function () {
+      var btn = this;
+      var cat = valor('mt-f-cat');
+      var dest = cat === 'livro_professor' ? 'professor' : cat === 'livro_aluno' ? 'aluno' : valor('mt-f-dest');
+      var url = normalizarLink(el('mt-f-url').value);
+      if (!el('mt-f-tit').value.trim()) { aviso('Informe o título do item.', 'error'); el('mt-f-tit').focus(); return; }
+      if (!url) { aviso(url === '' ? 'Informe o link.' : 'O link não parece um endereço válido.', 'error'); el('mt-f-url').focus(); return; }
+      el('mt-f-url').value = url;
+      var ordem = el('mt-f-ordem').value.trim();
+      var p = { material_id: mid, categoria: cat, destinatario: dest, liberacao: dest === 'aluno' ? valor('mt-f-lib') : null,
+                unidade: el('mt-f-uni').value.trim(), licao: el('mt-f-lic').value.trim(), titulo: el('mt-f-tit').value.trim(), url: url };
+      if (ordem !== '') p.ordem = parseInt(ordem, 10);
+      if (!novo) { p.id = it.id; p.ativo = el('mt-f-ativo').checked; }
+      ocupado(btn, true);
+      rpc('material_item_salvar', { p: p }).then(function (r) {
+        aviso(r.alterado === false ? 'Nenhuma alteração para salvar.' : (novo ? 'Item incluído.' : 'Item salvo.'));
+        fecharModal();
+        return recarregarItens(mid).then(atualizarContagem.bind(null, mid));
+      }).catch(function (e) { aviso(e.message, 'error'); ocupado(btn, false); });
+    });
+  }
+
+  function atualizarContagem(mid) {
+    var m = matById(mid), d = S.itens[mid];
+    if (m && d) { m.itens = (d.itens || []).filter(function (x) { return S.gestor || x.ativo; }).length; desenhar(); }
+  }
+
+  // Colar lista: colunas Unidade | Lição | Título | Link (copiadas de uma planilha)
+  function modalColar(mid) {
+    var m = matById(mid) || {};
+    var corpo =
+      '<div class="mt-grid">' +
+        '<div class="mt-campo s2"><span class="mt-rot">Tipo dos itens</span><div class="mt-opcoes">' + CATEGORIAS.filter(function (c) { return !/^livro/.test(c[0]); }).map(function (c) {
+          return '<label class="mt-opcao"><input type="radio" name="mt-c-cat" value="' + c[0] + '"' + (c[0] === 'audio' ? ' checked' : '') + '>' + esc(c[1]) + '</label>'; }).join('') + '</div></div>' +
+        '<div class="mt-campo s2"><span class="mt-rot">Para quem</span><div class="mt-opcoes">' +
+          '<label class="mt-opcao"><input type="radio" name="mt-c-dest" value="professor" checked>Só professores</label>' +
+          '<label class="mt-opcao"><input type="radio" name="mt-c-dest" value="aluno">Professores e alunos</label></div></div>' +
+        '<div class="mt-campo s2" id="mt-c-lib-box" hidden><span class="mt-rot">No Portal do Aluno</span><div class="mt-opcoes">' +
+          '<label class="mt-opcao"><input type="radio" name="mt-c-lib" value="professor" checked>Depois que o professor liberar</label>' +
+          '<label class="mt-opcao"><input type="radio" name="mt-c-lib" value="imediata">Aparece direto</label></div></div>' +
+        '<div class="mt-campo s2"><label for="mt-c-txt">Cole aqui as linhas da planilha</label>' +
+          '<textarea class="mt-input" id="mt-c-txt" rows="8" style="font-family:var(--font-mono,monospace);font-size:12.5px;" placeholder="Unidad 1&#9;Lección 1&#9;Pista 1&#9;https://drive.google.com/file/d/…"></textarea>' +
+          '<span class="mt-ajuda">Quatro colunas, nesta ordem: <strong>Unidade · Lição/atividade · Título · Link</strong>. Selecione as células na planilha (Google Planilhas ou Excel), copie e cole aqui. Unidade e lição podem ficar vazias. Uma linha de cabeçalho é ignorada.</span></div>' +
+        '<div class="mt-campo s2"><span class="mt-rot" id="mt-c-resumo">Prévia</span><div class="mt-tabela-wrap"><table class="mt-tabela"><thead><tr><th>#</th><th>Unidade</th><th>Lição</th><th>Título</th><th>Link</th></tr></thead><tbody id="mt-c-previa"><tr><td colspan="5" class="mt-vazio">Nada colado ainda.</td></tr></tbody></table></div></div>' +
+      '</div>';
+    var rodape = '<button class="btn-mt btn-mt-sec" type="button" data-fechar>Cancelar</button>' +
+      '<button class="btn-mt btn-mt-pri" type="button" id="mt-c-salvar" disabled><span class="material-icons-round">playlist_add</span><span id="mt-c-btn-txt">Incluir itens</span></button>';
+    abrirModal('Colar lista — ' + (m.titulo || ''), corpo, rodape, true);
+
+    var linhas = [];
+    function valor(nome) { var x = el('mt-modal-corpo').querySelector('input[name="' + nome + '"]:checked'); return x ? x.value : ''; }
+    function ler() {
+      linhas = [];
+      String(el('mt-c-txt').value || '').split(/\r?\n/).forEach(function (bruta, i) {
+        if (!bruta.trim()) return;
+        var cols = bruta.split('\t');
+        if (cols.length === 1 && bruta.indexOf(';') !== -1) cols = bruta.split(';');
+        cols = cols.map(function (x) { return x.trim(); });
+        // cabeçalho: primeira linha sem endereço no fim
+        if (!linhas.length && i === 0 && !/^(https?:\/\/|[a-z0-9-]+\.)/i.test(cols[cols.length - 1] || '') && /link|url|t[ií]tulo/i.test(bruta)) return;
+        var r = { unidade: cols[0] || '', licao: cols[1] || '', titulo: cols[2] || '', bruto: cols[3] || '', erro: '' };
+        if (cols.length < 4) r.erro = 'Faltam colunas (são 4: unidade, lição, título, link).';
+        else if (cols.length > 4 && cols.slice(4).some(Boolean)) r.erro = 'Há mais de 4 colunas.';
+        else if (!r.titulo) r.erro = 'Falta o título.';
+        else {
+          r.url = normalizarLink(r.bruto);
+          if (!r.url) r.erro = 'Link vazio ou inválido.';
+          else if (!dominioPermitido(r.url)) r.erro = 'O domínio ' + new URL(r.url).hostname + ' não está na lista de domínios permitidos.';
+        }
+        if (!r.erro && (r.unidade.length > 60 || r.licao.length > 100 || r.titulo.length > 200)) r.erro = 'Texto longo demais.';
+        linhas.push(r);
+      });
+      var erros = linhas.filter(function (r) { return r.erro; }).length;
+      el('mt-c-previa').innerHTML = linhas.length ? linhas.map(function (r, k) {
+        return '<tr' + (r.erro ? ' class="erro"' : '') + '><td>' + (k + 1) + '</td><td>' + esc(r.unidade) + '</td><td>' + esc(r.licao) + '</td><td>' + esc(r.titulo) +
+          (r.erro ? '<br><small style="color:#A32D2D;">' + esc(r.erro) + '</small>' : '') + '</td><td class="mono">' + esc(r.url || r.bruto) + '</td></tr>';
+      }).join('') : '<tr><td colspan="5" class="mt-vazio">Nada colado ainda.</td></tr>';
+      el('mt-c-resumo').textContent = linhas.length ? 'Prévia: ' + linhas.length + ' linha(s)' + (erros ? ', ' + erros + ' com problema — corrija na planilha e cole de novo' : ', tudo certo') : 'Prévia';
+      el('mt-c-salvar').disabled = !linhas.length || erros > 0;
+      el('mt-c-btn-txt').textContent = linhas.length && !erros ? 'Incluir ' + linhas.length + ' ite' + (linhas.length === 1 ? 'm' : 'ns') : 'Incluir itens';
+    }
+    el('mt-c-txt').addEventListener('input', ler);
+    el('mt-modal-corpo').querySelectorAll('input[name="mt-c-dest"]').forEach(function (r) {
+      r.addEventListener('change', function () { el('mt-c-lib-box').hidden = valor('mt-c-dest') !== 'aluno'; });
+    });
+    el('mt-c-salvar').addEventListener('click', function () {
+      var btn = this;
+      var cat = valor('mt-c-cat'), dest = valor('mt-c-dest'), lib = dest === 'aluno' ? valor('mt-c-lib') : null;
+      var itens = linhas.map(function (r) {
+        return { categoria: cat, destinatario: dest, liberacao: lib, unidade: r.unidade, licao: r.licao, titulo: r.titulo, url: r.url };
+      });
+      ocupado(btn, true);
+      rpc('material_itens_importar', { p_material_id: mid, p_itens: itens }).then(function (r) {
+        aviso((r.incluidos || itens.length) + ' item(ns) incluído(s).');
+        fecharModal();
+        return recarregarItens(mid).then(atualizarContagem.bind(null, mid));
+      }).catch(function (e) { aviso(e.message + ' Nada foi gravado.', 'error'); ocupado(btn, false); });
+    });
+  }
+
+  function arquivarItem(mid, it) {
+    var ativar = !it.ativo;
+    if (!ativar && !confirm('Arquivar "' + it.titulo + '"?\n\nO item some para professores e alunos (e do Portal na próxima atualização). Dá para reativar depois com "Mostrar arquivados".')) return;
+    rpc('material_item_salvar', { p: { id: it.id, ativo: ativar } }).then(function () {
+      aviso(ativar ? 'Item reativado.' : 'Item arquivado.');
+      return recarregarItens(mid).then(atualizarContagem.bind(null, mid));
+    }).catch(function (e) { aviso(e.message, 'error'); });
+  }
+  function excluirItem(mid, it) {
+    if (!confirm('Excluir de vez "' + it.titulo + '"?\n\nIsso não pode ser desfeito. Para só tirar da lista, use "Arquivar".')) return;
+    rpc('material_item_excluir', { p_id: it.id }).then(function () {
+      aviso('Item excluído.');
+      return recarregarItens(mid).then(atualizarContagem.bind(null, mid));
+    }).catch(function (e) { aviso(e.message, 'error'); });
+  }
+  function itemPorId(mid, id) { var d = S.itens[mid]; return d ? (d.itens || []).filter(function (x) { return x.id === id; })[0] : null; }
+
+  // ── Eventos da árvore ───────────────────────────────────────────────────
+  var arvore = el('mt-arvore');
+  arvore.addEventListener('toggle', function (e) {
+    var d = e.target;
+    if (S.busca || !d || !d.getAttribute || !d.getAttribute('data-chave')) return;   // na busca, tudo abre sozinho
+    S.abertos[d.getAttribute('data-chave')] = d.open;
+    var mid = d.getAttribute('data-material');
+    if (d.open && mid && !S.itens[mid]) carregarItens(mid);
+  }, true);
+  arvore.addEventListener('change', function (e) {
+    if (e.target.matches('input[data-acao="liberar"]')) alternar(e.target);
+  });
+  arvore.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-acao]');
+    if (!b) return;
+    var acao = b.getAttribute('data-acao'), mid = b.getAttribute('data-material'), iid = b.getAttribute('data-item');
+    if (acao === 'tocar') tocar(mid, b.getAttribute('data-curso'), iid);
+    else if (acao === 'editar-material') modalMaterial(matById(mid));
+    else if (acao === 'novo-item') modalItem(mid, null);
+    else if (acao === 'colar') modalColar(mid);
+    else if (acao === 'editar-item') { var it = itemPorId(mid, iid); if (it) modalItem(mid, it); }
+    else if (acao === 'arquivar-item') { var a = itemPorId(mid, iid); if (a) arquivarItem(mid, a); }
+    else if (acao === 'excluir-item') { var x = itemPorId(mid, iid); if (x) excluirItem(mid, x); }
+  });
+
+  // ── Barra de ferramentas ────────────────────────────────────────────────
+  var tBusca = null;
+  el('mt-busca').addEventListener('input', function () {
+    var v = this.value;
+    clearTimeout(tBusca);
+    tBusca = setTimeout(function () {
+      S.busca = norm(v);
+      desenhar();   // carrega os itens dos materiais que ainda não foram abertos
+    }, 300);
+  });
+  el('mt-idioma').addEventListener('change', function () { S.idioma = this.value; desenhar(); });
+  el('mt-arq').addEventListener('change', function () { S.verArq = this.checked; desenhar(); });
+  el('mt-novo').addEventListener('click', function () { modalMaterial(null); });
+
+  // ── Abas ────────────────────────────────────────────────────────────────
+  raiz.querySelectorAll('.mt-aba').forEach(function (b) {
+    b.addEventListener('click', function () { mostrarAba(b.getAttribute('data-aba')); });
+  });
+  function mostrarAba(aba) {
+    S.aba = aba;
+    raiz.querySelectorAll('.mt-aba').forEach(function (b) { b.classList.toggle('ativa', b.getAttribute('data-aba') === aba); });
+    el('mt-painel-materiais').hidden = aba !== 'materiais';
+    el('mt-painel-emails').hidden = aba !== 'emails';
+    el('mt-painel-dominios').hidden = aba !== 'dominios';
+    if (aba === 'emails') desenharEmails();
+    if (aba === 'dominios') desenharDominios();
+  }
+
+  // E-mails dos professores por idioma (para conferir o Google Grupo)
+  function desenharEmails() {
+    var box = el('mt-painel-emails');
+    var idis = (S.d && S.d.idiomas) || [];
+    if (!S.emails) S.emails = { idioma: S.idioma || (idis[0] || {}).id, lista: null };
+    box.innerHTML = '<div class="mt-card"><div class="mt-card-titulo"><span class="material-icons-round">group</span>Professores por idioma</div>' +
+      '<p class="mt-nota"><span class="material-icons-round">info</span><span>Use esta lista para conferir quem está no compartilhamento das pastas do professor (de preferência um Google Grupo por idioma). Entram os professores e a coordenação com o idioma validado no cadastro ou com turma dele neste semestre. O e-mail é o de acesso ao SGE: se a pessoa usa outra conta Google, confira com ela.</span></p>' +
+      '<div class="mt-toolbar"><select class="mt-input mt-sel" id="mt-e-idioma">' + idis.map(function (i) {
+        return '<option value="' + esc(i.id) + '"' + (i.id === S.emails.idioma ? ' selected' : '') + '>' + esc(i.nome) + '</option>'; }).join('') + '</select>' +
+      '<button class="btn-mt btn-mt-sec" type="button" id="mt-e-copiar" disabled><span class="material-icons-round">content_copy</span>Copiar todos os e-mails</button></div>' +
+      '<div id="mt-e-lista"><div class="mt-carregando"><div class="mt-spinner"></div>Carregando…</div></div></div>';
+    el('mt-e-idioma').addEventListener('change', function () { S.emails.idioma = this.value; S.emails.lista = null; desenharEmails(); });
+    el('mt-e-copiar').addEventListener('click', copiarEmails);
+    if (S.emails.lista) return listaEmails();
+    rpc('materiais_emails_professores', { p_idioma_id: S.emails.idioma }).then(function (l) { S.emails.lista = l || []; listaEmails(); })
+      .catch(function (e) { el('mt-e-lista').innerHTML = '<p class="mt-erro">' + esc(e.message) + '</p>'; });
+  }
+  function listaEmails() {
+    var l = S.emails.lista || [];
+    el('mt-e-copiar').disabled = !l.length;
+    el('mt-e-lista').innerHTML = l.length
+      ? '<div class="mt-tabela-wrap" style="max-height:none;"><table class="mt-tabela"><thead><tr><th>Nome</th><th>Papel</th><th>E-mail</th></tr></thead><tbody>' +
+        l.map(function (u) { return '<tr><td>' + esc(u.nome) + '</td><td>' + esc(u.papel === 'coordenacao' ? 'Coordenação' : 'Professor') + '</td><td class="mono">' + esc(u.email || '—') + '</td></tr>'; }).join('') +
+        '</tbody></table></div><p class="mt-nota" style="margin:8px 0 0;">' + l.length + ' pessoa(s).</p>'
+      : '<p class="mt-vazio">Nenhum professor com este idioma.</p>';
+  }
+  function copiarEmails() {
+    var txt = (S.emails.lista || []).map(function (u) { return u.email; }).filter(Boolean).join(', ');
+    var ok = function () { aviso('E-mails copiados. Cole no campo de compartilhamento do Drive ou do Google Grupo.'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, function () { prompt('Copie os e-mails:', txt); });
+    else prompt('Copie os e-mails:', txt);
+  }
+
+  // Domínios permitidos: todos os gestores veem; só o admin altera
+  function desenharDominios() {
+    var box = el('mt-painel-dominios');
+    var l = (S.d && S.d.dominios) || [];
+    box.innerHTML = '<div class="mt-card"><div class="mt-card-titulo"><span class="material-icons-round">verified_user</span>Domínios permitidos para os links</div>' +
+      '<p class="mt-nota"><span class="material-icons-round">info</span><span>Só são aceitos links <strong>https</strong> destes sites (e dos subdomínios deles: <span style="font-family:var(--font-mono,monospace);">wordwall.net</span> também aceita <span style="font-family:var(--font-mono,monospace);">www.wordwall.net</span>). Assim, mesmo que alguém use uma conta da coordenação indevidamente, não consegue pôr um site falso no Portal do Aluno.' +
+      (S.admin ? '' : ' Só o admin altera esta lista.') + '</span></p>' +
+      (S.admin ? '<div class="mt-aviso" style="margin-bottom:12px;"><span class="material-icons-round">warning</span><span>Evite domínios onde <strong>qualquer pessoa</strong> cria páginas, como <em>sites.google.com</em>, <em>github.io</em> ou <em>blogspot.com</em>: um link falso nesses sites passaria pela verificação. Prefira o endereço próprio da plataforma (ex.: <em>wordwall.net</em>, <em>liveworksheets.com</em>).</span></div>' : '') +
+      '<div class="mt-tabela-wrap" style="max-height:none;"><table class="mt-tabela"><thead><tr><th>Domínio</th><th>Descrição</th>' + (S.admin ? '<th></th>' : '') + '</tr></thead><tbody>' +
+      (l.length ? l.map(function (d) {
+        return '<tr><td class="mono">' + esc(d.dominio) + '</td><td>' + esc(d.descricao || '') + '</td>' +
+          (S.admin ? '<td style="text-align:right;"><button class="btn-mt-mini perigo" type="button" data-dominio="' + esc(d.dominio) + '"><span class="material-icons-round">remove_circle_outline</span>Retirar</button></td>' : '') + '</tr>';
+      }).join('') : '<tr><td colspan="3" class="mt-vazio">Nenhum domínio: nenhum link será aceito.</td></tr>') +
+      '</tbody></table></div>' +
+      (S.admin ? '<div class="mt-linha-form"><div class="mt-campo"><label for="mt-d-dom" class="mt-rot">Domínio ou endereço</label><input class="mt-input" id="mt-d-dom" placeholder="wordwall.net (ou cole um link do site)"></div>' +
+        '<div class="mt-campo"><label for="mt-d-desc" class="mt-rot">Descrição</label><input class="mt-input" id="mt-d-desc" maxlength="100" placeholder="Ex.: Wordwall — atividades"></div>' +
+        '<button class="btn-mt btn-mt-pri" type="button" id="mt-d-add"><span class="material-icons-round">add</span>Incluir</button></div>' : '') +
+      '</div>';
+    if (!S.admin) return;
+    el('mt-d-add').addEventListener('click', function () {
+      var btn = this, dom = el('mt-d-dom').value.trim();
+      if (!dom) { aviso('Informe o domínio.', 'error'); return; }
+      ocupado(btn, true);
+      rpc('material_dominio_salvar', { p_dominio: dom, p_descricao: el('mt-d-desc').value.trim() }).then(function (r) {
+        aviso('Domínio ' + r.dominio + ' incluído.');
+        S.itens = {};
+        return carregar();
+      }).catch(function (e) { aviso(e.message, 'error'); ocupado(btn, false); });
+    });
+    box.querySelectorAll('button[data-dominio]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var dom = b.getAttribute('data-dominio');
+        if (!confirm('Retirar ' + dom + ' da lista?\n\nOs itens com links desse site ficam marcados como "link bloqueado" e somem do Portal do Aluno na próxima atualização.')) return;
+        ocupado(b, true);
+        rpc('material_dominio_excluir', { p_dominio: dom }).then(function (r) {
+          aviso('Domínio retirado.' + (r.itens_bloqueados ? ' ' + r.itens_bloqueados + ' item(ns) ficaram com link bloqueado.' : ''));
+          S.itens = {};
+          return carregar();
+        }).catch(function (e) { aviso(e.message, 'error'); ocupado(b, false); });
+      });
+    });
+  }
+
+  carregar();
+}());
+</script>
