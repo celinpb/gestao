@@ -452,6 +452,12 @@
   .f9-ativo-check input { width: 16px; height: 16px; accent-color: #E63946; }
   .badge-inativo { display: inline-flex; padding: 1px 7px; border-radius: 4px; font-size: 10.5px; font-weight: 600; background: rgba(230,57,70,0.10); color: #A32D2D; margin-left: 6px; vertical-align: middle; }
   .f9-input[readonly] { background: #F0EEE8; color: var(--c-text-2, #5C5C7A); cursor: not-allowed; }
+  /* Novo curso criado a partir de "Próximo(s) curso(s)" */
+  .f9-subform { margin-top: 8px; background: #F8F7F3; border: 1.5px dashed #C8C7C2; border-radius: 9px; padding: 12px 14px; }
+  .f9-subform-titulo { font-size: 12.5px; font-weight: 600; color: var(--c-text-1, #1A1A2E); margin-bottom: 10px; }
+  .f9-subform .f9-form-grid { gap: 10px; }
+  .f9-subform-acoes { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+  .f9-subform-acoes .btn-f9-modal { height: 34px; font-size: 13px; padding: 0 14px; }
 </style>
 
 <!-- =========================================================
@@ -566,7 +572,8 @@
       <div class="f9-form-grid">
         <div class="f9-field">
           <label>CursoID <span class="req">*</span></label>
-          <input type="text" class="f9-input" id="fc-id" placeholder="Ex: C01">
+          <input type="text" class="f9-input" id="fc-id" placeholder="Ex: C01" readonly>
+          <span class="f9-hint" id="fc-id-dica">&nbsp;</span>
           <span class="f9-erro-msg" id="err-fc-id">Informe o CursoID.</span>
         </div>
         <div class="f9-field">
@@ -616,6 +623,49 @@
           <div class="f9-lista-ord" id="fc-proximos-lista"></div>
           <select class="f9-input" id="fc-proximos-add"><option value="">+ Adicionar próximo curso…</option></select>
           <span class="f9-hint">Deixe vazio se for o último curso da sequência. Mais de um = opções de continuação.</span>
+          <button type="button" class="btn-linha" id="fc-prox-novo-btn" style="align-self:flex-start;margin-top:4px;">
+            <span class="material-icons-round">add_circle_outline</span>Não encontrou? Cadastrar um curso novo como próximo
+          </button>
+          <div class="f9-subform" id="fc-prox-novo" style="display:none;">
+            <div class="f9-subform-titulo">Novo curso — é criado agora e entra como próximo curso deste</div>
+            <div class="f9-modal-alerta" id="np-alerta">
+              <span class="material-icons-round">error_outline</span>
+              <span id="np-alerta-msg"></span>
+            </div>
+            <div class="f9-form-grid">
+              <div class="f9-field">
+                <label>CursoID</label>
+                <input type="text" class="f9-input" id="np-id" readonly>
+              </div>
+              <div class="f9-field">
+                <label>Idioma <span class="req">*</span></label>
+                <select class="f9-input" id="np-idioma"></select>
+              </div>
+              <div class="f9-field span2">
+                <label>Nome do curso <span class="req">*</span></label>
+                <input type="text" class="f9-input" id="np-nome" placeholder="Ex: English 2">
+              </div>
+              <div class="f9-field">
+                <label>Sigla <span class="req">*</span></label>
+                <input type="text" class="f9-input" id="np-sigla" placeholder="Ex: EN2" maxlength="6">
+              </div>
+              <div class="f9-field" style="justify-content:flex-end;">
+                <label class="f9-ativo-check" style="font-size:12.5px;">
+                  <input type="checkbox" id="np-copiar" checked>
+                  Copiar avaliações e faixa de idade deste curso
+                </label>
+              </div>
+            </div>
+            <div class="f9-subform-acoes">
+              <button type="button" class="btn-f9-modal btn-f9-secundario-modal" id="np-cancelar">Cancelar</button>
+              <button type="button" class="btn-f9-modal btn-f9-primario-modal" id="np-criar">
+                <div class="spinner-btn"></div>
+                <span class="material-icons-round btn-txt" style="font-size:16px;">add</span>
+                <span class="btn-txt">Criar e incluir como próximo</span>
+              </button>
+            </div>
+            <span class="f9-hint" style="display:block;margin-top:6px;">O curso novo fica cadastrado mesmo que você cancele esta janela. A ligação como próximo curso só é gravada ao clicar em "Salvar" abaixo. Depois, edite o curso novo para completar o que faltar (ex.: os próximos cursos dele).</span>
+          </div>
         </div>
       </div>
     </div>
@@ -709,7 +759,7 @@
 function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 (function(){
   'use strict';
-  var S={cursos:[],avaliacoes:[],idiomas:[],busca:'',buscaAv:'',papel:'',podeEditar:false,modoCurso:'novo',modoAv:'novo',cursoSel:null,avSel:null,formAvaliacoes:[],formProximos:[]};
+  var S={cursos:[],avaliacoes:[],idiomas:[],busca:'',buscaAv:'',papel:'',podeEditar:false,modoCurso:'novo',modoAv:'novo',cursoSel:null,avSel:null,formAvaliacoes:[],formProximos:[],cursosOk:false};
   function postApi(a,d){return window.postApi(a,d);}
   function el(id){return document.getElementById(id);}
   function val(id){return el(id)?el(id).value.trim():'';}
@@ -823,6 +873,24 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
     }
   }
 
+  // Próximo CursoID da sequência: usa o prefixo mais comum dos códigos já
+  // cadastrados (ex.: C01…C42 → C43), mantendo a quantidade de dígitos.
+  // Pula qualquer código que já exista (inclusive de cursos inativos).
+  function proximoCursoId(reservado){
+    var cont={}, prefixo=null, usados={};
+    if(reservado)usados[String(reservado).toUpperCase()]=true;   // código já mostrado na janela de curso novo
+    S.cursos.forEach(function(c){
+      var cod=String(c.CursoID||'').toUpperCase(); if(cod)usados[cod]=true;
+      var m=/^([A-Z]+)(\d+)$/.exec(cod); if(!m)return;
+      var e=cont[m[1]]||(cont[m[1]]={n:0,max:0,larg:0});
+      e.n++; e.max=Math.max(e.max,parseInt(m[2],10)); e.larg=Math.max(e.larg,m[2].length);
+    });
+    Object.keys(cont).forEach(function(k){ if(!prefixo||cont[k].n>cont[prefixo].n)prefixo=k; });
+    var e=prefixo?cont[prefixo]:{max:0,larg:2}, p=prefixo||'C', n=e.max+1, cand;
+    do{ var num=String(n); while(num.length<e.larg)num='0'+num; cand=p+num; n++; }while(usados[cand]);
+    return cand;
+  }
+
   function esc(s){return String(s===null||s===undefined?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 
   // "192 meses = 16 anos" ao lado dos campos de idade
@@ -840,6 +908,7 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
     if(el('cursos-tabela'))el('cursos-tabela').style.display='none';
     postApi('cursos.listar',{}).then(function(res){
       S.cursos=(res.sucesso&&res.dados)?res.dados.map(normC):[];
+      S.cursosOk=!!res.sucesso;
       renderizarCursos();
     }).catch(function(){if(el('cursos-estado'))el('cursos-estado').innerHTML='<span class="material-icons-round">error_outline</span><p>Erro ao carregar cursos.</p>';});
   }
@@ -921,11 +990,14 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
   }
 
   function abrirModalCurso(modo,c){
+    if(modo==='novo'&&!S.cursosOk){ if(typeof toast==='function')toast('Aguarde carregar a lista de cursos para gerar o CursoID.','error'); return; }
     S.modoCurso=modo;S.cursoSel=c||null;
     if(el('modal-curso-titulo'))el('modal-curso-titulo').textContent=modo==='novo'?'Novo curso':'Editar curso';
     if(el('fc-nome'))  el('fc-nome').value  =c?(c.Nome||''):'';
     if(el('fc-sigla')) el('fc-sigla').value =c?(c.Sigla||''):'';
-    if(el('fc-id')){   el('fc-id').value    =c?(c.CursoID||''):''; el('fc-id').readOnly = (modo==='editar'); }
+    if(el('fc-id')){   el('fc-id').value    =c?(c.CursoID||''):proximoCursoId(); el('fc-id').readOnly = true; }
+    if(el('fc-id-dica'))el('fc-id-dica').textContent=modo==='novo'?'Gerado automaticamente, pela sequência dos cursos cadastrados.':'O CursoID não muda depois de criado.';
+    fecharSubformProximo();
     if(el('fc-idade-min')) el('fc-idade-min').value=c?c.IdadeMin:'';
     if(el('fc-idade-max')) el('fc-idade-max').value=c?c.IdadeMax:'';
     if(el('fc-ativo')) el('fc-ativo').checked=c?c.Ativo:true;
@@ -1023,6 +1095,62 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
     });
   }
 
+  // ── Novo curso a partir de "Próximo(s) curso(s)" ──────────────────────
+  function fecharSubformProximo(){
+    if(el('fc-prox-novo'))el('fc-prox-novo').style.display='none';
+    if(el('fc-prox-novo-btn'))el('fc-prox-novo-btn').style.display='';
+  }
+  function abrirSubformProximo(){
+    if(!S.cursosOk){ if(typeof toast==='function')toast('Aguarde carregar a lista de cursos.','error'); return; }
+    if(el('np-id'))el('np-id').value=proximoCursoId(S.modoCurso==='novo'?val('fc-id'):null);
+    if(el('np-nome'))el('np-nome').value='';
+    if(el('np-sigla'))el('np-sigla').value='';
+    if(el('np-copiar'))el('np-copiar').checked=true;
+    if(el('np-alerta'))el('np-alerta').className='f9-modal-alerta';
+    popularSelectIdioma('np-idioma',el('fc-idioma')?el('fc-idioma').value:'');
+    el('fc-prox-novo').style.display='block';
+    el('fc-prox-novo-btn').style.display='none';
+    setTimeout(function(){ if(el('np-nome'))el('np-nome').focus(); },30);
+  }
+  function alertaNovoProximo(msg){
+    if(el('np-alerta')){el('np-alerta').className='f9-modal-alerta show erro';el('np-alerta-msg').textContent=msg;}
+  }
+  function criarProximo(){
+    var nome=val('np-nome'), sigla=val('np-sigla').toUpperCase(), idi=el('np-idioma')?el('np-idioma').value:'';
+    var ext=val('np-id').toUpperCase();
+    if(!nome||!sigla||!idi){ alertaNovoProximo('Nome, sigla e idioma são obrigatórios.'); return; }
+    var reservado=S.modoCurso==='novo'?val('fc-id').toUpperCase():null;
+    if(ext===reservado||S.cursos.some(function(c){return (c.CursoID||'').toUpperCase()===ext;})){ ext=proximoCursoId(reservado); el('np-id').value=ext; }
+    var copiar=el('np-copiar')&&el('np-copiar').checked;
+    var idade=function(id){var v=val(id);var n=v===''?null:parseInt(v,10);return (n===null||isNaN(n)||n<0)?null:n;};
+    var dados={nome:nome,sigla:sigla,idioma_id:idi,external_id:ext,ativo:true,
+      idade_minima_meses:copiar?idade('fc-idade-min'):null,idade_maxima_meses:copiar?idade('fc-idade-max'):null};
+    var avs=copiar?S.formAvaliacoes.slice():[];
+    var btn=el('np-criar'); if(btn){btn.disabled=true;btn.classList.add('loading');}
+    var destravar=function(){ if(btn){btn.disabled=false;btn.classList.remove('loading');} };
+    postApi('cursos.criar',dados).then(function(res){
+      if(!res.sucesso){ destravar(); alertaNovoProximo(res.mensagem||'Erro ao criar o curso.'); return; }
+      var novoId=res.dados&&res.dados.id;
+      if(!novoId){ destravar(); alertaNovoProximo('O curso foi criado, mas não veio o identificador. Feche, recarregue e escolha-o na lista.'); return; }
+      var vinc=avs.length?postApi('cursos.salvarVinculos',{curso_id:novoId,avaliacoes:avs,proximos:[]}):Promise.resolve({sucesso:true});
+      return vinc.then(function(res2){
+        destravar();
+        var idiomaNome=(listaIdiomas().filter(function(i){return i.id===idi;})[0]||{}).nome||'';
+        S.cursos.push({id:novoId,CursoID:ext,Nome:nome,Sigla:sigla,Idioma:idiomaNome,idioma_id:idi,
+          IdadeMin:dados.idade_minima_meses==null?'':dados.idade_minima_meses,IdadeMax:dados.idade_maxima_meses==null?'':dados.idade_maxima_meses,
+          AvaliacaoIDs:(res2&&res2.sucesso)?avs:[],ProximoIDs:[],Ativo:true});
+        S.formProximos.push(novoId);
+        fecharSubformProximo();
+        renderizarListaOrd('prox');
+        renderizarCursos();
+        if(typeof toast==='function'){
+          toast('Curso '+ext+' · '+nome+' criado e incluído como próximo. Clique em "Salvar" para gravar a ligação.','success',7000);
+          if(res2&&!res2.sucesso)toast('As avaliações não foram copiadas para o curso novo: '+(res2.mensagem||'erro')+'. Edite-o depois.','error',8000);
+        }
+      });
+    }).catch(function(){ destravar(); alertaNovoProximo('Erro de comunicação.'); });
+  }
+
   // ── Grupos de avisos (etapa 32): carrega f16-grupos-avisos.html uma vez ──
   var _gruposCarregados=false;
   function carregarGruposAvisos(){
@@ -1070,6 +1198,11 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
       if(this.value){ S.formProximos.push(this.value); renderizarListaOrd('prox'); }
     });
     el('btn-salvar-av')&&el('btn-salvar-av').addEventListener('click',salvarAv);
+    // Novo curso como próximo
+    el('fc-prox-novo-btn')&&el('fc-prox-novo-btn').addEventListener('click',abrirSubformProximo);
+    el('np-cancelar')&&el('np-cancelar').addEventListener('click',fecharSubformProximo);
+    el('np-criar')&&el('np-criar').addEventListener('click',criarProximo);
+    el('np-sigla')&&el('np-sigla').addEventListener('keydown',function(e){if(e.key==='Enter')criarProximo();});
     // Cancelar / fechar — usando IDs reais do HTML
     el('btn-cancelar-modal-curso')&&el('btn-cancelar-modal-curso').addEventListener('click',function(){if(el('modal-curso-overlay'))el('modal-curso-overlay').style.display='none';});
     el('btn-fechar-modal-curso')&&el('btn-fechar-modal-curso').addEventListener('click',function(){if(el('modal-curso-overlay'))el('modal-curso-overlay').style.display='none';});
