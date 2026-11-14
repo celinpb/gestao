@@ -285,6 +285,12 @@
           <span class="material-icons-round">lock_open</span>Reabrir
         </button>
       </div>
+      <!-- Materiais didáticos do curso da turma (etapa 31): admin, coordenação e professor -->
+      <div class="t5-painel-acoes" id="t5-painel-materiais" style="display:none;">
+        <button class="btn-painel-t5 btn-painel-editar" id="btn-materiais-turma">
+          <span class="material-icons-round">library_books</span>Materiais do curso
+        </button>
+      </div>
     </div>
     <div class="t5-painel-abas">
       <button class="t5-tab ativa" data-tab="info">
@@ -899,6 +905,7 @@ function abrirLinkSeguro(u){if(!String(u||'').trim())return;var n=normalizarLink
       if(el('btn-encerrar-turma'))el('btn-encerrar-turma').style.display=(S.podeEditar&&t.SituacaoTurma==='ATIVA')?'':'none';
       if(el('btn-reabrir-turma'))el('btn-reabrir-turma').style.display=(S.podeEditar&&t.SituacaoTurma!=='ATIVA')?'':'none';
     }
+    if(el('t5-painel-materiais'))el('t5-painel-materiais').style.display=(['admin','coordenacao','professor'].indexOf(S.papel)!==-1&&typeof navegarPara==='function')?'flex':'none';
     // Abas do painel — ativar aba info
     ativarTabPainel('info');
     preencherInfoTurma(t);
@@ -1335,6 +1342,12 @@ function abrirLinkSeguro(u){if(!String(u||'').trim())return;var n=normalizarLink
     el('btn-encerrar-turma')&&el('btn-encerrar-turma').addEventListener('click',encerrarTurma);
     el('btn-reabrir-turma')&&el('btn-reabrir-turma').addEventListener('click',reabrirTurma);
     el('btn-salvar-links')&&el('btn-salvar-links').addEventListener('click',salvarLinks);
+    // Materiais didáticos: abre a tela já no curso desta turma (etapa 31)
+    el('btn-materiais-turma')&&el('btn-materiais-turma').addEventListener('click',function(){
+      if(!S.turmaSel)return;
+      window.SGE_MATERIAIS_CURSO=S.turmaSel.curso_id;
+      navegarPara('materiais','Materiais didáticos');
+    });
     // Links: abrir em nova aba
     el('btn-abrir-whatsapp')&&el('btn-abrir-whatsapp').addEventListener('click',function(){var u=abrirLinkSeguro(val('link-whatsapp'));});
     el('btn-abrir-meet')&&el('btn-abrir-meet').addEventListener('click',function(){var u=abrirLinkSeguro(val('link-meet'));});
