@@ -379,6 +379,16 @@
           <span class="material-icons-round">info</span>
           <span id="t5-links-alerta-msg"></span>
         </div>
+        <!-- Grupo de avisos da escola (etapa 32): definido pela coordenação em Cursos; só leitura aqui -->
+        <div class="link-campo" id="t5-gav" style="display:none;background:rgba(18,140,75,0.06);border:1px solid rgba(18,140,75,0.22);border-radius:8px;padding:10px 12px;margin-bottom:16px;">
+          <div class="link-label" style="color:#128C4B;">Grupo de avisos da escola</div>
+          <div style="font-size:13px;font-weight:600;color:var(--c-text-1,#1A1A2E);margin-bottom:6px;" id="t5-gav-nome"></div>
+          <div class="link-input-wrap">
+            <input type="text" class="link-input" id="t5-gav-link" readonly>
+            <button class="btn-link" id="btn-abrir-gav" title="Abrir link"><span class="material-icons-round">open_in_new</span></button>
+          </div>
+          <div style="font-size:11.5px;color:var(--c-text-3,#9898B0);margin-top:6px;">Definido pela coordenação em Cursos → Grupos de avisos. Aparece também no Portal do Aluno.</div>
+        </div>
         <div class="link-campo">
           <div class="link-label">WhatsApp</div>
           <div class="link-input-wrap">
@@ -910,6 +920,7 @@ function abrirLinkSeguro(u){if(!String(u||'').trim())return;var n=normalizarLink
     ativarTabPainel('info');
     preencherInfoTurma(t);
     preencherLinks(t);
+    carregarGrupoAvisos(t);
     carregarMatriculas();
   }
 
@@ -941,6 +952,22 @@ function abrirLinkSeguro(u){if(!String(u||'').trim())return;var n=normalizarLink
     if(el('link-whatsapp'))el('link-whatsapp').value=t.GrupoWhatsapp||'';
     if(el('link-meet'))el('link-meet').value=t.LinkMeet||'';
     if(el('link-classroom'))el('link-classroom').value=t.LinkClassroom||'';
+  }
+
+  // ── GRUPO DE AVISOS DA ESCOLA (etapa 32) ───────────────────────────────
+  // Só leitura. Se a função ainda não existir no banco, o bloco fica escondido.
+  function carregarGrupoAvisos(t){
+    var box=el('t5-gav'); if(!box)return;
+    box.style.display='none';
+    var sb=window._supabase; if(!sb||!t||!t.id)return;
+    sb.rpc('grupo_aviso_da_turma',{p_turma_id:t.id}).then(function(r){
+      if(!S.turmaSel||S.turmaSel.id!==t.id)return;   // trocou de turma enquanto carregava
+      var g=r&&!r.error?r.data:null;
+      if(!g||!g.link)return;
+      if(el('t5-gav-nome'))el('t5-gav-nome').textContent=g.nome||'';
+      if(el('t5-gav-link'))el('t5-gav-link').value=g.link;
+      box.style.display='block';
+    }).catch(function(){});
   }
 
   // ── MATRÍCULAS ─────────────────────────────────────────────────────────
@@ -1351,6 +1378,7 @@ function abrirLinkSeguro(u){if(!String(u||'').trim())return;var n=normalizarLink
     // Links: abrir em nova aba
     el('btn-abrir-whatsapp')&&el('btn-abrir-whatsapp').addEventListener('click',function(){var u=abrirLinkSeguro(val('link-whatsapp'));});
     el('btn-abrir-meet')&&el('btn-abrir-meet').addEventListener('click',function(){var u=abrirLinkSeguro(val('link-meet'));});
+    el('btn-abrir-gav')&&el('btn-abrir-gav').addEventListener('click',function(){abrirLinkSeguro(val('t5-gav-link'));});
     el('btn-abrir-classroom')&&el('btn-abrir-classroom').addEventListener('click',function(){var u=abrirLinkSeguro(val('link-classroom'));});
     // Matrícula dentro do painel
     el('add-mat-aluno-id')&&el('add-mat-aluno-id').addEventListener('input',function(){
