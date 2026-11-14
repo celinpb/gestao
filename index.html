@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <!-- Política de segurança (CSP): de onde a página pode carregar scripts e para onde pode mandar dados.
-       O endereço 127.0.0.1:54321 é o Supabase da cópia local; na produção ele não é usado. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://kolomiisespdgaoukvbj.supabase.co wss://kolomiisespdgaoukvbj.supabase.co http://127.0.0.1:54321 ws://127.0.0.1:54321; object-src 'none'; base-uri 'self'; form-action 'self'">
+       O endereço 127.0.0.1:54321 é o Supabase da cópia local; na produção ele não é usado.
+       frame-src: o player de Materiais didáticos (etapa 31) só abre Google Drive/Docs e YouTube. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://kolomiisespdgaoukvbj.supabase.co wss://kolomiisespdgaoukvbj.supabase.co http://127.0.0.1:54321 ws://127.0.0.1:54321; frame-src https://drive.google.com https://docs.google.com https://www.youtube-nocookie.com; object-src 'none'; base-uri 'self'; form-action 'self'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SGE · CELINPB</title>
@@ -177,6 +178,7 @@ var MODULOS = {
   matricula_novatos: 'modulos/f13-matricula.html',
   config:     'modulos/f-config.html',
   meu_cadastro: 'modulos/f14-cadastro.html',
+  materiais:  'modulos/f15-materiais.html',
 };
 
 // =========================================================
@@ -609,7 +611,9 @@ function renderizarMenuFallback() {
       { id: 'matriculas', label: 'Matrículas',     icone: 'assignment'   },
       { id: 'diario',     label: 'Diário de aula', icone: 'menu_book'    },
       { id: 'notas',      label: 'Notas',          icone: 'grade'        },
-      { id: 'relatorios', label: 'Relatórios',     icone: 'summarize'    }
+      { id: 'relatorios', label: 'Relatórios',     icone: 'summarize'    },
+      // Materiais didáticos (etapa 31): admin, coordenação e professor; secretaria não.
+      { id: 'materiais',  label: 'Materiais didáticos', icone: 'library_books' }
     );
     // ATENÇÃO: 'auditoria' e 'config' são EXCLUSIVOS de admin ('config' ver
     // m3_menuPorPapel em M3_Permissoes.gs; 'auditoria' é decisão da etapa 9 —
@@ -632,7 +636,8 @@ function renderizarMenuFallback() {
       { id: 'turmas',     label: 'Turmas',         icone: 'groups'    },
       { id: 'diario',     label: 'Diário de aula', icone: 'menu_book' },
       { id: 'notas',      label: 'Notas',          icone: 'grade'     },
-      { id: 'relatorios', label: 'Relatórios',     icone: 'summarize' }
+      { id: 'relatorios', label: 'Relatórios',     icone: 'summarize' },
+      { id: 'materiais',  label: 'Materiais didáticos', icone: 'library_books' }
     );
     // Nivelamento (Fase 6): o professor avaliador registra a prova oral só
     // durante as datas das provas (D-76).
