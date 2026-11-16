@@ -1193,10 +1193,16 @@ async function _matriculasListar(sb, dados) {
   });
   if (res.error) return _err(res.error.message);
   var linhas = res.data || [];
-  // Nome de quem cancelou (aparece ao passar o mouse na situação CANCELADA).
-  var mapaNomes = await _nomesPublicos(sb, linhas.map(function(m) { return m.cancelado_por_id; }));
+  // Nome de quem cancelou, transferiu ou trancou (aparece ao passar o mouse
+  // na situação — CANCELADA; TRANSFERIDA e TRANCADA desde a etapa 33).
+  var idsPessoas = [];
+  linhas.forEach(function(m) { idsPessoas.push(m.cancelado_por_id, m.transferido_por_id, m.trancado_por_id); });
+  var mapaNomes = await _nomesPublicos(sb, idsPessoas);
+  function _quem(id) { return id ? { nome: (mapaNomes[id] || {}).nome || '' } : null; }
   linhas.forEach(function(m) {
-    m.cancelado_por = m.cancelado_por_id ? { nome: (mapaNomes[m.cancelado_por_id] || {}).nome || '' } : null;
+    m.cancelado_por   = _quem(m.cancelado_por_id);
+    m.transferido_por = _quem(m.transferido_por_id);
+    m.trancado_por    = _quem(m.trancado_por_id);
   });
   // Código da turma de onde o aluno veio, para as telas sinalizarem a
   // transferência (etapa 30). Só consulta quando há transferidos na lista.
@@ -1296,6 +1302,10 @@ async function _matriculasAtualizarSituacao(sb, dados) {
   var campos = { situacao: dados.situacao };
   if (dados.motivo_cancelamento) campos.motivo_cancelamento = dados.motivo_cancelamento;
   if (dados.situacao === 'CANCELADA') campos.data_cancelamento = new Date().toISOString();
+  // Trancamento (etapa 33): o motivo vem da tela; quem trancou e quando são
+  // gravados pelo banco. Sempre enviado (vazio = null) para não sobrar o
+  // motivo de um trancamento anterior da mesma matrícula.
+  if (dados.situacao === 'TRANCADA') campos.motivo_trancamento = String(dados.motivo_trancamento || '').trim() || null;
 
   // Buscar a matrícula ANTES de atualizar — a cascata de inativação do aluno
   // (abaixo) só se aplica quando ela estava ATIVA antes deste cancelamento
