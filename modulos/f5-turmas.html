@@ -565,7 +565,7 @@
       </div>
       <div id="t5-motivo-wrap" style="display:none;margin-top:14px;">
         <label style="display:block;font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--c-text-3,#9898B0);margin-bottom:6px;">
-          Motivo do cancelamento <span style="color:#E63946;">*</span>
+          <span id="t5-motivo-rotulo">Motivo do cancelamento</span> <span style="color:#E63946;">*</span>
         </label>
         <textarea id="t5-motivo-texto" rows="3" placeholder="Descreva o motivo do cancelamento…"
           style="width:100%;border:1.5px solid var(--c-border,#E8E7E2);border-radius:7px;padding:8px 10px;font-family:var(--font-sans,sans-serif);font-size:13px;color:var(--c-text-1,#1A1A2E);background:#FAFAF8;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
@@ -1290,19 +1290,35 @@ function abrirLinkSeguro(u){if(!String(u||'').trim())return;var n=normalizarLink
   }
 
   // ── ALTERAR SITUAÇÃO MATRÍCULA ──────────────────────────────────────────
+  // Cancelar e trancar pedem motivo (etapa 33: trancamento também). O mesmo
+  // quadro serve aos dois; o texto e a cor mudam conforme a escolha.
+  var TEXTOS_MOTIVO={
+    CANCELADA:{rotulo:'Motivo do cancelamento',dica:'Descreva o motivo do cancelamento…',erro:'Informe o motivo do cancelamento.',botao:'Confirmar cancelamento'},
+    TRANCADA: {rotulo:'Motivo do trancamento', dica:'Descreva o motivo do trancamento…', erro:'Informe o motivo do trancamento.', botao:'Confirmar trancamento'},
+  };
   function confirmarSituacao(novaSit){
     if(!S.matriculaParaSit)return;
-    if(novaSit==='CANCELADA'){
-      // Mostrar campo de motivo
+    var tx=TEXTOS_MOTIVO[novaSit];
+    if(tx){
+      S.sitComMotivo=novaSit;
+      if(el('t5-motivo-rotulo'))el('t5-motivo-rotulo').textContent=tx.rotulo;
+      if(el('t5-motivo-texto')){el('t5-motivo-texto').placeholder=tx.dica;el('t5-motivo-texto').value='';}
+      if(el('t5-motivo-erro')){el('t5-motivo-erro').textContent=tx.erro;el('t5-motivo-erro').style.display='none';}
+      var b=el('btn-t5-confirmar-cancelamento');
+      if(b){b.textContent=tx.botao;b.className='sit-opcao '+novaSit;}
       if(el('t5-sit-opcoes'))el('t5-sit-opcoes').style.display='none';
       if(el('t5-motivo-wrap'))el('t5-motivo-wrap').style.display='block';
+      if(el('t5-motivo-texto'))el('t5-motivo-texto').focus();
       return;
     }
     executarSituacao(novaSit,'');
   }
 
   function executarSituacao(sit,motivo){
-    postApi('matriculas.atualizarSituacao',{id:S.matriculaParaSit.id,situacao:sit,motivo_cancelamento:motivo}).then(function(res){
+    var dados={id:S.matriculaParaSit.id,situacao:sit};
+    if(sit==='CANCELADA')dados.motivo_cancelamento=motivo;
+    if(sit==='TRANCADA') dados.motivo_trancamento=motivo;
+    postApi('matriculas.atualizarSituacao',dados).then(function(res){
       if(!res.sucesso){if(typeof toast==='function')toast(res.mensagem||'Erro.','error');return;}
       if(typeof toast==='function')toast('Situação atualizada.','success');
       if(el('modal-sit-overlay'))el('modal-sit-overlay').style.display='none';
@@ -1425,7 +1441,7 @@ function abrirLinkSeguro(u){if(!String(u||'').trim())return;var n=normalizarLink
       var motivo=el('t5-motivo-texto')?el('t5-motivo-texto').value.trim():'';
       if(!motivo){if(el('t5-motivo-erro'))el('t5-motivo-erro').style.display='block';return;}
       if(el('t5-motivo-erro'))el('t5-motivo-erro').style.display='none';
-      executarSituacao('CANCELADA',motivo);
+      executarSituacao(S.sitComMotivo||'CANCELADA',motivo);
     });
     el('btn-cancelar-sit')&&el('btn-cancelar-sit').addEventListener('click',function(){if(el('modal-sit-overlay'))el('modal-sit-overlay').style.display='none';});
     el('modal-sit-overlay')&&el('modal-sit-overlay').addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
