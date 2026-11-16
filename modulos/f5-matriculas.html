@@ -38,6 +38,8 @@
   .badge-m5.CANCELADA{background:rgba(230,57,70,0.10);color:#A32D2D;}
   .badge-m5.TRANCADA{background:rgba(233,196,106,0.20);color:#5C4200;}
   .badge-m5.CONCLUIDA{background:rgba(69,123,157,0.12);color:#185FA5;}
+  .badge-m5.TRANSFERIDA{background:rgba(100,100,120,0.12);color:#3A3A5C;}
+  .badge-m5.com-detalhe{cursor:help;border-bottom:1px dotted currentColor;}
   .m5-acoes{display:flex;gap:6px;justify-content:flex-end;}
   .btn-m5-acao{height:28px;padding:0 10px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--c-border,#E8E7E2);background:#fff;color:var(--c-text-2,#5C5C7A);font-family:var(--font-sans,sans-serif);display:inline-flex;align-items:center;gap:4px;transition:background 120ms ease;}
   .btn-m5-acao:hover{background:#F5F4F0;}
@@ -186,6 +188,7 @@
       <option value="TRANCADA">Trancadas</option>
       <option value="CONCLUIDA">Concluídas</option>
       <option value="CANCELADA">Canceladas</option>
+      <option value="TRANSFERIDA">Transferidas</option>
     </select>
     <select class="m5-select" id="m5-filtro-turma">
       <option value="">Todas as turmas</option>
@@ -232,10 +235,10 @@
         <button class="m5-sit-opcao CONCLUIDA" data-sit="CONCLUIDA">🎓 Concluída</button>
         <button class="m5-sit-opcao CANCELADA" data-sit="CANCELADA">✕ Cancelada</button>
       </div>
-      <!-- Campo de motivo — exibido apenas ao selecionar "Cancelada" -->
+      <!-- Campo de motivo — exibido ao selecionar "Cancelada" ou "Trancada" (o texto muda conforme a escolha) -->
       <div id="m5-motivo-wrap" style="display:none;margin-top:14px;">
         <label style="display:block;font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--c-text-3,#9898B0);margin-bottom:6px;">
-          Motivo do cancelamento <span style="color:#E63946;">*</span>
+          <span id="m5-motivo-rotulo">Motivo do cancelamento</span> <span style="color:#E63946;">*</span>
         </label>
         <textarea id="m5-motivo-texto" rows="3" placeholder="Descreva o motivo do cancelamento…"
           style="width:100%;border:1.5px solid var(--c-border,#E8E7E2);border-radius:7px;padding:8px 10px;font-family:var(--font-sans,sans-serif);font-size:13px;color:var(--c-text-1,#1A1A2E);background:#FAFAF8;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
@@ -362,6 +365,13 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
       MotivoCancelamento:m.motivo_cancelamento||'',
       DataCancelamento:m.data_cancelamento||'',
       CanceladoPor:(m.cancelado_por&&m.cancelado_por.nome)||'',
+      // Transferência e trancamento (etapa 33): preenchidos no banco ao mudar a situação.
+      DataTransferencia:m.data_transferencia||'',
+      TransferidoPor:(m.transferido_por&&m.transferido_por.nome)||'',
+      turma_destino_id:m.turma_destino_id||'',
+      MotivoTrancamento:m.motivo_trancamento||'',
+      DataTrancamento:m.data_trancamento||'',
+      TrancadoPor:(m.trancado_por&&m.trancado_por.nome)||'',
       aluno_id:m.aluno_id,turma_id:m.turma_id,semestre_id:m.semestre_id,
     };
   }
@@ -460,16 +470,39 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
   }
   function escAttr(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-  // Badge de situação (como no legado): em matrículas canceladas, passar o
-  // mouse mostra a data, o motivo e quem cancelou.
+  // Turma de destino de uma transferência: código e estágio, quando a turma
+  // está na lista carregada (turmas.listar).
+  function rotuloTurma(turmaId){
+    if(!turmaId)return '';
+    var t=state.turmas.find(function(x){return x.id===turmaId;});
+    if(!t)return '';
+    return t.TurmaID+((t.Estagio||t.CursoSigla)?' ('+(t.Estagio||t.CursoSigla)+')':'');
+  }
+
+  // Badge de situação (como no legado): passar o mouse mostra os detalhes —
+  //   Cancelada:   data, motivo e quem cancelou;
+  //   Transferida: data, turma de destino e quem transferiu (etapa 33);
+  //   Trancada:    data, motivo e quem trancou (etapa 33).
   function badgeSituacao(m){
     var sit=m.SituacaoMatricula||'ATIVA';
+    var titulo='';
     if(sit==='CANCELADA'&&(m.MotivoCancelamento||m.DataCancelamento||m.CanceladoPor)){
-      var titulo='Cancelada em '+(formatarDataHora(m.DataCancelamento)||'—')+
+      titulo='Cancelada em '+(formatarDataHora(m.DataCancelamento)||'—')+
         (m.MotivoCancelamento?'\nMotivo: '+m.MotivoCancelamento:'')+
         (m.CanceladoPor?'\nPor: '+m.CanceladoPor:'');
-      return '<span class="badge-m5 '+escTxt(sit)+'" title="'+escAttr(titulo)+'" style="cursor:help;border-bottom:1px dotted currentColor;">'+escTxt(sit)+'</span>';
+    }else if(sit==='TRANSFERIDA'){
+      var destino=rotuloTurma(m.turma_destino_id);
+      if(m.DataTransferencia||destino||m.TransferidoPor){
+        titulo='Transferida em '+(formatarDataHora(m.DataTransferencia)||'—')+
+          (destino?'\nPara a turma: '+destino:'')+
+          (m.TransferidoPor?'\nPor: '+m.TransferidoPor:'');
+      }
+    }else if(sit==='TRANCADA'&&(m.MotivoTrancamento||m.DataTrancamento||m.TrancadoPor)){
+      titulo='Trancada em '+(formatarDataHora(m.DataTrancamento)||'—')+
+        (m.MotivoTrancamento?'\nMotivo: '+m.MotivoTrancamento:'')+
+        (m.TrancadoPor?'\nPor: '+m.TrancadoPor:'');
     }
+    if(titulo)return '<span class="badge-m5 com-detalhe '+escTxt(sit)+'" title="'+escAttr(titulo)+'">'+escTxt(sit)+'</span>';
     return '<span class="badge-m5 '+escTxt(sit)+'">'+escTxt(sit)+'</span>';
   }
 
@@ -550,18 +583,35 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
     });
   }
 
+  // Cancelar e trancar pedem motivo (etapa 33: trancamento também). O mesmo
+  // quadro serve aos dois; o texto e a cor mudam conforme a escolha.
+  var TEXTOS_MOTIVO={
+    CANCELADA:{rotulo:'Motivo do cancelamento',dica:'Descreva o motivo do cancelamento…',erro:'Informe o motivo do cancelamento.',botao:'Confirmar cancelamento'},
+    TRANCADA: {rotulo:'Motivo do trancamento', dica:'Descreva o motivo do trancamento…', erro:'Informe o motivo do trancamento.', botao:'Confirmar trancamento'},
+  };
   function confirmarSituacao(novaSit){
     if(!state.matriculaParaSit)return;
-    if(novaSit==='CANCELADA'){
+    var tx=TEXTOS_MOTIVO[novaSit];
+    if(tx){
+      state.sitComMotivo=novaSit;
+      if(el('m5-motivo-rotulo'))el('m5-motivo-rotulo').textContent=tx.rotulo;
+      if(el('m5-motivo-texto')){el('m5-motivo-texto').placeholder=tx.dica;el('m5-motivo-texto').value='';}
+      if(el('m5-motivo-erro')){el('m5-motivo-erro').textContent=tx.erro;el('m5-motivo-erro').style.display='none';}
+      var b=el('btn-m5-confirmar-cancelamento');
+      if(b){b.textContent=tx.botao;b.className='m5-sit-opcao '+novaSit;}
       if(el('m5-sit-opcoes'))el('m5-sit-opcoes').style.display='none';
       if(el('m5-motivo-wrap'))el('m5-motivo-wrap').style.display='block';
+      if(el('m5-motivo-texto'))el('m5-motivo-texto').focus();
       return;
     }
     executarSituacao(novaSit,'');
   }
 
   function executarSituacao(sit,motivo){
-    postApi('matriculas.atualizarSituacao',{id:state.matriculaParaSit.id,situacao:sit,motivo_cancelamento:motivo}).then(function(res){
+    var dados={id:state.matriculaParaSit.id,situacao:sit};
+    if(sit==='CANCELADA')dados.motivo_cancelamento=motivo;
+    if(sit==='TRANCADA') dados.motivo_trancamento=motivo;
+    postApi('matriculas.atualizarSituacao',dados).then(function(res){
       if(!res.sucesso){if(typeof toast==='function')toast(res.mensagem||'Erro.','error');return;}
       if(typeof toast==='function')toast('Situação atualizada.','success');
       if(el('m5-modal-sit'))el('m5-modal-sit').style.display='none'; // ID real: m5-modal-sit
@@ -800,12 +850,12 @@ function escTxt(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){re
       if(el('m5-motivo-wrap'))el('m5-motivo-wrap').style.display='none';
       if(el('m5-sit-opcoes'))el('m5-sit-opcoes').style.display='';
     });
-    // Confirmar cancelamento
+    // Confirmar cancelamento ou trancamento (o quadro de motivo é o mesmo)
     el('btn-m5-confirmar-cancelamento')&&el('btn-m5-confirmar-cancelamento').addEventListener('click',function(){
       var motivo=el('m5-motivo-texto')?el('m5-motivo-texto').value.trim():'';
       if(!motivo){if(el('m5-motivo-erro'))el('m5-motivo-erro').style.display='block';return;}
       if(el('m5-motivo-erro'))el('m5-motivo-erro').style.display='none';
-      executarSituacao('CANCELADA',motivo);
+      executarSituacao(state.sitComMotivo||'CANCELADA',motivo);
     });
     // Cancelar modal situação — ID real: btn-cancelar-m5-sit
     el('btn-cancelar-m5-sit')&&el('btn-cancelar-m5-sit').addEventListener('click',function(){if(el('m5-modal-sit'))el('m5-modal-sit').style.display='none';});
